@@ -7,10 +7,33 @@ import { useFilterStore } from "@/store/filterStore";
 import { useUiStore } from "@/store/uiStore";
 import { queryEngine } from "@/shared/services/queryEngine";
 
+export interface DashboardSnapshotState {
+  dashboards: Dashboard[];
+  activeDashboardId: string | null;
+  activeGlobalFilters: GlobalFilter[];
+}
+
+const MAX_HISTORY = 25;
+const DEBOUNCE_MS = 600;
+let lastHistoryTimestamp = 0;
+
 interface DashboardState {
   dashboards: Dashboard[];
   activeDashboardId: string | null;
   activeGlobalFilters: GlobalFilter[];
+  
+  // Undo/Redo History
+  past: DashboardSnapshotState[];
+  future: DashboardSnapshotState[];
+
+  // History Actions
+  undo: () => void;
+  redo: () => void;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
+  restoreSnapshotState: (snapshotState: DashboardSnapshotState) => void;
+
+  // Mutating Actions
   setDashboards: (dashboards: Dashboard[]) => void;
   setActiveDashboardId: (id: string | null) => void;
   createDashboard: (name: string, datasetId: string, chartIds?: string[]) => void;
@@ -27,14 +50,121 @@ interface DashboardState {
   toggleCrossFilter: (filterInput: Omit<GlobalFilter, "id">) => void;
 }
 
+function pushPast(
+  get: () => DashboardState,
+  set: (partial: Partial<DashboardState> | ((state: DashboardState) => Partial<DashboardState>)) => void,
+  isDebounced = false
+) {
+  const currentSnapshot: DashboardSnapshotState = {
+    dashboards: JSON.parse(JSON.stringify(get().dashboards)),
+    activeDashboardId: get().activeDashboardId,
+    activeGlobalFilters: JSON.parse(JSON.stringify(get().activeGlobalFilters)),
+  };
+
+  const now = Date.now();
+  const past = get().past;
+
+  // For rapid continuous mutations (e.g. layout dragging), do not add multiple intermediate steps
+  if (isDebounced && now - lastHistoryTimestamp < DEBOUNCE_MS && past.length > 0) {
+    set({ future: [] });
+    return;
+  }
+
+  lastHistoryTimestamp = now;
+
+  // Don't push if duplicate of top of past
+  if (past.length > 0) {
+    const lastPast = past[past.length - 1];
+    if (JSON.stringify(lastPast) === JSON.stringify(currentSnapshot)) {
+      return;
+    }
+  }
+
+  const newPast = [...past, currentSnapshot].slice(-MAX_HISTORY);
+  set({ past: newPast, future: [] });
+}
+
 export const useDashboardStore = create<DashboardState>((set, get) => ({
   dashboards: [],
   activeDashboardId: null,
   activeGlobalFilters: [],
+  past: [],
+  future: [],
+
+  canUndo: () => get().past.length > 0,
+  canRedo: () => get().future.length > 0,
+
+  undo: () => {
+    const { past, future, dashboards, activeDashboardId, activeGlobalFilters } = get();
+    if (past.length === 0) return;
+
+    const previousState = past[past.length - 1];
+    const newPast = past.slice(0, past.length - 1);
+    const currentState: DashboardSnapshotState = {
+      dashboards: JSON.parse(JSON.stringify(dashboards)),
+      activeDashboardId,
+      activeGlobalFilters: JSON.parse(JSON.stringify(activeGlobalFilters)),
+    };
+
+    set({
+      dashboards: JSON.parse(JSON.stringify(previousState.dashboards)),
+      activeDashboardId: previousState.activeDashboardId,
+      activeGlobalFilters: JSON.parse(JSON.stringify(previousState.activeGlobalFilters)),
+      past: newPast,
+      future: [currentState, ...future],
+    });
+
+    toast({
+      title: "Undo",
+      description: "Restored previous state.",
+    });
+  },
+
+  redo: () => {
+    const { past, future, dashboards, activeDashboardId, activeGlobalFilters } = get();
+    if (future.length === 0) return;
+
+    const nextState = future[0];
+    const newFuture = future.slice(1);
+    const currentState: DashboardSnapshotState = {
+      dashboards: JSON.parse(JSON.stringify(dashboards)),
+      activeDashboardId,
+      activeGlobalFilters: JSON.parse(JSON.stringify(activeGlobalFilters)),
+    };
+
+    set({
+      dashboards: JSON.parse(JSON.stringify(nextState.dashboards)),
+      activeDashboardId: nextState.activeDashboardId,
+      activeGlobalFilters: JSON.parse(JSON.stringify(nextState.activeGlobalFilters)),
+      past: [...past, currentState].slice(-MAX_HISTORY),
+      future: newFuture,
+    });
+
+    toast({
+      title: "Redo",
+      description: "Re-applied state.",
+    });
+  },
+
+  restoreSnapshotState: (snapshotState: DashboardSnapshotState) => {
+    pushPast(get, set);
+    set({
+      dashboards: JSON.parse(JSON.stringify(snapshotState.dashboards || [])),
+      activeDashboardId: snapshotState.activeDashboardId,
+      activeGlobalFilters: JSON.parse(JSON.stringify(snapshotState.activeGlobalFilters || [])),
+      future: [],
+    });
+  },
   
-  setDashboards: (dashboards) => set({ dashboards }),
+  setDashboards: (dashboards) => {
+    pushPast(get, set);
+    set({ dashboards });
+  },
   
-  setActiveDashboardId: (activeDashboardId) => set({ activeDashboardId }),
+  setActiveDashboardId: (activeDashboardId) => {
+    pushPast(get, set);
+    set({ activeDashboardId });
+  },
   
   createDashboard: (name, datasetId, chartIds = []) => {
     const trimmedName = name.trim();
@@ -56,6 +186,8 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       });
       return;
     }
+
+    pushPast(get, set);
 
     const id = typeof crypto !== 'undefined' && crypto.randomUUID 
       ? crypto.randomUUID() 
@@ -85,6 +217,9 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   },
 
   saveDashboard: (id, updates) => {
+    const isLayoutUpdate = Boolean(updates.layout);
+    pushPast(get, set, isLayoutUpdate);
+
     const { dashboards } = get();
     const updated = dashboards.map(d => 
       d.id === id 
@@ -118,6 +253,8 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       return;
     }
 
+    pushPast(get, set);
+
     const updated = dashboards.map(d => 
       d.id === id 
         ? { ...d, name: trimmed, updatedAt: Date.now() } 
@@ -136,6 +273,8 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     const { dashboards, activeDashboardId } = get();
     const dashboardToDelete = dashboards.find(d => d.id === id);
     if (!dashboardToDelete) return;
+
+    pushPast(get, set);
 
     const updated = dashboards.filter(d => d.id !== id);
     
@@ -161,6 +300,8 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       });
       return;
     }
+
+    pushPast(get, set);
 
     // Restore associated dataset context
     const dataset = useDatasetStore.getState().datasets.find(d => d.id === dashboard.datasetId);
@@ -218,6 +359,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   },
 
   addKpiCard: (dashboardId, kpi) => {
+    pushPast(get, set);
     const { dashboards } = get();
     const updated = dashboards.map(d => {
       if (d.id === dashboardId) {
@@ -240,6 +382,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   },
 
   updateKpiCard: (dashboardId, kpiId, updates) => {
+    pushPast(get, set);
     const { dashboards } = get();
     const updated = dashboards.map(d => {
       if (d.id === dashboardId) {
@@ -260,6 +403,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   },
 
   deleteKpiCard: (dashboardId, kpiId) => {
+    pushPast(get, set);
     const { dashboards } = get();
     const updated = dashboards.map(d => {
       if (d.id === dashboardId) {
@@ -283,34 +427,46 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     });
   },
 
-  addGlobalFilter: (filter) => set((state) => ({
-    activeGlobalFilters: [...state.activeGlobalFilters, filter]
-  })),
+  addGlobalFilter: (filter) => {
+    pushPast(get, set);
+    set((state) => ({
+      activeGlobalFilters: [...state.activeGlobalFilters, filter]
+    }));
+  },
 
-  removeGlobalFilter: (filterId) => set((state) => ({
-    activeGlobalFilters: state.activeGlobalFilters.filter(f => f.id !== filterId)
-  })),
+  removeGlobalFilter: (filterId) => {
+    pushPast(get, set);
+    set((state) => ({
+      activeGlobalFilters: state.activeGlobalFilters.filter(f => f.id !== filterId)
+    }));
+  },
 
-  clearGlobalFilters: () => set({ activeGlobalFilters: [] }),
+  clearGlobalFilters: () => {
+    pushPast(get, set);
+    set({ activeGlobalFilters: [] });
+  },
 
-  toggleCrossFilter: (filterInput) => set((state) => {
-    const existingIndex = state.activeGlobalFilters.findIndex(
-      (f) =>
-        f.column === filterInput.column &&
-        JSON.stringify(f.value) === JSON.stringify(filterInput.value) &&
-        f.sourceWidgetId === filterInput.sourceWidgetId
-    );
+  toggleCrossFilter: (filterInput) => {
+    pushPast(get, set);
+    set((state) => {
+      const existingIndex = state.activeGlobalFilters.findIndex(
+        (f) =>
+          f.column === filterInput.column &&
+          JSON.stringify(f.value) === JSON.stringify(filterInput.value) &&
+          f.sourceWidgetId === filterInput.sourceWidgetId
+      );
 
-    if (existingIndex > -1) {
-      const updated = state.activeGlobalFilters.filter((_, i) => i !== existingIndex);
-      return { activeGlobalFilters: updated };
-    } else {
-      const id = `gf-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-      const newFilter: GlobalFilter = {
-        ...filterInput,
-        id,
-      };
-      return { activeGlobalFilters: [...state.activeGlobalFilters, newFilter] };
-    }
-  })
+      if (existingIndex > -1) {
+        const updated = state.activeGlobalFilters.filter((_, i) => i !== existingIndex);
+        return { activeGlobalFilters: updated };
+      } else {
+        const id = `gf-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+        const newFilter: GlobalFilter = {
+          ...filterInput,
+          id,
+        };
+        return { activeGlobalFilters: [...state.activeGlobalFilters, newFilter] };
+      }
+    });
+  }
 }));

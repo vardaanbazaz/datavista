@@ -18,3 +18,12 @@ export const allFunctions: FunctionDefinition[] = [
 allFunctions.forEach((func) => {
   formulaRegistry.set(func.name.toUpperCase(), func);
 });
+
+export function registerCustomFormula(func: FunctionDefinition): void {
+  const upperName = func.name.toUpperCase();
+  formulaRegistry.set(upperName, func);
+  if (!allFunctions.some((f) => f.name.toUpperCase() === upperName)) {
+    allFunctions.push(func);
+  }
+}
+

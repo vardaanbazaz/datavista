@@ -22,6 +22,9 @@ import { BarChart3, Upload, Filter } from "lucide-react";
 import { useUiStore } from "@/store/uiStore";
 import { useDatasetStore } from "@/store/datasetStore";
 import { useFilterStore } from "@/store/filterStore";
+import { useDashboardStore } from "@/features/dashboards/store/dashboardStore";
+
+import { shortcutManager } from "@/features/workspace/services/shortcutManager";
 
 import { DataRow as SharedDataRow, Dataset as SharedDataset, ChartConfig as SharedChartConfig, FilterState as SharedFilterState } from "@/shared/types";
 import { persistenceService } from "@/shared/services/persistenceService";
@@ -46,17 +49,28 @@ export function Dashboard() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
 
-  // Handle global search shortcut (Cmd+K / Ctrl+K)
+  // Initialize global shortcuts (Cmd+K for Command Palette, Cmd+Z, Cmd+Shift+Z, Cmd+P, etc.)
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        setIsSearchOpen((prev) => !prev);
-      }
+    shortcutManager.init(() => setIsSearchOpen((prev) => !prev));
+
+    const handleOpenSnapshots = () => {
+      setActiveView("overview");
+      // Trigger snapshot manager open via custom event or state
     };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+
+    const handleExportPdf = () => {
+      setActiveView("export");
+    };
+
+    window.addEventListener("datavista:open-snapshots", handleOpenSnapshots);
+    window.addEventListener("datavista:export-pdf", handleExportPdf);
+
+    return () => {
+      shortcutManager.destroy();
+      window.removeEventListener("datavista:open-snapshots", handleOpenSnapshots);
+      window.removeEventListener("datavista:export-pdf", handleExportPdf);
+    };
+  }, [setActiveView]);
 
   // Initialize persistence on mount
   useEffect(() => {

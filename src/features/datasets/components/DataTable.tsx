@@ -6,16 +6,21 @@ import { Badge } from "@/shared/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/components/ui/dialog";
-import { Search, ArrowUpDown, Download, Palette } from "lucide-react";
+import { Search, ArrowUpDown, Download, Palette, RefreshCw } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Dataset, Query, DataRow, ConditionalFormatRule } from "@/shared/types";
+import Papa from "papaparse";
+import * as XLSX from "xlsx";
+import { Dataset, Query, DataRow, ConditionalFormatRule, DatasetMetadata } from "@/shared/types";
 import { queryEngine } from "@/shared/services/queryEngine";
 import { formattingEngine } from "@/shared/services/formattingEngine";
+import { processRawData } from "@/shared/services/parsingService";
 import { useDatasetStore } from "@/store/datasetStore";
 import { useFilterStore } from "@/store/filterStore";
+import { toast } from "@/shared/hooks/use-toast";
 import { CalculatedFieldsManager } from "./CalculatedFieldsManager";
 import { QueryPerformanceBadge } from "@/features/dashboard/components/QueryPerformanceBadge";
 import { ConditionalFormattingBuilder } from "@/features/dashboards/components/ConditionalFormattingBuilder";
+import { DatasetUpdateModal } from "./DatasetUpdateModal";
 
 interface DataTableProps {
   customDataset?: Dataset | null;
@@ -37,9 +42,97 @@ export function DataTable({
 
   const activeDatasetStore = useDatasetStore((state) => state.activeDataset);
   const storeFilteredData = useFilterStore((state) => state.filteredData);
+  const updateDatasetData = useDatasetStore((state) => state.updateDatasetData);
 
   const activeDataset = customDataset !== undefined ? customDataset : activeDatasetStore;
   const storeData = customData !== undefined ? customData : storeFilteredData;
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+  const [newParsedData, setNewParsedData] = useState<{
+    data: DataRow[];
+    columns: string[];
+    columnTypes: Record<string, "numeric" | "categorical" | "date">;
+    metadata?: DatasetMetadata;
+  } | null>(null);
+
+  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !activeDataset) return;
+
+    const fileName = file.name;
+    const ext = fileName.split(".").pop()?.toLowerCase();
+
+    try {
+      let rawData: Record<string, unknown>[] = [];
+
+      if (ext === "csv" || ext === "tsv") {
+        Papa.parse(file, {
+          header: true,
+          skipEmptyLines: "greedy",
+          delimiter: ext === "tsv" ? "\t" : undefined,
+          complete: (results) => {
+            try {
+              rawData = results.data as Record<string, unknown>[];
+              const processed = processRawData(rawData, fileName);
+              setNewParsedData({
+                data: processed.data,
+                columns: processed.columns,
+                columnTypes: processed.columnTypes,
+                metadata: processed.metadata,
+              });
+              setIsUpdateModalOpen(true);
+            } catch (err: unknown) {
+              toast({
+                title: "Processing Failed",
+                description: (err as Error)?.message || "Failed to process raw CSV data.",
+                variant: "destructive",
+              });
+            }
+          },
+        });
+      } else if (ext === "xlsx" || ext === "xls") {
+        const buffer = await file.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: "array" });
+        const firstSheet = workbook.SheetNames[0];
+        rawData = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheet]);
+        const processed = processRawData(rawData, fileName);
+        setNewParsedData({
+          data: processed.data,
+          columns: processed.columns,
+          columnTypes: processed.columnTypes,
+          metadata: processed.metadata,
+        });
+        setIsUpdateModalOpen(true);
+      } else {
+        toast({
+          title: "Unsupported Format",
+          description: "Please select a valid .csv, .tsv, or .xlsx file.",
+          variant: "destructive",
+        });
+      }
+    } catch (err: unknown) {
+      toast({
+        title: "File Parse Error",
+        description: (err as Error)?.message || "An error occurred while reading the file.",
+        variant: "destructive",
+      });
+    } finally {
+      if (e.target) e.target.value = "";
+    }
+  };
+
+  const handleConfirmVersionUpdate = () => {
+    if (!activeDataset || !newParsedData) return;
+    updateDatasetData(
+      activeDataset.id,
+      newParsedData.data,
+      newParsedData.metadata,
+      newParsedData.columnTypes,
+      newParsedData.columns
+    );
+    setNewParsedData(null);
+  };
 
   const dataset = useMemo(() => {
     if (!activeDataset) return null;
@@ -222,6 +315,31 @@ export function DataTable({
             </span>
             <div className="flex gap-2">
               {!hideCalculatedFields && <CalculatedFieldsManager />}
+              {activeDataset && (
+                <>
+                  <Button
+                    onClick={() => fileInputRef.current?.click()}
+                    variant="outline"
+                    className="gap-2 glass border-primary/20 text-foreground hover:bg-primary/5"
+                    title="Upload new file version to update data while preserving calculated fields & dashboard links"
+                  >
+                    <RefreshCw className="w-4 h-4 text-primary" />
+                    Update Version
+                    {activeDataset.version && activeDataset.version > 1 && (
+                      <Badge variant="secondary" className="ml-0.5 text-[10px] px-1.5 py-0">
+                        v{activeDataset.version}
+                      </Badge>
+                    )}
+                  </Button>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileSelected}
+                    accept=".csv,.tsv,.xlsx,.xls"
+                    className="hidden"
+                  />
+                </>
+              )}
               <Button
                 onClick={() => setIsFormattingOpen(true)}
                 variant={formattingRules.length > 0 ? "default" : "outline"}
@@ -503,6 +621,14 @@ export function DataTable({
           </Button>
         </div>
       )}
+
+      <DatasetUpdateModal
+        isOpen={isUpdateModalOpen}
+        onClose={() => setIsUpdateModalOpen(false)}
+        existingDataset={activeDataset}
+        newParsedData={newParsedData}
+        onConfirm={handleConfirmVersionUpdate}
+      />
     </div>
   );
 }

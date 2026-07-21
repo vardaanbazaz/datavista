@@ -1,5 +1,4 @@
-import { create } from "zustand";
-import { Dataset, CalculatedField, WindowQuery } from "@/shared/types";
+import { Dataset, CalculatedField, WindowQuery, DataRow, DatasetMetadata } from "@/shared/types";
 import { useUiStore } from "./uiStore";
 import { useFilterStore } from "./filterStore";
 import { useChartStore } from "./chartStore";
@@ -14,6 +13,13 @@ interface DatasetState {
   setDatasets: (datasets: Dataset[]) => void;
   setActiveDataset: (dataset: Dataset | null) => void;
   uploadDataset: (dataset: Dataset) => Promise<void>;
+  updateDatasetData: (
+    datasetId: string,
+    newRawData: DataRow[],
+    newMetadata?: DatasetMetadata,
+    newColumnTypes?: Record<string, "numeric" | "categorical" | "date">,
+    newColumns?: string[]
+  ) => void;
   selectDataset: (dataset: Dataset) => void;
   renameDataset: (id: string, newName: string) => void;
   deleteDataset: (id: string) => void;
@@ -40,7 +46,13 @@ export const useDatasetStore = create<DatasetState>((set, get) => ({
     // Simulate processing time for better UX
     await new Promise(resolve => setTimeout(resolve, 1000));
     
-    const evaluated = windowEngine.augmentMetadata(formulaEngine.evaluateCalculatedFields(dataset));
+    const initialDataset: Dataset = {
+      ...dataset,
+      version: dataset.version || 1,
+      lastUpdated: dataset.lastUpdated || Date.now(),
+    };
+
+    const evaluated = windowEngine.augmentMetadata(formulaEngine.evaluateCalculatedFields(initialDataset));
     
     set((state) => ({
       datasets: [...state.datasets, evaluated],
@@ -56,6 +68,52 @@ export const useDatasetStore = create<DatasetState>((set, get) => ({
     toast({
       title: "Dataset uploaded successfully",
       description: `${dataset.name} with ${dataset.data.length} rows`,
+    });
+  },
+
+  updateDatasetData: (datasetId, newRawData, newMetadata, newColumnTypes, newColumns) => {
+    const { datasets, activeDataset } = get();
+    const targetDataset = datasets.find((d) => d.id === datasetId);
+    if (!targetDataset) return;
+
+    // Purge optimizer cache so stale aggregations are cleared
+    queryCache.invalidate(datasetId);
+
+    const nextVersion = (targetDataset.version || 1) + 1;
+    const computedColumns = newColumns || (newMetadata ? newMetadata.columns.map((c) => c.name) : targetDataset.columns);
+    const computedTypes = newColumnTypes || targetDataset.columnTypes;
+
+    const updatedDataset: Dataset = {
+      ...targetDataset,
+      data: newRawData,
+      columns: computedColumns,
+      columnTypes: computedTypes,
+      metadata: newMetadata || targetDataset.metadata,
+      version: nextVersion,
+      lastUpdated: Date.now(),
+      calculatedFields: targetDataset.calculatedFields || [],
+      windowQueries: targetDataset.windowQueries || [],
+    };
+
+    const evaluated = windowEngine.augmentMetadata(formulaEngine.evaluateCalculatedFields(updatedDataset));
+
+    const updatedDatasets = datasets.map((d) => (d.id === datasetId ? evaluated : d));
+
+    const isCurrentlyActive = activeDataset?.id === datasetId;
+
+    set({
+      datasets: updatedDatasets,
+      activeDataset: isCurrentlyActive ? evaluated : activeDataset,
+    });
+
+    if (isCurrentlyActive) {
+      useFilterStore.getState().setFilteredData(evaluated.data);
+      useFilterStore.getState().resetFilters();
+    }
+
+    toast({
+      title: "Dataset Updated",
+      description: `"${updatedDataset.name}" updated to v${nextVersion} (${newRawData.length} rows).`,
     });
   },
   

@@ -17,11 +17,13 @@ export interface Dataset {
   metadata?: DatasetMetadata;
   calculatedFields?: CalculatedField[];
   windowQueries?: WindowQuery[];
+  version?: number;
+  lastUpdated?: number;
 }
 
 export interface ChartConfig {
   id: string;
-  type: 'bar' | 'line' | 'pie' | 'scatter' | 'histogram' | 'heatmap' | 'area' | 'bubble';
+  type: 'bar' | 'line' | 'pie' | 'scatter' | 'histogram' | 'heatmap' | 'area' | 'bubble' | (string & {});
   title: string;
   xAxis?: string;
   yAxis?: string;
@@ -73,4 +75,7 @@ export * from "./filter";
 export * from "./drill";
 export * from "./formatting";
 export * from "./serialization";
+export * from "./commands";
+export * from "./plugins";
+
 

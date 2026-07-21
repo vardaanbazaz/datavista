@@ -12,6 +12,8 @@ import { ArrowUp, GitFork, X } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import { toast } from "@/shared/hooks/use-toast";
 
+import { pluginRegistry } from "@/shared/services/pluginRegistry";
+
 interface ChartVisualizationProps {
   chart: ChartConfig;
 }
@@ -32,6 +34,8 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(500);
   const [isDrillMode, setIsDrillMode] = useState(false);
+
+  const pluginChartDef = pluginRegistry.getCustomChart(chart.type);
 
   // Pre-compile conditional formatting rules
   const compiledFormattingRules = useMemo(() => {
@@ -1184,8 +1188,17 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
     compiledFormattingRules
   ]);
 
+  if (pluginChartDef) {
+    const PluginComponent = pluginChartDef.component;
+    return (
+      <div ref={containerRef} className="h-full w-full flex flex-col p-2 bg-background overflow-hidden">
+        <PluginComponent chart={chart} data={chartData} />
+      </div>
+    );
+  }
+
   return (
-    <div ref={containerRef} className="w-full flex flex-col h-full gap-2 animate-chart-animate relative" data-chart-id={chart.id}>
+    <div ref={containerRef} className="h-full w-full flex flex-col p-4 bg-background animate-chart-animate relative" data-chart-id={chart.id}>
       {/* Chart Toolbar (for Drill-Down controls) */}
       {chart.drillPath && chart.drillPath.length > 0 && (
         <div className="flex items-center justify-between text-xs border-b border-border/40 pb-2 px-1 flex-shrink-0">

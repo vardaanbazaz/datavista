@@ -11,13 +11,14 @@ import { ChartVisualization } from "@/features/charts/components/ChartVisualizat
 import { DashboardGrid } from "@/features/dashboards/components/DashboardGrid";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select";
 import { Button } from "@/shared/components/ui/button";
-import { BarChart3, Database, Filter, PieChart, TrendingUp, Users, LayoutDashboard, Calendar, AlertCircle, Plus, LayoutTemplate } from "lucide-react";
+import { BarChart3, Database, Filter, PieChart, TrendingUp, Users, LayoutDashboard, Calendar, AlertCircle, Plus, LayoutTemplate, RotateCcw, RotateCw, Camera } from "lucide-react";
 import { GlobalFilterBar } from "@/features/dashboards/components/GlobalFilterBar";
 import { DrillThroughModal } from "@/features/dashboards/components/DrillThroughModal";
 import { motion } from "framer-motion";
 import { KPIBuilder } from "@/features/kpi/components/KPIBuilder";
 import { KPICardConfig } from "@/features/kpi/types";
 import { CreateTemplateModal } from "@/features/dashboards/components/CreateTemplateModal";
+import { SnapshotManager } from "@/features/dashboards/components/SnapshotManager";
 import { useTemplateStore } from "@/features/dashboards/store/templateStore";
 import { templateEngine } from "@/features/dashboards/services/templateEngine";
 
@@ -33,11 +34,18 @@ export function DashboardSummary() {
   const addKpiCard = useDashboardStore((state) => state.addKpiCard);
   const updateKpiCard = useDashboardStore((state) => state.updateKpiCard);
 
+  const undo = useDashboardStore((state) => state.undo);
+  const redo = useDashboardStore((state) => state.redo);
+  const past = useDashboardStore((state) => state.past);
+  const future = useDashboardStore((state) => state.future);
+
   const addTemplate = useTemplateStore((state) => state.addTemplate);
 
   const [isKpiBuilderOpen, setIsKpiBuilderOpen] = useState(false);
   const [editKpi, setEditKpi] = useState<KPICardConfig | null>(null);
   const [isCreateTemplateOpen, setIsCreateTemplateOpen] = useState(false);
+  const [isSnapshotManagerOpen, setIsSnapshotManagerOpen] = useState(false);
+
 
   const activeDashboard = useMemo(() => {
     return dashboards.find(d => d.id === activeDashboardId) || null;
@@ -213,6 +221,40 @@ export function DashboardSummary() {
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
+          {/* Undo/Redo & Snapshot Toolbar Controls */}
+          <div className="flex items-center gap-1.5 border-r border-border/40 pr-3 mr-1">
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8 glass hover:bg-primary/10 border-border"
+              onClick={undo}
+              disabled={past.length === 0}
+              title="Undo (Ctrl+Z)"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8 glass hover:bg-primary/10 border-border"
+              onClick={redo}
+              disabled={future.length === 0}
+              title="Redo (Ctrl+Shift+Z)"
+            >
+              <RotateCw className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 glass hover:bg-primary/5 border-primary/20 text-foreground ml-1"
+              onClick={() => setIsSnapshotManagerOpen(true)}
+              title="Manage Workspace Snapshots & History"
+            >
+              <Camera className="h-4 w-4 text-primary" />
+              Snapshots
+            </Button>
+          </div>
+
           {activeDashboard && (
             <>
               <Button
@@ -481,6 +523,10 @@ export function DashboardSummary() {
       />
 
       <DrillThroughModal />
+      <SnapshotManager
+        isOpen={isSnapshotManagerOpen}
+        onClose={() => setIsSnapshotManagerOpen(false)}
+      />
     </motion.div>
   );
 }

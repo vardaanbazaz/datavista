@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
 import { Badge } from "@/shared/components/ui/badge";
-import { Trash2, Plus, BarChart, LineChart, PieChart, ScatterChart, X, Palette } from "lucide-react";
+import { Trash2, Plus, BarChart, LineChart, PieChart, ScatterChart, X, Palette, Gauge } from "lucide-react";
 import { useMemo } from "react";
 import { Dataset, ChartConfig, ConditionalFormatRule } from "@/shared/types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/components/ui/dialog";
@@ -13,6 +13,7 @@ import { useDatasetStore } from "@/store/datasetStore";
 import { useFilterStore } from "@/store/filterStore";
 import { useChartStore } from "@/store/chartStore";
 import { useDashboardStore } from "@/features/dashboards/store/dashboardStore";
+import { pluginRegistry } from "@/shared/services/pluginRegistry";
 import { ChartVisualization } from "./ChartVisualization";
 import { ConditionalFormattingBuilder } from "@/features/dashboards/components/ConditionalFormattingBuilder";
 import { motion } from "framer-motion";
@@ -47,6 +48,27 @@ export function ChartBuilder() {
   const [sizeBy, setSizeBy] = useState('');
   const [formattingRules, setFormattingRules] = useState<ConditionalFormatRule[]>([]);
   const [isFormattingModalOpen, setIsFormattingModalOpen] = useState(false);
+
+  const chartTypes = useMemo(() => {
+    const coreTypes = [
+      { value: 'bar', label: 'Bar Chart', icon: BarChart },
+      { value: 'line', label: 'Line Chart', icon: LineChart },
+      { value: 'pie', label: 'Pie Chart', icon: PieChart },
+      { value: 'scatter', label: 'Scatter Plot', icon: ScatterChart },
+      { value: 'histogram', label: 'Histogram', icon: BarChart },
+      { value: 'heatmap', label: 'Heatmap', icon: BarChart },
+      { value: 'area', label: 'Area Chart', icon: LineChart },
+      { value: 'bubble', label: 'Bubble Chart', icon: ScatterChart },
+    ];
+
+    const pluginTypes = pluginRegistry.getCustomCharts().map((c) => ({
+      value: c.type,
+      label: `${c.label} (Plugin)`,
+      icon: Gauge,
+    }));
+
+    return [...coreTypes, ...pluginTypes];
+  }, []);
 
   const numericColumns = useMemo(() => {
     if (!dataset) return [];
@@ -94,17 +116,6 @@ export function ChartBuilder() {
       </div>
     );
   }
-
-  const chartTypes = [
-    { value: 'bar', label: 'Bar Chart', icon: BarChart },
-    { value: 'line', label: 'Line Chart', icon: LineChart },
-    { value: 'pie', label: 'Pie Chart', icon: PieChart },
-    { value: 'scatter', label: 'Scatter Plot', icon: ScatterChart },
-    { value: 'histogram', label: 'Histogram', icon: BarChart },
-    { value: 'heatmap', label: 'Heatmap', icon: BarChart },
-    { value: 'area', label: 'Area Chart', icon: LineChart },
-    { value: 'bubble', label: 'Bubble Chart', icon: ScatterChart },
-  ] as const;
 
   const handleCreateChart = () => {
     if (!chartTitle.trim()) {

@@ -1,4 +1,4 @@
-import { GlobalFilter, DashboardLayoutItem, ChartConfig, DrillState } from "./index";
+import { GlobalFilter, DashboardLayoutItem, ChartConfig, DrillState, Dashboard } from "./index";
 import { KPICardConfig } from "@/features/kpi/types";
 
 export interface SavedView {
@@ -25,3 +25,19 @@ export interface DashboardTemplate {
   kpis?: KPICardConfig[];
   createdAt: number;
 }
+
+export interface WorkspaceSnapshot {
+  id: string;
+  name: string;
+  description?: string;
+  timestamp: number;
+  dashboardState: {
+    dashboards: Dashboard[];
+    activeDashboardId: string | null;
+    activeGlobalFilters: GlobalFilter[];
+  };
+  datasetState?: {
+    activeDatasetId: string | null;
+  };
+}
+
