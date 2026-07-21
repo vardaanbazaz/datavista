@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import { Dashboard, Query } from "@/shared/types";
+import { Dashboard, Query, GlobalFilter } from "@/shared/types";
+import { KPICardConfig } from "@/features/kpi/types";
 import { toast } from "@/shared/hooks/use-toast";
 import { useDatasetStore } from "@/store/datasetStore";
 import { useFilterStore } from "@/store/filterStore";
@@ -9,6 +10,7 @@ import { queryEngine } from "@/shared/services/queryEngine";
 interface DashboardState {
   dashboards: Dashboard[];
   activeDashboardId: string | null;
+  activeGlobalFilters: GlobalFilter[];
   setDashboards: (dashboards: Dashboard[]) => void;
   setActiveDashboardId: (id: string | null) => void;
   createDashboard: (name: string, datasetId: string, chartIds?: string[]) => void;
@@ -16,11 +18,19 @@ interface DashboardState {
   renameDashboard: (id: string, name: string) => void;
   deleteDashboard: (id: string) => void;
   loadDashboard: (id: string) => void;
+  addKpiCard: (dashboardId: string, kpi: KPICardConfig) => void;
+  updateKpiCard: (dashboardId: string, kpiId: string, updates: Partial<KPICardConfig>) => void;
+  deleteKpiCard: (dashboardId: string, kpiId: string) => void;
+  addGlobalFilter: (filter: GlobalFilter) => void;
+  removeGlobalFilter: (filterId: string) => void;
+  clearGlobalFilters: () => void;
+  toggleCrossFilter: (filterInput: Omit<GlobalFilter, "id">) => void;
 }
 
 export const useDashboardStore = create<DashboardState>((set, get) => ({
   dashboards: [],
   activeDashboardId: null,
+  activeGlobalFilters: [],
   
   setDashboards: (dashboards) => set({ dashboards }),
   
@@ -163,7 +173,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       toast({
         title: "Dataset Missing",
         description: `The dataset for "${dashboard.name}" has been deleted.`,
-        variant: "warning" as any,
+        variant: "destructive",
       });
       return;
     }
@@ -198,12 +208,109 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       filteredData
     });
 
-    set({ activeDashboardId: id });
+    set({ activeDashboardId: id, activeGlobalFilters: [] });
     useUiStore.getState().setActiveView('overview');
 
     toast({
       title: "Dashboard Loaded",
       description: `"${dashboard.name}" context restored.`,
     });
-  }
+  },
+
+  addKpiCard: (dashboardId, kpi) => {
+    const { dashboards } = get();
+    const updated = dashboards.map(d => {
+      if (d.id === dashboardId) {
+        const kpis = d.kpis || [];
+        const kpiIds = d.kpiIds || [];
+        return {
+          ...d,
+          kpis: [...kpis, kpi],
+          kpiIds: [...kpiIds, kpi.id],
+          updatedAt: Date.now()
+        };
+      }
+      return d;
+    });
+    set({ dashboards: updated });
+    toast({
+      title: "KPI Card Added",
+      description: `"${kpi.title}" has been added to the dashboard.`,
+    });
+  },
+
+  updateKpiCard: (dashboardId, kpiId, updates) => {
+    const { dashboards } = get();
+    const updated = dashboards.map(d => {
+      if (d.id === dashboardId) {
+        const kpis = (d.kpis || []).map(k => k.id === kpiId ? { ...k, ...updates } : k);
+        return {
+          ...d,
+          kpis,
+          updatedAt: Date.now()
+        };
+      }
+      return d;
+    });
+    set({ dashboards: updated });
+    toast({
+      title: "KPI Card Updated",
+      description: "The KPI card configuration has been updated.",
+    });
+  },
+
+  deleteKpiCard: (dashboardId, kpiId) => {
+    const { dashboards } = get();
+    const updated = dashboards.map(d => {
+      if (d.id === dashboardId) {
+        const kpis = (d.kpis || []).filter(k => k.id !== kpiId);
+        const kpiIds = (d.kpiIds || []).filter(id => id !== kpiId);
+        const layout = (d.layout || []).filter(item => item.i !== kpiId);
+        return {
+          ...d,
+          kpis,
+          kpiIds,
+          layout,
+          updatedAt: Date.now()
+        };
+      }
+      return d;
+    });
+    set({ dashboards: updated });
+    toast({
+      title: "KPI Card Removed",
+      description: "The KPI card has been removed from the dashboard.",
+    });
+  },
+
+  addGlobalFilter: (filter) => set((state) => ({
+    activeGlobalFilters: [...state.activeGlobalFilters, filter]
+  })),
+
+  removeGlobalFilter: (filterId) => set((state) => ({
+    activeGlobalFilters: state.activeGlobalFilters.filter(f => f.id !== filterId)
+  })),
+
+  clearGlobalFilters: () => set({ activeGlobalFilters: [] }),
+
+  toggleCrossFilter: (filterInput) => set((state) => {
+    const existingIndex = state.activeGlobalFilters.findIndex(
+      (f) =>
+        f.column === filterInput.column &&
+        JSON.stringify(f.value) === JSON.stringify(filterInput.value) &&
+        f.sourceWidgetId === filterInput.sourceWidgetId
+    );
+
+    if (existingIndex > -1) {
+      const updated = state.activeGlobalFilters.filter((_, i) => i !== existingIndex);
+      return { activeGlobalFilters: updated };
+    } else {
+      const id = `gf-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+      const newFilter: GlobalFilter = {
+        ...filterInput,
+        id,
+      };
+      return { activeGlobalFilters: [...state.activeGlobalFilters, newFilter] };
+    }
+  })
 }));

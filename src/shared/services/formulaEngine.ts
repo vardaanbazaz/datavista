@@ -302,17 +302,20 @@ class Parser {
     }
 
     if (this.match('IDENTIFIER')) {
-      const name = this.previous().value.toUpperCase();
-      this.consume('LPAREN', `Expect '(' after function name '${name}'`);
-      
-      const args: ASTNode[] = [];
-      if (!this.check('RPAREN')) {
-        do {
-          args.push(this.logicOr());
-        } while (this.match('COMMA'));
+      const rawName = this.previous().value;
+      if (this.check('LPAREN')) {
+        this.advance(); // Consume '('
+        const name = rawName.toUpperCase();
+        const args: ASTNode[] = [];
+        if (!this.check('RPAREN')) {
+          do {
+            args.push(this.logicOr());
+          } while (this.match('COMMA'));
+        }
+        this.consume('RPAREN', "Expect ')' after function arguments");
+        return { type: 'FunctionCall', name, args };
       }
-      this.consume('RPAREN', "Expect ')' after function arguments");
-      return { type: 'FunctionCall', name, args };
+      return { type: 'FieldReference', name: rawName };
     }
 
     if (this.match('LPAREN')) {
@@ -343,8 +346,17 @@ export function evaluateAST(node: ASTNode, row: DataRow): unknown {
       return node.value;
     case 'StringLiteral':
       return node.value;
-    case 'FieldReference':
-      return row[node.name] ?? null;
+    case 'FieldReference': {
+      if (node.name in row && row[node.name] !== undefined) {
+        return row[node.name];
+      }
+      const lowerName = node.name.toLowerCase();
+      const matchKey = Object.keys(row).find((k) => k.toLowerCase() === lowerName);
+      if (matchKey !== undefined) {
+        return row[matchKey];
+      }
+      return null;
+    }
     case 'UnaryExpression': {
       const val = evaluateAST(node.argument, row);
       if (node.operator === '-') {
@@ -667,7 +679,7 @@ export const formulaEngine = {
           val = null;
         }
 
-        row[field.name] = val;
+        row[field.name] = (val as string | number | null);
         values.push(val);
 
         if (val === null) {

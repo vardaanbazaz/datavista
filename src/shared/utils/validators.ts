@@ -1,33 +1,35 @@
 import { Dataset, ChartConfig, FilterState, Dashboard } from "@/shared/types";
 
-export function isValidDataset(obj: any): obj is Dataset {
+export function isValidDataset(obj: unknown): obj is Dataset {
   if (!obj || typeof obj !== "object") return false;
-  if (typeof obj.id !== "string" || !obj.id.trim()) return false;
-  if (typeof obj.name !== "string" || !obj.name.trim()) return false;
-  if (!Array.isArray(obj.data)) return false;
-  if (!Array.isArray(obj.columns)) return false;
-  if (!obj.columnTypes || typeof obj.columnTypes !== "object") return false;
+  const d = obj as Record<string, unknown>;
+  if (typeof d.id !== "string" || !d.id.trim()) return false;
+  if (typeof d.name !== "string" || !d.name.trim()) return false;
+  if (!Array.isArray(d.data)) return false;
+  if (!Array.isArray(d.columns)) return false;
+  if (!d.columnTypes || typeof d.columnTypes !== "object") return false;
 
   // Validate that all columns list elements are strings
-  const columnsValid = obj.columns.every((col: any) => typeof col === "string");
+  const columnsValid = d.columns.every((col: unknown) => typeof col === "string");
   if (!columnsValid) return false;
 
   // Validate that all columnTypes mapping values are valid categories
   const allowedTypes = ["numeric", "categorical", "date"];
-  const typesValid = Object.entries(obj.columnTypes).every(
-    ([key, val]: [string, any]) => typeof key === "string" && allowedTypes.includes(val)
+  const typesValid = Object.entries(d.columnTypes as Record<string, unknown>).every(
+    ([key, val]: [string, unknown]) => typeof key === "string" && typeof val === "string" && allowedTypes.includes(val)
   );
   if (!typesValid) return false;
 
   return true;
 }
 
-export function isValidChartConfig(obj: any): obj is ChartConfig {
+export function isValidChartConfig(obj: unknown): obj is ChartConfig {
   if (!obj || typeof obj !== "object") return false;
-  if (typeof obj.id !== "string" || !obj.id.trim()) return false;
-  if (typeof obj.title !== "string" || !obj.title.trim()) return false;
-  if (typeof obj.datasetId !== "string" || !obj.datasetId.trim()) return false;
-  if (!Array.isArray(obj.data)) return false;
+  const c = obj as Record<string, unknown>;
+  if (typeof c.id !== "string" || !c.id.trim()) return false;
+  if (typeof c.title !== "string" || !c.title.trim()) return false;
+  if (typeof c.datasetId !== "string" || !c.datasetId.trim()) return false;
+  if (!Array.isArray(c.data)) return false;
 
   const allowedTypes = [
     "bar",
@@ -39,39 +41,42 @@ export function isValidChartConfig(obj: any): obj is ChartConfig {
     "area",
     "bubble"
   ];
-  if (!allowedTypes.includes(obj.type)) return false;
+  if (typeof c.type !== "string" || !allowedTypes.includes(c.type)) return false;
 
   return true;
 }
 
-export function isValidFilterState(obj: any): obj is FilterState {
+export function isValidFilterState(obj: unknown): obj is FilterState {
   if (!obj || typeof obj !== "object") return false;
+  const f = obj as Record<string, unknown>;
   
   // Verify categoricalFilters structure
-  if (!obj.categoricalFilters || typeof obj.categoricalFilters !== "object") return false;
-  const categoricalValid = Object.entries(obj.categoricalFilters).every(
-    ([_, val]) => Array.isArray(val) && val.every((v: any) => typeof v === "string")
+  if (!f.categoricalFilters || typeof f.categoricalFilters !== "object") return false;
+  const categoricalValid = Object.entries(f.categoricalFilters as Record<string, unknown>).every(
+    ([_, val]) => Array.isArray(val) && val.every((v: unknown) => typeof v === "string")
   );
   if (!categoricalValid) return false;
 
   // Verify dateRangeFilters structure
-  if (!obj.dateRangeFilters || typeof obj.dateRangeFilters !== "object") return false;
-  const dateRangeValid = Object.entries(obj.dateRangeFilters).every(
-    ([_, val]: [string, any]) => {
+  if (!f.dateRangeFilters || typeof f.dateRangeFilters !== "object") return false;
+  const dateRangeValid = Object.entries(f.dateRangeFilters as Record<string, unknown>).every(
+    ([_, val]: [string, unknown]) => {
       if (!val || typeof val !== "object") return false;
-      const startValid = val.start === undefined || val.start === null || val.start instanceof Date || !isNaN(Date.parse(val.start));
-      const endValid = val.end === undefined || val.end === null || val.end instanceof Date || !isNaN(Date.parse(val.end));
+      const v = val as { start?: unknown; end?: unknown };
+      const startValid = v.start === undefined || v.start === null || v.start instanceof Date || !isNaN(Date.parse(String(v.start)));
+      const endValid = v.end === undefined || v.end === null || v.end instanceof Date || !isNaN(Date.parse(String(v.end)));
       return startValid && endValid;
     }
   );
   if (!dateRangeValid) return false;
 
   // Optionals
-  if (obj.groupByColumn !== undefined && typeof obj.groupByColumn !== "string") return false;
+  if (f.groupByColumn !== undefined && typeof f.groupByColumn !== "string") return false;
   if (
-    obj.groupByPeriod !== undefined &&
-    obj.groupByPeriod !== null &&
-    !["day", "month", "year"].includes(obj.groupByPeriod)
+    f.groupByPeriod !== undefined &&
+    f.groupByPeriod !== null &&
+    typeof f.groupByPeriod === "string" &&
+    !["day", "month", "year"].includes(f.groupByPeriod)
   ) {
     return false;
   }
@@ -79,14 +84,14 @@ export function isValidFilterState(obj: any): obj is FilterState {
   return true;
 }
 
-export function isValidUIState(key: string, value: any): boolean {
+export function isValidUIState(key: string, value: unknown): boolean {
   if (typeof key !== "string" || !key) return false;
   
   switch (key) {
     case "theme":
       return value === "light" || value === "dark" || value === "system";
     case "activeView":
-      return ["overview", "upload", "charts", "data", "filters", "export"].includes(value);
+      return typeof value === "string" && ["overview", "upload", "charts", "data", "filters", "export"].includes(value);
     case "showWelcome":
       return typeof value === "boolean";
     case "activeDatasetId":
@@ -98,14 +103,15 @@ export function isValidUIState(key: string, value: any): boolean {
   }
 }
 
-export function isValidDashboard(obj: any): obj is Dashboard {
+export function isValidDashboard(obj: unknown): obj is Dashboard {
   if (!obj || typeof obj !== "object") return false;
-  if (typeof obj.id !== "string" || !obj.id.trim()) return false;
-  if (typeof obj.name !== "string" || !obj.name.trim()) return false;
-  if (typeof obj.datasetId !== "string" || !obj.datasetId.trim()) return false;
-  if (!Array.isArray(obj.chartIds)) return false;
-  if (typeof obj.createdAt !== "number") return false;
-  if (typeof obj.updatedAt !== "number") return false;
+  const d = obj as Record<string, unknown>;
+  if (typeof d.id !== "string" || !d.id.trim()) return false;
+  if (typeof d.name !== "string" || !d.name.trim()) return false;
+  if (typeof d.datasetId !== "string" || !d.datasetId.trim()) return false;
+  if (!Array.isArray(d.chartIds)) return false;
+  if (typeof d.createdAt !== "number") return false;
+  if (typeof d.updatedAt !== "number") return false;
   return true;
 }
 

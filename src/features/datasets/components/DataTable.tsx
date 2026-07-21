@@ -5,26 +5,49 @@ import { Button } from "@/shared/components/ui/button";
 import { Badge } from "@/shared/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select";
-import { Search, ArrowUpDown, Download } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/components/ui/dialog";
+import { Search, ArrowUpDown, Download, Palette } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Dataset, Query } from "@/shared/types";
+import { Dataset, Query, DataRow, ConditionalFormatRule } from "@/shared/types";
 import { queryEngine } from "@/shared/services/queryEngine";
+import { formattingEngine } from "@/shared/services/formattingEngine";
 import { useDatasetStore } from "@/store/datasetStore";
 import { useFilterStore } from "@/store/filterStore";
 import { CalculatedFieldsManager } from "./CalculatedFieldsManager";
 import { QueryPerformanceBadge } from "@/features/dashboard/components/QueryPerformanceBadge";
+import { ConditionalFormattingBuilder } from "@/features/dashboards/components/ConditionalFormattingBuilder";
 
-export function DataTable() {
-  const activeDataset = useDatasetStore((state) => state.activeDataset);
+interface DataTableProps {
+  customDataset?: Dataset | null;
+  customData?: DataRow[];
+  hideCalculatedFields?: boolean;
+}
+
+export function DataTable({
+  customDataset,
+  customData,
+  hideCalculatedFields = false
+}: DataTableProps = {}) {
+  const [formattingRules, setFormattingRules] = useState<ConditionalFormatRule[]>([]);
+  const [isFormattingOpen, setIsFormattingOpen] = useState(false);
+
+  const compiledFormattingRules = useMemo(() => {
+    return formattingEngine.compileRules(formattingRules);
+  }, [formattingRules]);
+
+  const activeDatasetStore = useDatasetStore((state) => state.activeDataset);
   const storeFilteredData = useFilterStore((state) => state.filteredData);
+
+  const activeDataset = customDataset !== undefined ? customDataset : activeDatasetStore;
+  const storeData = customData !== undefined ? customData : storeFilteredData;
 
   const dataset = useMemo(() => {
     if (!activeDataset) return null;
     return {
       ...activeDataset,
-      data: storeFilteredData,
+      data: storeData,
     };
-  }, [activeDataset, storeFilteredData]);
+  }, [activeDataset, storeData]);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [sortColumn, setSortColumn] = useState<string | null>(null);
@@ -56,11 +79,11 @@ export function DataTable() {
 
     const tempDataset: Dataset = {
       ...dataset,
-      data: storeFilteredData
+      data: storeData
     };
 
     return queryEngine.execute(tempDataset, query);
-  }, [dataset, storeFilteredData, searchTerm, filterColumn, filterValue, sortColumn, sortDirection, activeDataset?.windowQueries]);
+  }, [dataset, storeData, searchTerm, filterColumn, filterValue, sortColumn, sortDirection, activeDataset?.windowQueries]);
 
   const filteredData = useMemo(() => {
     return queryResult ? queryResult.rows : [];
@@ -198,7 +221,20 @@ export function DataTable() {
               Data Explorer
             </span>
             <div className="flex gap-2">
-              <CalculatedFieldsManager />
+              {!hideCalculatedFields && <CalculatedFieldsManager />}
+              <Button
+                onClick={() => setIsFormattingOpen(true)}
+                variant={formattingRules.length > 0 ? "default" : "outline"}
+                className="gap-2"
+              >
+                <Palette className="w-4 h-4" />
+                Conditional Formatting
+                {formattingRules.length > 0 && (
+                  <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">
+                    {formattingRules.length}
+                  </Badge>
+                )}
+              </Button>
               <Button onClick={handleExport} variant="outline" className="gap-2">
                 <Download className="w-4 h-4" />
                 Export CSV
@@ -206,6 +242,25 @@ export function DataTable() {
             </div>
           </CardTitle>
         </CardHeader>
+
+        {/* Conditional Formatting Dialog */}
+        <Dialog open={isFormattingOpen} onOpenChange={setIsFormattingOpen}>
+          <DialogContent className="max-w-4xl glass border-white/20 shadow-2xl p-6">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold flex items-center gap-2">
+                <Palette className="h-5 w-5 text-primary" />
+                Data Table Conditional Formatting
+              </DialogTitle>
+            </DialogHeader>
+            <div className="mt-4">
+              <ConditionalFormattingBuilder
+                rules={formattingRules}
+                onChange={setFormattingRules}
+                availableColumns={dataset.columns}
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
         <CardContent>
           <div className="flex flex-wrap gap-4 mb-4">
             {/* Search */}
@@ -361,17 +416,35 @@ export function DataTable() {
                           className="h-[52px]"
                           ref={rowVirtualizer.measureElement}
                         >
-                          {dataset.columns.map((column) => (
-                            <TableCell key={column} className="max-w-48">
-                              <div className="truncate">
-                                {row[column] === null || row[column] === undefined ? (
-                                  <span className="text-muted-foreground italic">null</span>
-                                ) : (
-                                  String(row[column])
-                                )}
-                              </div>
-                            </TableCell>
-                          ))}
+                          {dataset.columns.map((column) => {
+                            const cellStyle = formattingEngine.evaluateCompiledRules(
+                              compiledFormattingRules,
+                              row,
+                              column
+                            );
+                            return (
+                              <TableCell
+                                key={column}
+                                className="max-w-48 transition-colors"
+                                style={
+                                  cellStyle
+                                    ? {
+                                        color: cellStyle.textColor,
+                                        backgroundColor: cellStyle.backgroundColor
+                                      }
+                                    : undefined
+                                }
+                              >
+                                <div className="truncate font-medium">
+                                  {row[column] === null || row[column] === undefined ? (
+                                    <span className="text-muted-foreground italic">null</span>
+                                  ) : (
+                                    String(row[column])
+                                  )}
+                                </div>
+                              </TableCell>
+                            );
+                          })}
                         </TableRow>
                       );
                     })}

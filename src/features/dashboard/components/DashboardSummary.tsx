@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { Badge } from "@/shared/components/ui/badge";
 import { Progress } from "@/shared/components/ui/progress";
@@ -10,8 +10,16 @@ import { useDashboardStore } from "@/features/dashboards/store/dashboardStore";
 import { ChartVisualization } from "@/features/charts/components/ChartVisualization";
 import { DashboardGrid } from "@/features/dashboards/components/DashboardGrid";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select";
-import { BarChart3, Database, Filter, PieChart, TrendingUp, Users, LayoutDashboard, Calendar, AlertCircle } from "lucide-react";
+import { Button } from "@/shared/components/ui/button";
+import { BarChart3, Database, Filter, PieChart, TrendingUp, Users, LayoutDashboard, Calendar, AlertCircle, Plus, LayoutTemplate } from "lucide-react";
+import { GlobalFilterBar } from "@/features/dashboards/components/GlobalFilterBar";
+import { DrillThroughModal } from "@/features/dashboards/components/DrillThroughModal";
 import { motion } from "framer-motion";
+import { KPIBuilder } from "@/features/kpi/components/KPIBuilder";
+import { KPICardConfig } from "@/features/kpi/types";
+import { CreateTemplateModal } from "@/features/dashboards/components/CreateTemplateModal";
+import { useTemplateStore } from "@/features/dashboards/store/templateStore";
+import { templateEngine } from "@/features/dashboards/services/templateEngine";
 
 export function DashboardSummary() {
   const dataset = useDatasetStore((state) => state.activeDataset);
@@ -22,10 +30,30 @@ export function DashboardSummary() {
   const activeDashboardId = useDashboardStore((state) => state.activeDashboardId);
   const dashboards = useDashboardStore((state) => state.dashboards);
   const loadDashboard = useDashboardStore((state) => state.loadDashboard);
+  const addKpiCard = useDashboardStore((state) => state.addKpiCard);
+  const updateKpiCard = useDashboardStore((state) => state.updateKpiCard);
+
+  const addTemplate = useTemplateStore((state) => state.addTemplate);
+
+  const [isKpiBuilderOpen, setIsKpiBuilderOpen] = useState(false);
+  const [editKpi, setEditKpi] = useState<KPICardConfig | null>(null);
+  const [isCreateTemplateOpen, setIsCreateTemplateOpen] = useState(false);
 
   const activeDashboard = useMemo(() => {
     return dashboards.find(d => d.id === activeDashboardId) || null;
   }, [dashboards, activeDashboardId]);
+
+  const handleSaveTemplate = (name: string, description: string) => {
+    if (!activeDashboard || !dataset) return;
+    const template = templateEngine.extractTemplate(
+      activeDashboard,
+      name,
+      description,
+      dataset,
+      allCharts
+    );
+    addTemplate(template);
+  };
 
   const charts = useMemo(() => {
     if (!dataset) return [];
@@ -184,33 +212,68 @@ export function DashboardSummary() {
           </div>
         </div>
 
-        {dashboards.length > 0 && (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground whitespace-nowrap">Switch Dashboard:</span>
-            <Select
-              value={activeDashboardId || "none"}
-              onValueChange={(val) => {
-                if (val === "none") {
-                  useDashboardStore.setState({ activeDashboardId: null });
-                } else {
-                  loadDashboard(val);
-                }
-              }}
-            >
-              <SelectTrigger className="w-[200px] glass">
-                <SelectValue placeholder="Select dashboard" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">None (Dataset Overview)</SelectItem>
-                {dashboards.map((d) => (
-                  <SelectItem key={d.id} value={d.id}>
-                    {d.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
+        <div className="flex items-center gap-3 flex-wrap">
+          {activeDashboard && (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 glass hover:bg-primary/5 border-primary/20 text-foreground"
+                onClick={() => setIsCreateTemplateOpen(true)}
+              >
+                <LayoutTemplate className="h-4 w-4 text-primary" />
+                Save as Template
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 glass hover:bg-primary/5 border-primary/20 text-foreground"
+                onClick={() => {
+                  setEditKpi(null);
+                  setIsKpiBuilderOpen(true);
+                }}
+              >
+                <Plus className="h-4 w-4 text-primary" />
+                Add KPI Card
+              </Button>
+
+              <CreateTemplateModal
+                isOpen={isCreateTemplateOpen}
+                onClose={() => setIsCreateTemplateOpen(false)}
+                onSave={handleSaveTemplate}
+              />
+            </>
+          )}
+
+          {dashboards.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground whitespace-nowrap">Switch Dashboard:</span>
+              <Select
+                value={activeDashboardId || "none"}
+                onValueChange={(val) => {
+                  if (val === "none") {
+                    useDashboardStore.setState({ activeDashboardId: null });
+                  } else {
+                    loadDashboard(val);
+                  }
+                }}
+              >
+                <SelectTrigger className="w-[200px] glass">
+                  <SelectValue placeholder="Select dashboard" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None (Dataset Overview)</SelectItem>
+                  {dashboards.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>
+                      {d.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Key Metrics Grid */}
@@ -371,24 +434,53 @@ export function DashboardSummary() {
           transition={{ delay: 0.7 }}
           className="mt-8 space-y-4"
         >
-          <div className="border-t pt-6">
-            <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
+          <div className="border-t pt-6 space-y-4">
+            <GlobalFilterBar />
+            
+            <h3 className="text-xl font-semibold flex items-center gap-2">
               <LayoutDashboard className="h-5 w-5" />
-              Charts ({charts.length})
+              Dashboard Widgets ({charts.length + (activeDashboard.kpis?.length || 0)})
             </h3>
-            {charts.length === 0 ? (
+            {charts.length === 0 && (!activeDashboard.kpis || activeDashboard.kpis.length === 0) ? (
               <Card className="glass border-dashed border-2 py-12 text-center text-muted-foreground">
                 <CardContent className="space-y-2">
-                  <p>No charts added to this dashboard yet.</p>
-                  <p className="text-xs">Go to the "Charts" builder to create and add charts.</p>
+                  <p>No widgets added to this dashboard yet.</p>
+                  <p className="text-xs">Go to the "Charts" builder or click "Add KPI Card" above to get started.</p>
                 </CardContent>
               </Card>
             ) : (
-              <DashboardGrid charts={charts} activeDashboardId={activeDashboard.id} />
+              <DashboardGrid 
+                charts={charts} 
+                activeDashboardId={activeDashboard.id} 
+                onEditKpi={(kpi) => {
+                  setEditKpi(kpi);
+                  setIsKpiBuilderOpen(true);
+                }}
+              />
             )}
           </div>
         </motion.div>
       )}
+
+      {/* KPI Card Builder Sidebar */}
+      <KPIBuilder
+        isOpen={isKpiBuilderOpen}
+        onClose={() => {
+          setIsKpiBuilderOpen(false);
+          setEditKpi(null);
+        }}
+        onSave={(kpi) => {
+          if (!activeDashboard) return;
+          if (editKpi) {
+            updateKpiCard(activeDashboard.id, kpi.id, kpi);
+          } else {
+            addKpiCard(activeDashboard.id, kpi);
+          }
+        }}
+        editKpi={editKpi}
+      />
+
+      <DrillThroughModal />
     </motion.div>
   );
 }

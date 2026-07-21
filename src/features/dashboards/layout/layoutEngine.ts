@@ -3,20 +3,25 @@ import { DashboardLayoutItem } from "@/shared/types";
 /**
  * Find a free spot in a 12-column grid for a new item of w: 4, h: 4
  */
-export const findFreeSpot = (existingItems: DashboardLayoutItem[], newId: string): DashboardLayoutItem => {
+export const findFreeSpot = (
+  existingItems: DashboardLayoutItem[],
+  newId: string,
+  w = 4,
+  h = 4
+): DashboardLayoutItem => {
   let y = 0;
   while (true) {
-    for (let x = 0; x <= 8; x++) {
+    for (let x = 0; x <= 12 - w; x++) {
       const overlaps = existingItems.some((item) => {
         return !(
-          x + 4 <= item.x ||
+          x + w <= item.x ||
           x >= item.x + item.w ||
-          y + 4 <= item.y ||
+          y + h <= item.y ||
           y >= item.y + item.h
         );
       });
       if (!overlaps) {
-        return { i: newId, x, y, w: 4, h: 4 };
+        return { i: newId, x, y, w, h };
       }
     }
     y++;
@@ -69,7 +74,7 @@ export const scaleToSm = (items: DashboardLayoutItem[]): DashboardLayoutItem[] =
  * Scales layout changes back to the 12-column space (lg) if modifications were made in md.
  */
 export const scaleToLg = (
-  items: any[],
+  items: { i: string; x: number; y: number; w: number; h: number }[],
   currentBreakpoint: string,
   previousLgLayout: DashboardLayoutItem[]
 ): DashboardLayoutItem[] => {

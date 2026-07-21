@@ -27,19 +27,23 @@ import {
   Menu,
   Grid,
   Sigma,
-  Columns
+  Columns,
+  LayoutTemplate,
+  Search
 } from "lucide-react";
 import { Dataset } from "@/shared/types";
 import { useUiStore, ViewType } from "@/store/uiStore";
 import { useDatasetStore } from "@/store/datasetStore";
 import { useDashboardStore } from "@/features/dashboards/store/dashboardStore";
+import { InstantiateTemplateModal } from "@/features/dashboards/components/InstantiateTemplateModal";
 import { ThemeToggle } from "@/shared/components/ThemeToggle";
 import { motion } from "framer-motion";
 
-export function Sidebar() {
+export function Sidebar({ onOpenSearch }: { onOpenSearch?: () => void }) {
   const activeView = useUiStore((state) => state.activeView);
   const onViewChange = useUiStore((state) => state.setActiveView);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [isInstantiateModalOpen, setIsInstantiateModalOpen] = useState(false);
   
   const datasets = useDatasetStore((state) => state.datasets);
   const activeDataset = useDatasetStore((state) => state.activeDataset);
@@ -189,6 +193,20 @@ export function Sidebar() {
             <Menu className="h-5 w-5" />
           </Button>
         </div>
+        
+        <Button
+          variant="outline"
+          className="w-full mt-4 justify-between h-9 px-3 text-muted-foreground hover:text-foreground text-xs glass border-border/60"
+          onClick={() => onOpenSearch?.()}
+        >
+          <div className="flex items-center gap-2">
+            <Search className="h-3.5 w-3.5 text-primary" />
+            <span>Global Search...</span>
+          </div>
+          <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
+            <span className="text-[10px]">⌘</span>K
+          </kbd>
+        </Button>
       </div>
 
       <div className={cn("flex-col flex-1", isMobileOpen ? "flex" : "hidden lg:flex")}>
@@ -318,12 +336,27 @@ export function Sidebar() {
           <Button 
             variant="ghost" 
             size="icon" 
-            className="h-6 w-6 ml-2 hover:bg-muted"
+            className="h-6 w-6 hover:bg-muted"
+            onClick={() => setIsInstantiateModalOpen(true)}
+            title="Create from Template"
+          >
+            <LayoutTemplate className="h-3.5 w-3.5 text-primary" />
+          </Button>
+
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-6 w-6 hover:bg-muted"
             onClick={handleCreateDashboard}
-            title="Create Dashboard"
+            title="Create New Blank Dashboard"
           >
             <Plus className="h-4 w-4" />
           </Button>
+
+          <InstantiateTemplateModal
+            isOpen={isInstantiateModalOpen}
+            onClose={() => setIsInstantiateModalOpen(false)}
+          />
         </div>
 
         <ScrollArea className="flex-1 min-h-0">

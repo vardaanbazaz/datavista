@@ -1,24 +1,110 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import * as d3 from "d3";
-import { ChartConfig } from "@/features/dashboard/components/Dashboard";
+import { ChartConfig, Query, DataRow, FilterOperator } from "@/shared/types";
 import { useDatasetStore } from "@/store/datasetStore";
+import { useDashboardStore } from "@/features/dashboards/store/dashboardStore";
+import { useFilterStore } from "@/store/filterStore";
+import { filterManager } from "@/features/dashboards/services/filterManager";
+import { queryEngine } from "@/shared/services/queryEngine";
+import { formattingEngine } from "@/shared/services/formattingEngine";
+import { useDrillStore } from "@/features/dashboards/store/drillStore";
+import { ArrowUp, GitFork, X } from "lucide-react";
+import { Button } from "@/shared/components/ui/button";
+import { toast } from "@/shared/hooks/use-toast";
 
 interface ChartVisualizationProps {
   chart: ChartConfig;
+}
+
+interface PieSlice {
+  key: string;
+  value: number;
+}
+
+interface HeatmapCell {
+  x: string;
+  y: string;
+  value: number;
 }
 
 export function ChartVisualization({ chart }: ChartVisualizationProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(500);
+  const [isDrillMode, setIsDrillMode] = useState(false);
+
+  // Pre-compile conditional formatting rules
+  const compiledFormattingRules = useMemo(() => {
+    return formattingEngine.compileRules(chart.formattingRules || []);
+  }, [chart.formattingRules]);
+
+  // Retrieve global store data
+  const dataset = useDatasetStore((state) => state.activeDataset);
+  const activeGlobalFilters = useDashboardStore((state) => state.activeGlobalFilters || []);
+  const activeFilters = useFilterStore((state) => state.activeFilters);
+  const toggleCrossFilter = useDashboardStore((state) => state.toggleCrossFilter);
+
+  // Drill State
+  const widgetDrillStates = useDrillStore((state) => state.widgetDrillStates);
+  const setWidgetDrillState = useDrillStore((state) => state.setWidgetDrillState);
+  const resetWidgetDrillState = useDrillStore((state) => state.resetWidgetDrillState);
+  const openDrillThrough = useDrillStore((state) => state.openDrillThrough);
+
+  const drillState = widgetDrillStates[chart.id];
+
+  // Resolve current active X-axis dimension based on drillState depth
+  const currentDimension = useMemo(() => {
+    if (chart.drillPath && chart.drillPath.length > 0 && drillState) {
+      return chart.drillPath[drillState.currentDepth] || chart.xAxis || "";
+    }
+    return chart.xAxis || "";
+  }, [chart.xAxis, chart.drillPath, drillState]);
+
+  // Dynamically calculate chart data using queryEngine, filterManager, and drillState
+  const chartData = useMemo(() => {
+    if (!dataset) return chart.data;
+
+    const baseQuery: Query = {
+      filters: {
+        categoricalFilters: activeFilters.categoricalFilters,
+        dateRangeFilters: activeFilters.dateRangeFilters,
+        conditions: []
+      },
+      pagination: { pageSize: 'all' }
+    };
+
+    // 1. Merge global dashboard filters
+    const mergedQuery = filterManager.merge(baseQuery, activeGlobalFilters, chart.id, dataset);
+
+    // 2. Merge local drill-down path filters
+    if (drillState && drillState.activeFilters.length > 0) {
+      if (!mergedQuery.filters) mergedQuery.filters = {};
+      if (!mergedQuery.filters.conditions) mergedQuery.filters.conditions = [];
+      
+      drillState.activeFilters.forEach((f) => {
+        mergedQuery.filters!.conditions!.push({
+          column: f.column,
+          operator: f.operator,
+          value: f.value,
+        });
+      });
+    }
+
+    const result = queryEngine.execute(dataset, mergedQuery);
+    return result.rows;
+  }, [dataset, chart.data, activeFilters, activeGlobalFilters, chart.id, drillState]);
+
+  // Find if there is an active cross-filter originating from this chart
+  const activeCrossFilter = useMemo(() => {
+    return activeGlobalFilters.find((f) => f.sourceWidgetId === chart.id);
+  }, [activeGlobalFilters, chart.id]);
 
   // ResizeObserver to handle layout container resizing
   useEffect(() => {
     if (!containerRef.current) return;
 
     const resizeObserver = new ResizeObserver((entries) => {
-      for (let entry of entries) {
-        // Give it a bit of padding inside the container card
+      for (const entry of entries) {
         const newWidth = Math.max(entry.contentRect.width, 280);
         setWidth(newWidth);
       }
@@ -35,13 +121,66 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
     return () => resizeObserver.disconnect();
   }, []);
 
+  const handleDrillUp = () => {
+    if (!drillState) return;
+    if (drillState.currentDepth <= 1) {
+      resetWidgetDrillState(chart.id);
+    } else {
+      setWidgetDrillState(chart.id, {
+        currentDepth: drillState.currentDepth - 1,
+        activeFilters: drillState.activeFilters.slice(0, -1),
+      });
+    }
+  };
+
   useEffect(() => {
-    if (!svgRef.current || !chart.data.length) return;
+    if (!svgRef.current || !chartData.length || !currentDimension) {
+      const svg = d3.select(svgRef.current);
+      svg.selectAll("*").remove();
+      const chartAreaError = svg
+        .append("g")
+        .attr("transform", `translate(${width / 2},160)`);
+        
+      chartAreaError.append("text")
+        .attr("text-anchor", "middle")
+        .style("font-size", "14px")
+        .style("fill", "hsl(var(--muted-foreground))")
+        .style("font-weight", "500")
+        .text("No data matches current filters.");
+      return;
+    }
+
+    // Helper to determine visual opacity based on cross-filter highlight state
+    const getOpacity = (val: unknown, defaultOpacity = 0.85) => {
+      if (!activeCrossFilter) return defaultOpacity;
+      
+      // Equal match
+      if (activeCrossFilter.operator === 'equals' && String(activeCrossFilter.value) === String(val)) {
+        return 1.0;
+      }
+      
+      // Between match (range-based highlight for histogram bins)
+      if (
+        activeCrossFilter.operator === 'between' && 
+        typeof activeCrossFilter.value === 'object' && 
+        activeCrossFilter.value !== null &&
+        typeof val === 'object' && 
+        val !== null
+      ) {
+        const range = activeCrossFilter.value as { start?: number; end?: number };
+        const bin = val as { start?: number; end?: number };
+        if (range.start === bin.start && range.end === bin.end) {
+          return 1.0;
+        }
+      }
+      
+      return 0.25; // Dimmed state
+    };
 
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove();
 
-    const height = 320;
+    const height = 300;
     const margin = { top: 20, right: 30, bottom: 65, left: 60 };
 
     svg.attr("width", width).attr("height", height);
@@ -61,7 +200,7 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
         if (colMeta) return colMeta.inferredDataType;
       }
 
-      const nonNull = chart.data.map(d => d[col]).filter(v => v !== null && v !== undefined && v !== "");
+      const nonNull = chartData.map(d => d[col]).filter(v => v !== null && v !== undefined && v !== "");
       if (!nonNull.length) return 'categorical';
       
       const numericCount = nonNull.filter(v => !isNaN(Number(v))).length;
@@ -77,38 +216,38 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
       return 'categorical';
     };
 
-    const xType = chart.xAxis ? getColumnType(chart.xAxis) : 'categorical';
+    const xType = currentDimension ? getColumnType(currentDimension) : 'categorical';
     const yType = chart.yAxis ? getColumnType(chart.yAxis) : 'categorical';
     const sizeType = chart.sizeBy ? getColumnType(chart.sizeBy) : null;
 
     // Validate configuration safety
     let validationError = "";
     if (chart.type === 'scatter') {
-      if (!chart.xAxis || !chart.yAxis) {
+      if (!currentDimension || !chart.yAxis) {
         validationError = "Scatter Plot requires both X and Y axis fields.";
       } else if (xType !== 'numeric' || yType !== 'numeric') {
         validationError = "Scatter Plot requires numeric columns for both X and Y axes.";
       }
     } else if (chart.type === 'bubble') {
-      if (!chart.xAxis || !chart.yAxis || !chart.sizeBy) {
+      if (!currentDimension || !chart.yAxis || !chart.sizeBy) {
         validationError = "Bubble Chart requires X axis, Y axis, and Size By fields.";
       } else if (xType !== 'numeric' || yType !== 'numeric' || (sizeType && sizeType !== 'numeric')) {
         validationError = "Bubble Chart requires numeric columns for X axis, Y axis, and Size parameter.";
       }
     } else if (chart.type === 'histogram') {
-      if (!chart.xAxis) {
+      if (!currentDimension) {
         validationError = "Histogram requires an X-axis field.";
       } else if (xType !== 'numeric') {
         validationError = "Histogram requires a numeric column for the X-axis.";
       }
     } else if (['bar', 'line', 'area'].includes(chart.type)) {
-      if (!chart.xAxis || !chart.yAxis) {
+      if (!currentDimension || !chart.yAxis) {
         validationError = `${chart.type.charAt(0).toUpperCase() + chart.type.slice(1)} chart requires both X and Y axis fields.`;
       } else if (yType !== 'numeric') {
         validationError = `${chart.type.charAt(0).toUpperCase() + chart.type.slice(1)} chart requires a numeric column for the Y-axis.`;
       }
     } else if (chart.type === 'pie') {
-      if (!chart.xAxis || !chart.yAxis) {
+      if (!currentDimension || !chart.yAxis) {
         validationError = "Pie chart requires Category and Values fields.";
       } else if (yType !== 'numeric') {
         validationError = "Pie chart requires a numeric column for Values.";
@@ -119,6 +258,91 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
       renderErrorMessage(validationError);
       return;
     }
+
+    const datasetsList = useDatasetStore.getState().datasets;
+    const linkedDatasets = datasetsList.map(d => d.id).filter(id => id !== chart.datasetId);
+
+    // Consolidated Handler for clicks (Drill-Down vs. Cross-Filtering)
+    const handlePointClick = (value: unknown, operator: FilterOperator = 'equals') => {
+      if (isDrillMode && chart.drillPath && chart.drillPath.length > 0) {
+        const currentDepth = drillState?.currentDepth || 0;
+        const nextDepth = currentDepth + 1;
+        
+        if (nextDepth < chart.drillPath.length) {
+          const newFilter = {
+            column: currentDimension,
+            operator,
+            value,
+          };
+          const updatedFilters = drillState 
+            ? [...drillState.activeFilters, newFilter]
+            : [newFilter];
+            
+          setWidgetDrillState(chart.id, {
+            currentDepth: nextDepth,
+            activeFilters: updatedFilters
+          });
+        } else {
+          toast({
+            title: "End of Hierarchy",
+            description: "You have reached the deepest level of the drill path.",
+          });
+        }
+      } else {
+        toggleCrossFilter({
+          column: currentDimension,
+          operator,
+          value,
+          sourceWidgetId: chart.id,
+          datasetId: chart.datasetId,
+          linkedDatasets
+        });
+      }
+    };
+
+    // Consolidated Handler for Right-Clicks (Drill-Through raw view)
+    const handlePointRightClick = (event: MouseEvent, value: unknown, operator: FilterOperator = 'equals', filterCol: string = currentDimension) => {
+      event.preventDefault();
+
+      if (!dataset) return;
+
+      const baseQuery: Query = {
+        filters: {
+          categoricalFilters: activeFilters.categoricalFilters,
+          dateRangeFilters: activeFilters.dateRangeFilters,
+          conditions: []
+        },
+        pagination: { pageSize: 1000 }
+      };
+
+      const mergedQuery = filterManager.merge(baseQuery, activeGlobalFilters, chart.id, dataset);
+
+      // Append local drill-down filters
+      if (drillState && drillState.activeFilters.length > 0) {
+        drillState.activeFilters.forEach((f) => {
+          mergedQuery.filters!.conditions!.push({
+            column: f.column,
+            operator: f.operator,
+            value: f.value,
+          });
+        });
+      }
+
+      // Append selected element value filter
+      mergedQuery.filters!.conditions!.push({
+        column: filterCol,
+        operator,
+        value,
+      });
+
+      const rangeVal = value as { start?: number; end?: number } | null;
+      const formattedVal = typeof value === 'object' && value !== null
+        ? `${rangeVal?.start ?? "-∞"} to ${rangeVal?.end ?? "∞"}`
+        : String(value);
+
+      const modalTitle = `Raw Data for ${chart.title} (${filterCol} = ${formattedVal})`;
+      openDrillThrough(chart.datasetId, mergedQuery, modalTitle);
+    };
 
     try {
       switch (chart.type) {
@@ -167,19 +391,19 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
     }
 
     function renderBarChart() {
-      if (!chart.xAxis || !chart.yAxis) return;
+      if (!currentDimension || !chart.yAxis) return;
 
       const aggregatedData = chart.groupBy
         ? d3.rollup(
-            chart.data,
+            chartData,
             v => d3.sum(v, d => Number(d[chart.yAxis!]) || 0),
-            d => String(d[chart.xAxis!]),
+            d => String(d[currentDimension]),
             d => String(d[chart.groupBy!])
           )
         : d3.rollup(
-            chart.data,
+            chartData,
             v => d3.sum(v, d => Number(d[chart.yAxis!]) || 0),
-            d => String(d[chart.xAxis!])
+            d => String(d[currentDimension])
           );
 
       let data: Array<{ key: string; value: number; group?: string }> = [];
@@ -244,8 +468,36 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
           .attr("y", d => yScale(d.value))
           .attr("width", xSubScale.bandwidth())
           .attr("height", d => chartHeight - yScale(d.value))
-          .attr("fill", d => colorScale(d.group!) as string)
-          .attr("opacity", 0.85);
+          .attr("fill", d => {
+            const evalRow = { [currentDimension]: d.key, [chart.yAxis!]: d.value, value: d.value, [chart.groupBy!]: d.group! };
+            const style = formattingEngine.evaluateCompiledRules(compiledFormattingRules, evalRow, chart.yAxis || currentDimension);
+            return style?.fill || style?.textColor || style?.backgroundColor || (colorScale(d.group!) as string);
+          })
+          .attr("opacity", d => getOpacity(d.key, 0.85))
+          .style("cursor", "pointer")
+          .attr("title", "Left-click to filter/drill, Right-click to view raw rows")
+          .on("click", (event, d) => handlePointClick(d.key))
+          .on("contextmenu", (event, d) => {
+            event.preventDefault();
+            if (!dataset) return;
+            const baseQuery: Query = {
+              filters: {
+                categoricalFilters: activeFilters.categoricalFilters,
+                dateRangeFilters: activeFilters.dateRangeFilters,
+                conditions: []
+              },
+              pagination: { pageSize: 1000 }
+            };
+            const mergedQuery = filterManager.merge(baseQuery, activeGlobalFilters, chart.id, dataset);
+            if (drillState && drillState.activeFilters.length > 0) {
+              drillState.activeFilters.forEach((f) => {
+                mergedQuery.filters!.conditions!.push({ column: f.column, operator: f.operator, value: f.value });
+              });
+            }
+            mergedQuery.filters!.conditions!.push({ column: currentDimension, operator: 'equals', value: d.key });
+            mergedQuery.filters!.conditions!.push({ column: chart.groupBy!, operator: 'equals', value: d.group! });
+            openDrillThrough(chart.datasetId, mergedQuery, `Raw Data (${currentDimension} = ${d.key}, ${chart.groupBy} = ${d.group})`);
+          });
       } else {
         chartArea.selectAll(".bar")
           .data(data)
@@ -255,8 +507,16 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
           .attr("y", d => yScale(d.value))
           .attr("width", xScale.bandwidth())
           .attr("height", d => chartHeight - yScale(d.value))
-          .attr("fill", "hsl(var(--chart-1))")
-          .attr("opacity", 0.85);
+          .attr("fill", d => {
+            const evalRow = { [currentDimension]: d.key, [chart.yAxis!]: d.value, value: d.value };
+            const style = formattingEngine.evaluateCompiledRules(compiledFormattingRules, evalRow, chart.yAxis || currentDimension);
+            return style?.fill || style?.textColor || style?.backgroundColor || "hsl(var(--chart-1))";
+          })
+          .attr("opacity", d => getOpacity(d.key, 0.85))
+          .style("cursor", "pointer")
+          .attr("title", "Left-click to filter/drill, Right-click to view raw rows")
+          .on("click", (event, d) => handlePointClick(d.key))
+          .on("contextmenu", (event, d) => handlePointRightClick(event, d.key));
       }
 
       // Axis labels
@@ -275,17 +535,17 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
         .style("text-anchor", "middle")
         .style("font-size", "11px")
         .style("fill", "hsl(var(--muted-foreground))")
-        .text(chart.xAxis);
+        .text(currentDimension);
     }
 
     function renderLineChart() {
-      if (!chart.xAxis || !chart.yAxis) return;
+      if (!currentDimension || !chart.yAxis) return;
 
-      const data = chart.data
-        .filter(d => d[chart.xAxis!] !== null && d[chart.yAxis!] !== null)
+      const data = chartData
+        .filter(d => d[currentDimension] !== null && d[chart.yAxis!] !== null)
         .sort((a, b) => {
-          const aVal = a[chart.xAxis!];
-          const bVal = b[chart.xAxis!];
+          const aVal = a[currentDimension];
+          const bVal = b[currentDimension];
           if (xType === 'numeric') {
             return Number(aVal) - Number(bVal);
           } else if (xType === 'date') {
@@ -300,18 +560,19 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
         return;
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let xScale: any;
       if (xType === 'numeric') {
         xScale = d3.scaleLinear()
-          .domain(d3.extent(data, d => Number(d[chart.xAxis!])) as [number, number])
+          .domain(d3.extent(data, d => Number(d[currentDimension])) as [number, number])
           .range([0, chartWidth]);
       } else if (xType === 'date') {
         xScale = d3.scaleTime()
-          .domain(d3.extent(data, d => new Date(String(d[chart.xAxis!]))) as [Date, Date])
+          .domain(d3.extent(data, d => new Date(String(d[currentDimension]))) as [Date, Date])
           .range([0, chartWidth]);
       } else {
         xScale = d3.scalePoint()
-          .domain(data.map(d => String(d[chart.xAxis!])))
+          .domain(data.map(d => String(d[currentDimension])))
           .range([0, chartWidth])
           .padding(0.1);
       }
@@ -321,12 +582,12 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
         .nice()
         .range([chartHeight, 0]);
 
-      const line = d3.line<any>()
+      const line = d3.line<DataRow>()
         .x(d => {
-          const val = d[chart.xAxis!];
-          if (xType === 'numeric') return xScale(Number(val));
-          if (xType === 'date') return xScale(new Date(String(val)));
-          return xScale(String(val)) || 0;
+          const val = d[currentDimension];
+          if (xType === 'numeric') return Number(xScale(Number(val)));
+          if (xType === 'date') return Number(xScale(new Date(String(val))));
+          return Number(xScale(String(val))) || 0;
         })
         .y(d => yScale(Number(d[chart.yAxis!])))
         .curve(d3.curveMonotoneX);
@@ -336,7 +597,7 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
         .attr("transform", `translate(0,${chartHeight})`);
 
       if (xType === 'date') {
-        xAxisG.call(d3.axisBottom(xScale).ticks(Math.max(2, Math.floor(chartWidth / 85))).tickFormat(d3.timeFormat("%Y-%m-%d") as any));
+        xAxisG.call(d3.axisBottom(xScale).ticks(Math.max(2, Math.floor(chartWidth / 85))).tickFormat(d3.timeFormat("%Y-%m-%d") as unknown as (dv: d3.NumberValue, i: number) => string));
       } else {
         xAxisG.call(d3.axisBottom(xScale).ticks(Math.max(2, Math.floor(chartWidth / 85))));
       }
@@ -361,20 +622,28 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
         .attr("d", line);
 
       // Points (only draw if dataset is reasonably sized to avoid overlap crowding)
-      if (data.length <= 100) {
+      if (data.length <= 250) {
         chartArea.selectAll(".dot")
           .data(data)
           .enter().append("circle")
           .attr("class", "dot")
           .attr("cx", d => {
-            const val = d[chart.xAxis!];
-            if (xType === 'numeric') return xScale(Number(val));
-            if (xType === 'date') return xScale(new Date(String(val)));
-            return xScale(String(val)) || 0;
+            const val = d[currentDimension];
+            if (xType === 'numeric') return Number(xScale(Number(val)));
+            if (xType === 'date') return Number(xScale(new Date(String(val))));
+            return Number(xScale(String(val))) || 0;
           })
           .attr("cy", d => yScale(Number(d[chart.yAxis!])))
-          .attr("r", 3)
-          .attr("fill", "hsl(var(--chart-1))");
+          .attr("r", 5)
+          .attr("fill", d => {
+            const style = formattingEngine.evaluateCompiledRules(compiledFormattingRules, d, chart.yAxis || currentDimension);
+            return style?.fill || style?.textColor || style?.backgroundColor || "hsl(var(--chart-1))";
+          })
+          .attr("opacity", d => getOpacity(String(d[currentDimension]), 0.75))
+          .style("cursor", "pointer")
+          .attr("title", "Left-click to filter/drill, Right-click to view raw rows")
+          .on("click", (event, d) => handlePointClick(String(d[currentDimension])))
+          .on("contextmenu", (event, d) => handlePointRightClick(event, String(d[currentDimension])));
       }
 
       // Labels
@@ -393,16 +662,16 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
         .style("text-anchor", "middle")
         .style("font-size", "11px")
         .style("fill", "hsl(var(--muted-foreground))")
-        .text(chart.xAxis);
+        .text(currentDimension);
     }
 
     function renderPieChart() {
-      if (!chart.xAxis || !chart.yAxis) return;
+      if (!currentDimension || !chart.yAxis) return;
 
       const aggregatedData = d3.rollup(
-        chart.data,
+        chartData,
         v => d3.sum(v, d => Number(d[chart.yAxis!]) || 0),
-        d => String(d[chart.xAxis!])
+        d => String(d[currentDimension])
       );
 
       const data = Array.from(aggregatedData, ([key, value]) => ({ key, value }))
@@ -422,11 +691,11 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
         .domain(data.map(d => d.key))
         .range(["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))"]);
 
-      const pie = d3.pie<any>()
+      const pie = d3.pie<PieSlice>()
         .value(d => d.value)
         .sort(null);
 
-      const arc = d3.arc<any>()
+      const arc = d3.arc<d3.PieArcDatum<PieSlice>>()
         .innerRadius(0)
         .outerRadius(radius);
 
@@ -438,8 +707,16 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
 
       arcs.append("path")
         .attr("d", arc)
-        .attr("fill", d => colorScale(d.data.key) as string)
-        .attr("opacity", 0.85);
+        .attr("fill", d => {
+          const evalRow = { [currentDimension]: d.data.key, [chart.yAxis!]: d.data.value, value: d.data.value };
+          const style = formattingEngine.evaluateCompiledRules(compiledFormattingRules, evalRow, chart.yAxis || currentDimension);
+          return style?.fill || style?.textColor || style?.backgroundColor || (colorScale(d.data.key) as string);
+        })
+        .attr("opacity", d => getOpacity(d.data.key, 0.85))
+        .style("cursor", "pointer")
+        .attr("title", "Left-click to filter/drill, Right-click to view raw rows")
+        .on("click", (event, d) => handlePointClick(d.data.key))
+        .on("contextmenu", (event, d) => handlePointRightClick(event, d.data.key));
 
       arcs.append("text")
         .attr("transform", d => `translate(${arc.centroid(d)})`)
@@ -455,14 +732,14 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
     }
 
     function renderScatterPlot() {
-      if (!chart.xAxis || !chart.yAxis) return;
+      if (!currentDimension || !chart.yAxis) return;
 
-      const data = chart.data.filter(d => 
-        d[chart.xAxis!] !== null && d[chart.yAxis!] !== null
+      const data = chartData.filter(d => 
+        d[currentDimension] !== null && d[chart.yAxis!] !== null
       );
 
       const xScale = d3.scaleLinear()
-        .domain(d3.extent(data, d => Number(d[chart.xAxis!])) as [number, number])
+        .domain(d3.extent(data, d => Number(d[currentDimension])) as [number, number])
         .nice()
         .range([0, chartWidth]);
 
@@ -482,15 +759,24 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
       chartArea.append("g")
         .call(d3.axisLeft(yScale));
 
+      const filterCol = chart.groupBy ? chart.groupBy : currentDimension;
+
       chartArea.selectAll(".dot")
         .data(data)
         .enter().append("circle")
         .attr("class", "dot")
-        .attr("cx", d => xScale(Number(d[chart.xAxis!])))
+        .attr("cx", d => xScale(Number(d[currentDimension])))
         .attr("cy", d => yScale(Number(d[chart.yAxis!])))
-        .attr("r", 4.5)
-        .attr("fill", d => colorScale(chart.groupBy ? String(d[chart.groupBy!]) : 'default') as string)
-        .attr("opacity", 0.75);
+        .attr("r", 5)
+        .attr("fill", d => {
+          const style = formattingEngine.evaluateCompiledRules(compiledFormattingRules, d, chart.yAxis || currentDimension);
+          return style?.fill || style?.textColor || style?.backgroundColor || (colorScale(chart.groupBy ? String(d[chart.groupBy!]) : 'default') as string);
+        })
+        .attr("opacity", d => getOpacity(chart.groupBy ? String(d[chart.groupBy!]) : String(d[currentDimension]), 0.75))
+        .style("cursor", "pointer")
+        .attr("title", "Left-click to filter/drill, Right-click to view raw rows")
+        .on("click", (event, d) => handlePointClick(String(d[filterCol])))
+        .on("contextmenu", (event, d) => handlePointRightClick(event, String(d[filterCol]), 'equals', filterCol));
 
       chartArea.append("text")
         .attr("transform", "rotate(-90)")
@@ -507,14 +793,14 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
         .style("text-anchor", "middle")
         .style("font-size", "11px")
         .style("fill", "hsl(var(--muted-foreground))")
-        .text(chart.xAxis);
+        .text(currentDimension);
     }
 
     function renderHistogram() {
-      if (!chart.xAxis) return;
+      if (!currentDimension) return;
 
-      const data = chart.data
-        .map(d => Number(d[chart.xAxis!]))
+      const data = chartData
+        .map(d => Number(d[currentDimension]))
         .filter(d => !isNaN(d));
 
       const xScale = d3.scaleLinear()
@@ -522,8 +808,7 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
         .nice()
         .range([0, chartWidth]);
 
-      const histogram = d3.histogram()
-        .value(d => d)
+      const histogram = d3.bin()
         .domain(xScale.domain() as [number, number])
         .thresholds(xScale.ticks(20));
 
@@ -549,8 +834,16 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
         .attr("y", d => yScale(d.length))
         .attr("width", d => Math.max(0, xScale(d.x1!) - xScale(d.x0!) - 1))
         .attr("height", d => chartHeight - yScale(d.length))
-        .attr("fill", "hsl(var(--chart-1))")
-        .attr("opacity", 0.85);
+        .attr("fill", d => {
+          const evalRow = { [currentDimension]: d.x0, count: d.length, value: d.length };
+          const style = formattingEngine.evaluateCompiledRules(compiledFormattingRules, evalRow, currentDimension);
+          return style?.fill || style?.textColor || style?.backgroundColor || "hsl(var(--chart-1))";
+        })
+        .attr("opacity", d => getOpacity({ start: d.x0, end: d.x1 }, 0.85))
+        .style("cursor", "pointer")
+        .attr("title", "Left-click to filter/drill, Right-click to view raw rows")
+        .on("click", (event, d) => handlePointClick({ start: d.x0, end: d.x1 }, 'between'))
+        .on("contextmenu", (event, d) => handlePointRightClick(event, { start: d.x0, end: d.x1 }, 'between'));
 
       chartArea.append("text")
         .attr("transform", "rotate(-90)")
@@ -567,21 +860,21 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
         .style("text-anchor", "middle")
         .style("font-size", "11px")
         .style("fill", "hsl(var(--muted-foreground))")
-        .text(chart.xAxis);
+        .text(currentDimension);
     }
 
     function renderHeatmap() {
-      if (!chart.xAxis || !chart.yAxis) return;
+      if (!currentDimension || !chart.yAxis) return;
 
       const aggregated = d3.rollup(
-        chart.data,
+        chartData,
         v => v.length,
-        d => String(d[chart.xAxis!]),
+        d => String(d[currentDimension]),
         d => String(d[chart.yAxis!])
       );
 
-      const xValues = Array.from(new Set(chart.data.map(d => String(d[chart.xAxis!])))).sort();
-      const yValues = Array.from(new Set(chart.data.map(d => String(d[chart.yAxis!])))).sort();
+      const xValues = Array.from(new Set(chartData.map(d => String(d[currentDimension])))).sort();
+      const yValues = Array.from(new Set(chartData.map(d => String(d[chart.yAxis!])))).sort();
 
       const xScale = d3.scaleBand()
         .domain(xValues)
@@ -597,7 +890,7 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
       const colorScale = d3.scaleSequential(d3.interpolateBlues)
         .domain([0, maxValue]);
 
-      const heatmapData: any[] = [];
+      const heatmapData: HeatmapCell[] = [];
       xValues.forEach(x => {
         yValues.forEach(y => {
           const value = aggregated.get(x)?.get(y) || 0;
@@ -609,13 +902,22 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
         .data(heatmapData)
         .enter().append("rect")
         .attr("class", "cell")
-        .attr("x", (d: any) => xScale(d.x) || 0)
-        .attr("y", (d: any) => yScale(d.y) || 0)
+        .attr("x", d => xScale(d.x) || 0)
+        .attr("y", d => yScale(d.y) || 0)
         .attr("width", xScale.bandwidth())
         .attr("height", yScale.bandwidth())
-        .attr("fill", (d: any) => colorScale(d.value))
+        .attr("fill", d => {
+          const evalRow = { [currentDimension]: d.x, [chart.yAxis!]: d.y, value: d.value };
+          const style = formattingEngine.evaluateCompiledRules(compiledFormattingRules, evalRow, chart.yAxis || currentDimension);
+          return style?.fill || style?.textColor || style?.backgroundColor || colorScale(d.value);
+        })
+        .attr("opacity", d => getOpacity(d.x, 1.0))
+        .style("cursor", "pointer")
+        .attr("title", "Left-click to filter/drill, Right-click to view raw rows")
+        .on("click", (event, d) => handlePointClick(d.x))
+        .on("contextmenu", (event, d) => handlePointRightClick(event, d.x))
         .append("title")
-        .text((d: any) => `${d.x}, ${d.y}: ${d.value}`);
+        .text(d => `${d.x}, ${d.y}: ${d.value}`);
 
       chartArea.append("g")
         .attr("transform", `translate(0,${chartHeight})`)
@@ -644,17 +946,17 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
         .style("text-anchor", "middle")
         .style("font-size", "11px")
         .style("fill", "hsl(var(--muted-foreground))")
-        .text(chart.xAxis);
+        .text(currentDimension);
     }
 
     function renderAreaChart() {
-      if (!chart.xAxis || !chart.yAxis) return;
+      if (!currentDimension || !chart.yAxis) return;
 
-      const data = chart.data
-        .filter(d => d[chart.xAxis!] !== null && d[chart.yAxis!] !== null)
+      const data = chartData
+        .filter(d => d[currentDimension] !== null && d[chart.yAxis!] !== null)
         .sort((a, b) => {
-          const aVal = a[chart.xAxis!];
-          const bVal = b[chart.xAxis!];
+          const aVal = a[currentDimension];
+          const bVal = b[currentDimension];
           if (xType === 'numeric') {
             return Number(aVal) - Number(bVal);
           } else if (xType === 'date') {
@@ -669,18 +971,19 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
         return;
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let xScale: any;
       if (xType === 'numeric') {
         xScale = d3.scaleLinear()
-          .domain(d3.extent(data, d => Number(d[chart.xAxis!])) as [number, number])
+          .domain(d3.extent(data, d => Number(d[currentDimension])) as [number, number])
           .range([0, chartWidth]);
       } else if (xType === 'date') {
         xScale = d3.scaleTime()
-          .domain(d3.extent(data, d => new Date(String(d[chart.xAxis!]))) as [Date, Date])
+          .domain(d3.extent(data, d => new Date(String(d[currentDimension]))) as [Date, Date])
           .range([0, chartWidth]);
       } else {
         xScale = d3.scalePoint()
-          .domain(data.map(d => String(d[chart.xAxis!])))
+          .domain(data.map(d => String(d[currentDimension])))
           .range([0, chartWidth])
           .padding(0.1);
       }
@@ -690,23 +993,23 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
         .nice()
         .range([chartHeight, 0]);
 
-      const area = d3.area<any>()
+      const area = d3.area<DataRow>()
         .x(d => {
-          const val = d[chart.xAxis!];
-          if (xType === 'numeric') return xScale(Number(val));
-          if (xType === 'date') return xScale(new Date(String(val)));
-          return xScale(String(val)) || 0;
+          const val = d[currentDimension];
+          if (xType === 'numeric') return Number(xScale(Number(val)));
+          if (xType === 'date') return Number(xScale(new Date(String(val))));
+          return Number(xScale(String(val))) || 0;
         })
         .y0(chartHeight)
         .y1(d => yScale(Number(d[chart.yAxis!])))
         .curve(d3.curveMonotoneX);
 
-      const line = d3.line<any>()
+      const line = d3.line<DataRow>()
         .x(d => {
-          const val = d[chart.xAxis!];
-          if (xType === 'numeric') return xScale(Number(val));
-          if (xType === 'date') return xScale(new Date(String(val)));
-          return xScale(String(val)) || 0;
+          const val = d[currentDimension];
+          if (xType === 'numeric') return Number(xScale(Number(val)));
+          if (xType === 'date') return Number(xScale(new Date(String(val))));
+          return Number(xScale(String(val))) || 0;
         })
         .y(d => yScale(Number(d[chart.yAxis!])))
         .curve(d3.curveMonotoneX);
@@ -715,7 +1018,7 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
         .attr("transform", `translate(0,${chartHeight})`);
 
       if (xType === 'date') {
-        xAxisG.call(d3.axisBottom(xScale).ticks(Math.max(2, Math.floor(chartWidth / 85))).tickFormat(d3.timeFormat("%Y-%m-%d") as any));
+        xAxisG.call(d3.axisBottom(xScale).ticks(Math.max(2, Math.floor(chartWidth / 85))).tickFormat(d3.timeFormat("%Y-%m-%d") as unknown as (dv: d3.NumberValue, i: number) => string));
       } else {
         xAxisG.call(d3.axisBottom(xScale).ticks(Math.max(2, Math.floor(chartWidth / 85))));
       }
@@ -744,6 +1047,31 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
         .attr("stroke-width", 2)
         .attr("d", line);
 
+      // Points (only draw if dataset is reasonably sized to avoid overlap crowding)
+      if (data.length <= 250) {
+        chartArea.selectAll(".dot")
+          .data(data)
+          .enter().append("circle")
+          .attr("class", "dot")
+          .attr("cx", d => {
+            const val = d[currentDimension];
+            if (xType === 'numeric') return Number(xScale(Number(val)));
+            if (xType === 'date') return Number(xScale(new Date(String(val))));
+            return Number(xScale(String(val))) || 0;
+          })
+          .attr("cy", d => yScale(Number(d[chart.yAxis!])))
+          .attr("r", 4)
+          .attr("fill", d => {
+            const style = formattingEngine.evaluateCompiledRules(compiledFormattingRules, d, chart.yAxis || currentDimension);
+            return style?.fill || style?.textColor || style?.backgroundColor || "hsl(var(--chart-1))";
+          })
+          .attr("opacity", d => getOpacity(String(d[currentDimension]), 0.85))
+          .style("cursor", "pointer")
+          .attr("title", "Left-click to filter/drill, Right-click to view raw rows")
+          .on("click", (event, d) => handlePointClick(String(d[currentDimension])))
+          .on("contextmenu", (event, d) => handlePointRightClick(event, String(d[currentDimension])));
+      }
+
       chartArea.append("text")
         .attr("transform", "rotate(-90)")
         .attr("y", 0 - margin.left)
@@ -759,20 +1087,23 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
         .style("text-anchor", "middle")
         .style("font-size", "11px")
         .style("fill", "hsl(var(--muted-foreground))")
-        .text(chart.xAxis);
+        .text(currentDimension);
     }
 
     function renderBubbleChart() {
-      if (!chart.xAxis || !chart.yAxis || !chart.sizeBy) return;
+      if (!currentDimension || !chart.yAxis || !chart.sizeBy) return;
 
-      const data = chart.data.filter(d => 
-        d[chart.xAxis!] !== null && 
-        d[chart.yAxis!] !== null && 
-        d[chart.sizeBy!] !== null
-      );
+      const data = chartData
+        .filter(d => d[currentDimension] !== null && d[chart.yAxis!] !== null && d[chart.sizeBy!] !== null)
+        .filter(d => !isNaN(Number(d[currentDimension])) && !isNaN(Number(d[chart.yAxis!])) && !isNaN(Number(d[chart.sizeBy!])));
+
+      if (!data.length) {
+        renderErrorMessage("No valid numeric records found for bubble chart.");
+        return;
+      }
 
       const xScale = d3.scaleLinear()
-        .domain(d3.extent(data, d => Number(d[chart.xAxis!])) as [number, number])
+        .domain(d3.extent(data, d => Number(d[currentDimension])) as [number, number])
         .nice()
         .range([0, chartWidth]);
 
@@ -796,17 +1127,26 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
       chartArea.append("g")
         .call(d3.axisLeft(yScale));
 
+      const filterCol = chart.groupBy ? chart.groupBy : currentDimension;
+
       chartArea.selectAll(".bubble")
         .data(data)
         .enter().append("circle")
         .attr("class", "bubble")
-        .attr("cx", d => xScale(Number(d[chart.xAxis!])))
+        .attr("cx", d => xScale(Number(d[currentDimension])))
         .attr("cy", d => yScale(Number(d[chart.yAxis!])))
         .attr("r", d => sizeScale(Number(d[chart.sizeBy!])))
-        .attr("fill", d => colorScale(chart.groupBy ? String(d[chart.groupBy!]) : 'default') as string)
-        .attr("opacity", 0.7)
+        .attr("fill", d => {
+          const style = formattingEngine.evaluateCompiledRules(compiledFormattingRules, d, chart.yAxis || currentDimension);
+          return style?.fill || style?.textColor || style?.backgroundColor || (colorScale(chart.groupBy ? String(d[chart.groupBy!]) : 'default') as string);
+        })
+        .attr("opacity", d => getOpacity(chart.groupBy ? String(d[chart.groupBy!]) : String(d[currentDimension]), 0.7))
+        .style("cursor", "pointer")
+        .attr("title", "Left-click to filter/drill, Right-click to view raw rows")
+        .on("click", (event, d) => handlePointClick(String(d[filterCol])))
+        .on("contextmenu", (event, d) => handlePointRightClick(event, String(d[filterCol]), 'equals', filterCol))
         .append("title")
-        .text(d => `${chart.xAxis}: ${d[chart.xAxis!]}, ${chart.yAxis}: ${d[chart.yAxis!]}, ${chart.sizeBy}: ${d[chart.sizeBy!]}`);
+        .text(d => `${currentDimension}: ${d[currentDimension]}, ${chart.yAxis}: ${d[chart.yAxis!]}, ${chart.sizeBy}: ${d[chart.sizeBy!]}`);
 
       chartArea.append("text")
         .attr("transform", "rotate(-90)")
@@ -823,14 +1163,89 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
         .style("text-anchor", "middle")
         .style("font-size", "11px")
         .style("fill", "hsl(var(--muted-foreground))")
-        .text(chart.xAxis);
+        .text(currentDimension);
     }
 
-  }, [chart, width]);
+  }, [
+    chart,
+    width,
+    chartData,
+    activeCrossFilter,
+    toggleCrossFilter,
+    drillState,
+    currentDimension,
+    isDrillMode,
+    openDrillThrough,
+    setWidgetDrillState,
+    resetWidgetDrillState,
+    activeFilters,
+    activeGlobalFilters,
+    dataset,
+    compiledFormattingRules
+  ]);
 
   return (
-    <div ref={containerRef} className="w-full animate-chart-animate" data-chart-id={chart.id}>
-      <svg ref={svgRef} className="w-full h-auto" />
+    <div ref={containerRef} className="w-full flex flex-col h-full gap-2 animate-chart-animate relative" data-chart-id={chart.id}>
+      {/* Chart Toolbar (for Drill-Down controls) */}
+      {chart.drillPath && chart.drillPath.length > 0 && (
+        <div className="flex items-center justify-between text-xs border-b border-border/40 pb-2 px-1 flex-shrink-0">
+          <div className="flex items-center gap-1.5 min-w-0">
+            {drillState && drillState.currentDepth > 0 ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-[10px] gap-1 shrink-0"
+                onClick={handleDrillUp}
+              >
+                <ArrowUp className="h-3 w-3" />
+                Up
+              </Button>
+            ) : (
+              <span className="text-muted-foreground italic truncate text-[10px]">
+                Drill Down Hierarchy
+              </span>
+            )}
+            
+            {/* Breadcrumb list */}
+            {drillState && drillState.currentDepth > 0 && (
+              <div className="flex items-center gap-1 min-w-0 text-[10px] text-muted-foreground overflow-hidden">
+                <span className="shrink-0 font-semibold text-foreground">{chart.drillPath[0]}</span>
+                {drillState.activeFilters.map((f, idx) => (
+                  <div key={idx} className="flex items-center gap-1 min-w-0">
+                    <span>/</span>
+                    <span className="truncate font-medium text-primary max-w-[60px]" title={String(f.value)}>
+                      {String(f.value)}
+                    </span>
+                    <span>/</span>
+                    <span className="shrink-0 font-semibold text-foreground">
+                      {chart.drillPath[idx + 1] || 'Details'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Drill Mode Toggle */}
+          <div className="flex items-center gap-1">
+            <Button
+              variant={isDrillMode ? "premium" : "ghost"}
+              size="sm"
+              className="h-7 px-2 text-[10px] gap-1"
+              onClick={() => setIsDrillMode(!isDrillMode)}
+              title={isDrillMode ? "Clicking a point will drill down" : "Clicking a point will cross-filter"}
+            >
+              <GitFork className="h-3.5 w-3.5 rotate-90" />
+              Drill Mode: {isDrillMode ? "ON" : "OFF"}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* SVG drawing area */}
+      <div className="flex-1 min-h-0 w-full relative">
+        <svg ref={svgRef} className="w-full h-auto" />
+      </div>
     </div>
   );
 }

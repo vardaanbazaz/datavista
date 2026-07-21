@@ -1,5 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Sidebar } from "./Sidebar";
+import { GlobalSearchModal } from "./GlobalSearchModal";
+import { InstantiateTemplateModal } from "@/features/dashboards/components/InstantiateTemplateModal";
 import { MainContent } from "@/app/layout/MainContent";
 import { FileUpload } from "@/features/upload/components/FileUpload";
 import { ChartBuilder } from "@/features/charts/components/ChartBuilder";
@@ -40,6 +42,21 @@ export function Dashboard() {
   const uploadDataset = useDatasetStore((state) => state.uploadDataset);
 
   const filteredData = useFilterStore((state) => state.filteredData);
+
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+
+  // Handle global search shortcut (Cmd+K / Ctrl+K)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setIsSearchOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   // Initialize persistence on mount
   useEffect(() => {
@@ -98,7 +115,7 @@ export function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col lg:flex-row">
-      <Sidebar />
+      <Sidebar onOpenSearch={() => setIsSearchOpen(true)} />
       
       <MainContent>
         {isLoading && (
@@ -428,6 +445,16 @@ export function Dashboard() {
       </MainContent>
       
       <WelcomeOverlay />
+      
+      <GlobalSearchModal
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+        onOpenTemplateModal={() => setIsTemplateModalOpen(true)}
+      />
+      <InstantiateTemplateModal
+        isOpen={isTemplateModalOpen}
+        onClose={() => setIsTemplateModalOpen(false)}
+      />
     </div>
   );
 }

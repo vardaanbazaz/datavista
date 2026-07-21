@@ -18,7 +18,7 @@ import { formulaEngine } from "@/shared/services/formulaEngine";
 import { toast } from "@/shared/hooks/use-toast";
 
 function createDebouncer(delay: number) {
-  let timer: any = null;
+  let timer: ReturnType<typeof setTimeout> | null = null;
   return (callback: () => void) => {
     if (timer) clearTimeout(timer);
     timer = setTimeout(callback, delay);
@@ -67,7 +67,7 @@ export const persistenceService = {
 
       // 4. Fetch UI preferences
       const preferences = await db.uiState.toArray();
-      const prefs: Record<string, any> = {};
+      const prefs: Record<string, unknown> = {};
       preferences.forEach((p) => {
         if (isValidUIState(p.key, p.value)) {
           prefs[p.key] = p.value;
@@ -342,7 +342,10 @@ export const persistenceService = {
           const hasMissingCharts = dashboard.chartIds.some((id) => !allChartIds.has(id));
           if (hasMissingCharts) {
             const updatedChartIds = dashboard.chartIds.filter((id) => allChartIds.has(id));
-            const updatedLayout = (dashboard.layout || []).filter((item) => allChartIds.has(item.i));
+            const updatedLayout = (dashboard.layout || []).filter((item) => {
+              const isKpiCard = (dashboard.kpiIds || []).includes(item.i);
+              return isKpiCard || allChartIds.has(item.i);
+            });
             saveDashboard(dashboard.id, {
               chartIds: updatedChartIds,
               layout: updatedLayout,

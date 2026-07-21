@@ -2,6 +2,8 @@ import { DatasetMetadata } from "./metadata";
 import { CalculatedField } from "./formula";
 import { WindowQuery } from "../services/window/types";
 
+import { ConditionalFormatRule } from "./formatting";
+
 export interface DataRow {
   [key: string]: string | number | null;
 }
@@ -27,6 +29,8 @@ export interface ChartConfig {
   sizeBy?: string; // For bubble charts
   data: DataRow[];
   datasetId: string; // Tracks which dataset the chart belongs to
+  drillPath?: string[]; // Dimension hierarchy for drill-down
+  formattingRules?: ConditionalFormatRule[];
 }
 
 export interface FilterState {
@@ -44,10 +48,14 @@ export interface DashboardLayoutItem {
   h: number;
 }
 
+import { KPICardConfig } from "@/features/kpi/types";
+
 export interface Dashboard {
   id: string;
   name: string;
   chartIds: string[];
+  kpiIds?: string[];
+  kpis?: KPICardConfig[];
   datasetId: string;
   createdAt: number;
   updatedAt: number;
@@ -61,4 +69,8 @@ export * from "./query";
 export * from "./metadata";
 export * from "./formula";
 export * from "../services/window/types";
+export * from "./filter";
+export * from "./drill";
+export * from "./formatting";
+export * from "./serialization";
 

@@ -17,7 +17,8 @@ export type FilterValue =
   | boolean 
   | string[] 
   | number[]
-  | { start?: string | Date; end?: string | Date } 
+  | { start?: string | number | Date; end?: string | number | Date } 
+  | Date
   | null;
 
 export interface FilterCondition {

@@ -5,14 +5,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
 import { Badge } from "@/shared/components/ui/badge";
-import { Trash2, Plus, BarChart, LineChart, PieChart, ScatterChart } from "lucide-react";
+import { Trash2, Plus, BarChart, LineChart, PieChart, ScatterChart, X, Palette } from "lucide-react";
 import { useMemo } from "react";
-import { Dataset, ChartConfig } from "@/shared/types";
+import { Dataset, ChartConfig, ConditionalFormatRule } from "@/shared/types";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/components/ui/dialog";
 import { useDatasetStore } from "@/store/datasetStore";
 import { useFilterStore } from "@/store/filterStore";
 import { useChartStore } from "@/store/chartStore";
 import { useDashboardStore } from "@/features/dashboards/store/dashboardStore";
 import { ChartVisualization } from "./ChartVisualization";
+import { ConditionalFormattingBuilder } from "@/features/dashboards/components/ConditionalFormattingBuilder";
 import { motion } from "framer-motion";
 
 export function ChartBuilder() {
@@ -39,9 +41,12 @@ export function ChartBuilder() {
   const [chartType, setChartType] = useState<ChartConfig['type']>('bar');
   const [chartTitle, setChartTitle] = useState('');
   const [xAxis, setXAxis] = useState('');
+  const [drillPath, setDrillPath] = useState<string[]>([]);
   const [yAxis, setYAxis] = useState('');
   const [groupBy, setGroupBy] = useState('none');
   const [sizeBy, setSizeBy] = useState('');
+  const [formattingRules, setFormattingRules] = useState<ConditionalFormatRule[]>([]);
+  const [isFormattingModalOpen, setIsFormattingModalOpen] = useState(false);
 
   const numericColumns = useMemo(() => {
     if (!dataset) return [];
@@ -116,6 +121,8 @@ export function ChartBuilder() {
       sizeBy: sizeBy || undefined,
       data: dataset.data,
       datasetId: activeDataset?.id || "",
+      drillPath: xAxis ? [xAxis, ...drillPath] : undefined,
+      formattingRules: formattingRules.length > 0 ? formattingRules : undefined,
     };
 
     createChart(newChart);
@@ -128,9 +135,11 @@ export function ChartBuilder() {
     // Reset form
     setChartTitle('');
     setXAxis('');
+    setDrillPath([]);
     setYAxis('');
     setGroupBy('none');
     setSizeBy('');
+    setFormattingRules([]);
   };
 
   const isFormValid = () => {
@@ -227,7 +236,10 @@ export function ChartBuilder() {
             {/* X Axis */}
             <div className="space-y-2">
               <Label>X Axis</Label>
-              <Select value={xAxis} onValueChange={setXAxis}>
+              <Select value={xAxis} onValueChange={(val) => {
+                setXAxis(val);
+                setDrillPath([]);
+              }}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select column" />
                 </SelectTrigger>
@@ -244,6 +256,77 @@ export function ChartBuilder() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Drill Path Setup */}
+            <div className="space-y-2 col-span-full">
+              <Label className="flex items-center justify-between">
+                <span>Configure Drill Path (Optional Hierarchy)</span>
+                {drillPath.length > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-xs text-muted-foreground hover:text-destructive"
+                    onClick={() => setDrillPath([])}
+                  >
+                    Clear Drill Path
+                  </Button>
+                )}
+              </Label>
+              
+              <div className="flex flex-wrap gap-2 items-center min-h-[40px] p-2 border border-dashed rounded-lg">
+                {xAxis ? (
+                  <Badge variant="secondary" className="gap-1">
+                    1. {xAxis} (X-Axis)
+                  </Badge>
+                ) : (
+                  <span className="text-xs text-muted-foreground">Select an X-Axis first to build a hierarchy.</span>
+                )}
+                
+                {drillPath.map((col, idx) => (
+                  <div key={idx} className="flex items-center gap-1">
+                    <span className="text-muted-foreground text-xs">→</span>
+                    <Badge variant="outline" className="gap-1 pr-1">
+                      {idx + 2}. {col}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-3 w-3 rounded-full p-0 text-muted-foreground hover:text-destructive hover:bg-muted"
+                        onClick={() => setDrillPath(drillPath.filter((_, i) => i !== idx))}
+                      >
+                        <X className="h-2.5 w-2.5" />
+                      </Button>
+                    </Badge>
+                  </div>
+                ))}
+
+                {xAxis && (
+                  <Select
+                    value=""
+                    onValueChange={(col) => {
+                      if (col && !drillPath.includes(col) && col !== xAxis) {
+                        setDrillPath([...drillPath, col]);
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="w-40 h-8 text-xs border-dashed">
+                      <SelectValue placeholder="+ Add drill depth" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-56">
+                      {allColumns
+                        .filter(col => col !== xAxis && !drillPath.includes(col))
+                        .map(col => (
+                          <SelectItem key={col} value={col} className="text-xs">
+                            {col}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                Define a hierarchy path (e.g. Region → Country → State). Click data points on the chart with Drill Mode active to drill down.
+              </p>
             </div>
 
             {/* Y Axis - conditional */}
@@ -315,6 +398,45 @@ export function ChartBuilder() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Conditional Formatting Rules */}
+            <div className="space-y-2 col-span-full">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-semibold">Chart Conditional Formatting</Label>
+                {formattingRules.length > 0 && (
+                  <span className="text-xs text-emerald-500 font-medium">
+                    {formattingRules.length} rule(s) configured
+                  </span>
+                )}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsFormattingModalOpen(true)}
+                className="w-full justify-start gap-2"
+              >
+                <Palette className="h-4 w-4 text-primary" />
+                {formattingRules.length > 0 ? "Edit Threshold Rules" : "Add Formatting Rules"}
+              </Button>
+
+              <Dialog open={isFormattingModalOpen} onOpenChange={setIsFormattingModalOpen}>
+                <DialogContent className="max-w-3xl glass border-white/20 shadow-2xl p-6">
+                  <DialogHeader>
+                    <DialogTitle className="text-xl font-bold flex items-center gap-2">
+                      <Palette className="h-5 w-5 text-primary" />
+                      Chart Visual Threshold Formatting Rules
+                    </DialogTitle>
+                  </DialogHeader>
+                  <div className="mt-4">
+                    <ConditionalFormattingBuilder
+                      rules={formattingRules}
+                      onChange={setFormattingRules}
+                      availableColumns={allColumns}
+                    />
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
 

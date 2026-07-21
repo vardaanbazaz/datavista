@@ -3,13 +3,13 @@ import { Dataset, ChartConfig, FilterState } from '@/shared/types';
 
 export interface UIPreference {
   key: string;
-  value: any;
+  value: unknown;
 }
 
 export interface DashboardConfig {
   id: string;
   name: string;
-  layout: any;
+  layout: unknown;
   chartIds: string[];
 }
 

@@ -44,7 +44,7 @@ export function FileUpload() {
         });
       }
 
-      let rawData: any[] = [];
+      let rawData: Record<string, unknown>[] = [];
 
       if (fileExtension === 'csv' || fileExtension === 'tsv') {
         // Parse CSV/TSV with Papa Parse
@@ -58,7 +58,7 @@ export function FileUpload() {
                 console.warn('CSV parsing warnings:', results.errors);
               }
               
-              rawData = results.data;
+              rawData = results.data as Record<string, unknown>[];
               setUploadProgress(70);
               
               const dataset = processRawData(rawData, fileName);
@@ -69,10 +69,10 @@ export function FileUpload() {
                 setIsUploading(false);
                 setUploadProgress(0);
               }, 500);
-            } catch (error: any) {
+            } catch (error: unknown) {
               toast({
                 title: "Processing failed",
-                description: error?.message || "An error occurred while cleaning dataset.",
+                description: (error as Error)?.message || "An error occurred while cleaning dataset.",
                 variant: "destructive",
               });
               setIsUploading(false);
@@ -112,10 +112,10 @@ export function FileUpload() {
             setIsUploading(false);
             setUploadProgress(0);
           }, 500);
-        } catch (error: any) {
+        } catch (error: unknown) {
           toast({
             title: "Processing failed",
-            description: error?.message || "An error occurred while cleaning dataset.",
+            description: (error as Error)?.message || "An error occurred while cleaning dataset.",
             variant: "destructive",
           });
           setIsUploading(false);
@@ -124,7 +124,7 @@ export function FileUpload() {
       } else {
         throw new Error("Unsupported file format. Please upload CSV, TSV, or XLSX files.");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('File processing error:', error);
       toast({
         title: "Upload failed",

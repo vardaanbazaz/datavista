@@ -6,6 +6,8 @@ import { useDashboardStore } from "@/features/dashboards/store/dashboardStore";
 import { Button } from "@/shared/components/ui/button";
 import { GripVertical, X } from "lucide-react";
 import { ChartConfig, DashboardLayoutItem } from "@/shared/types";
+import { KPICard } from "@/features/kpi/components/KPICard";
+import { KPICardConfig } from "@/features/kpi/types";
 import {
   findFreeSpot,
   scaleToMd,
@@ -18,24 +20,44 @@ const ResponsiveReactGridLayout = WidthProvider(Responsive);
 interface DashboardGridProps {
   charts: ChartConfig[];
   activeDashboardId: string;
+  onEditKpi?: (kpi: KPICardConfig) => void;
 }
 
-export function DashboardGrid({ charts, activeDashboardId }: DashboardGridProps) {
+export function DashboardGrid({ charts, activeDashboardId, onEditKpi }: DashboardGridProps) {
   const dashboards = useDashboardStore((state) => state.dashboards);
   const saveDashboard = useDashboardStore((state) => state.saveDashboard);
+  const deleteKpiCard = useDashboardStore((state) => state.deleteKpiCard);
   
   const [currentBreakpoint, setCurrentBreakpoint] = useState("lg");
+
+  const activeDashboard = useMemo(() => {
+    return dashboards.find((d) => d.id === activeDashboardId) || null;
+  }, [dashboards, activeDashboardId]);
+
+  // Combine charts and KPI cards in a single widgets list
+  // Put KPI cards first so they naturally stack at the top of the dashboard on layout initialization
+  const widgets = useMemo(() => {
+    const chartWidgets = charts.map((c) => ({
+      id: c.id,
+      type: "chart" as const,
+      title: c.title,
+      data: c,
+    }));
+    const kpiWidgets = (activeDashboard?.kpis || []).map((k) => ({
+      id: k.id,
+      type: "kpi-card" as const,
+      title: k.title,
+      data: k,
+    }));
+    return [...kpiWidgets, ...chartWidgets];
+  }, [charts, activeDashboard]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       window.dispatchEvent(new Event("resize"));
     }, 150);
     return () => clearTimeout(timer);
-  }, [charts.length]);
-
-  const activeDashboard = useMemo(() => {
-    return dashboards.find((d) => d.id === activeDashboardId) || null;
-  }, [dashboards, activeDashboardId]);
+  }, [widgets.length]);
 
   // Build grid layout items based on stored settings
   const layoutItems = useMemo(() => {
@@ -44,28 +66,30 @@ export function DashboardGrid({ charts, activeDashboardId }: DashboardGridProps)
     const storedLayout = activeDashboard.layout || [];
     const currentLayout: DashboardLayoutItem[] = [];
 
-    // Filter layout items that match existing charts on this dashboard
+    // Filter layout items that match existing widgets on this dashboard
     const validStoredLayout = storedLayout.filter((item) =>
-      charts.some((c) => c.id === item.i)
+      widgets.some((w) => w.id === item.i)
     );
 
-    // Position each chart
-    charts.forEach((chart) => {
-      const existing = validStoredLayout.find((item) => item.i === chart.id);
+    // Position each widget
+    widgets.forEach((widget) => {
+      const existing = validStoredLayout.find((item) => item.i === widget.id);
       if (existing) {
         currentLayout.push(existing);
       } else {
-        const spot = findFreeSpot(currentLayout, chart.id);
+        const defaultW = widget.type === "kpi-card" ? 3 : 4;
+        const defaultH = widget.type === "kpi-card" ? 2 : 4;
+        const spot = findFreeSpot(currentLayout, widget.id, defaultW, defaultH);
         currentLayout.push(spot);
       }
     });
 
     return currentLayout;
-  }, [activeDashboard, charts]);
+  }, [activeDashboard, widgets]);
 
-  // Automatically persist new layout items when a new chart is added or when layout is initialized
+  // Automatically persist new layout items when a new widget is added or when layout is initialized
   useEffect(() => {
-    if (!activeDashboard || charts.length === 0) return;
+    if (!activeDashboard || widgets.length === 0) return;
     const storedLayout = activeDashboard.layout || [];
     
     const hasChanges = layoutItems.length > storedLayout.length || 
@@ -74,7 +98,7 @@ export function DashboardGrid({ charts, activeDashboardId }: DashboardGridProps)
     if (hasChanges) {
       saveDashboard(activeDashboard.id, { layout: layoutItems });
     }
-  }, [layoutItems, activeDashboard, saveDashboard, charts.length]);
+  }, [layoutItems, activeDashboard, saveDashboard, widgets.length]);
 
   // Generate responsive layouts dynamically
   const layouts = useMemo(() => {
@@ -85,7 +109,7 @@ export function DashboardGrid({ charts, activeDashboardId }: DashboardGridProps)
     };
   }, [layoutItems]);
 
-  const handleLayoutChange = (newLayout: any[]) => {
+  const handleLayoutChange = (newLayout: { i: string; x: number; y: number; w: number; h: number }[]) => {
     if (!activeDashboard) return;
     // Prevent layout corruption from mobile stack layout modifications
     if (currentBreakpoint === "sm") return;
@@ -114,7 +138,7 @@ export function DashboardGrid({ charts, activeDashboardId }: DashboardGridProps)
     });
   };
 
-  if (!activeDashboard || charts.length === 0) return null;
+  if (!activeDashboard || widgets.length === 0) return null;
 
   const isMobile = currentBreakpoint === "sm";
 
@@ -133,32 +157,41 @@ export function DashboardGrid({ charts, activeDashboardId }: DashboardGridProps)
         onBreakpointChange={setCurrentBreakpoint}
         onLayoutChange={handleLayoutChange}
       >
-        {charts.map((chart) => (
-          <div key={chart.id}>
-            <Card className="h-full w-full glass border-border flex flex-col overflow-hidden shadow-sm group">
-              <CardHeader className="p-3 pb-2 flex flex-row items-center justify-between border-b flex-shrink-0 drag-handle select-none">
-                <div className="flex items-center gap-2 min-w-0">
-                  {!isMobile && (
-                    <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab active:cursor-grabbing shrink-0" />
-                  )}
-                  <CardTitle className="text-sm font-semibold truncate">
-                    {chart.title}
-                  </CardTitle>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
-                  onClick={() => handleRemoveChartFromDashboard(chart.id)}
-                  title="Remove from Dashboard"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </Button>
-              </CardHeader>
-              <CardContent className="p-4 flex-1 min-h-0 w-full relative bg-card/10">
-                <ChartVisualization chart={chart} />
-              </CardContent>
-            </Card>
+        {widgets.map((widget) => (
+          <div key={widget.id}>
+            {widget.type === "chart" ? (
+              <Card className="h-full w-full glass border-border flex flex-col overflow-hidden shadow-sm group">
+                <CardHeader className="p-3 pb-2 flex flex-row items-center justify-between border-b flex-shrink-0 drag-handle select-none">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {!isMobile && (
+                      <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab active:cursor-grabbing shrink-0" />
+                    )}
+                    <CardTitle className="text-sm font-semibold truncate">
+                      {widget.title}
+                    </CardTitle>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+                    onClick={() => handleRemoveChartFromDashboard(widget.id)}
+                    title="Remove from Dashboard"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </CardHeader>
+                <CardContent className="p-4 flex-1 min-h-0 w-full relative bg-card/10">
+                  <ChartVisualization chart={widget.data} />
+                </CardContent>
+              </Card>
+            ) : (
+              <KPICard
+                config={widget.data}
+                onRemove={() => deleteKpiCard(activeDashboard.id, widget.id)}
+                onEdit={() => onEditKpi?.(widget.data)}
+                isMobile={isMobile}
+              />
+            )}
           </div>
         ))}
       </ResponsiveReactGridLayout>
