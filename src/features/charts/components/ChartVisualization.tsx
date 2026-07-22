@@ -8,11 +8,15 @@ import { filterManager } from "@/features/dashboards/services/filterManager";
 import { queryEngine } from "@/shared/services/queryEngine";
 import { formattingEngine } from "@/shared/services/formattingEngine";
 import { useDrillStore } from "@/features/dashboards/store/drillStore";
-import { ArrowUp, GitFork, X } from "lucide-react";
+import { ArrowUp, GitFork, X, AlertTriangle } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
+import { Badge } from "@/shared/components/ui/badge";
 import { toast } from "@/shared/hooks/use-toast";
 
 import { pluginRegistry } from "@/shared/services/pluginRegistry";
+import { anomalyDetector } from "@/features/ai/anomalyDetector";
+import { forecastingEngine } from "@/shared/services/forecasting/engine";
+import { ForecastPoint } from "@/shared/services/forecasting/types";
 
 interface ChartVisualizationProps {
   chart: ChartConfig;
@@ -56,6 +60,11 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
 
   const drillState = widgetDrillStates[chart.id];
 
+  // Detect statistical anomalies in widget data
+  const chartAnomalies = useMemo(() => {
+    return anomalyDetector.detectChartAnomalies(chart);
+  }, [chart]);
+
   // Resolve current active X-axis dimension based on drillState depth
   const currentDimension = useMemo(() => {
     if (chart.drillPath && chart.drillPath.length > 0 && drillState) {
@@ -97,6 +106,14 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
     const result = queryEngine.execute(dataset, mergedQuery);
     return result.rows;
   }, [dataset, chart.data, activeFilters, activeGlobalFilters, chart.id, drillState]);
+
+  // Apply forecasting engine if configured for line or area charts
+  const processedChartData = useMemo(() => {
+    if ((chart.type === 'line' || chart.type === 'area') && chart.forecast?.enabled && currentDimension && chart.yAxis) {
+      return forecastingEngine.generateForecast(chartData, currentDimension, chart.yAxis, chart.forecast);
+    }
+    return chartData.map((d) => ({ ...d, isForecast: false })) as ForecastPoint[];
+  }, [chartData, chart.type, chart.forecast, currentDimension, chart.yAxis]);
 
   // Find if there is an active cross-filter originating from this chart
   const activeCrossFilter = useMemo(() => {
@@ -545,7 +562,7 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
     function renderLineChart() {
       if (!currentDimension || !chart.yAxis) return;
 
-      const data = chartData
+      const data = processedChartData
         .filter(d => d[currentDimension] !== null && d[chart.yAxis!] !== null)
         .sort((a, b) => {
           const aVal = a[currentDimension];
@@ -586,7 +603,7 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
         .nice()
         .range([chartHeight, 0]);
 
-      const line = d3.line<DataRow>()
+      const line = d3.line<ForecastPoint>()
         .x(d => {
           const val = d[currentDimension];
           if (xType === 'numeric') return Number(xScale(Number(val)));
@@ -617,13 +634,34 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
       chartArea.append("g")
         .call(d3.axisLeft(yScale));
 
-      // Path
-      chartArea.append("path")
-        .datum(data)
-        .attr("fill", "none")
-        .attr("stroke", "hsl(var(--chart-1))")
-        .attr("stroke-width", 2)
-        .attr("d", line);
+      // Separate historical vs forecast data points
+      const historicalData = data.filter(d => !d.isForecast);
+      const forecastStartIndex = data.findIndex(d => d.isForecast);
+      const forecastData = forecastStartIndex !== -1
+        ? data.slice(Math.max(0, forecastStartIndex - 1))
+        : [];
+
+      // Historical Path
+      if (historicalData.length > 0) {
+        chartArea.append("path")
+          .datum(historicalData)
+          .attr("fill", "none")
+          .attr("stroke", "hsl(var(--chart-1))")
+          .attr("stroke-width", 2)
+          .attr("d", line);
+      }
+
+      // Forecast Path (Dashed)
+      if (forecastData.length > 1) {
+        chartArea.append("path")
+          .datum(forecastData)
+          .attr("fill", "none")
+          .attr("stroke", "hsl(var(--primary))")
+          .attr("stroke-width", 2)
+          .attr("stroke-dasharray", "5 4")
+          .attr("opacity", 0.9)
+          .attr("d", line);
+      }
 
       // Points (only draw if dataset is reasonably sized to avoid overlap crowding)
       if (data.length <= 250) {
@@ -638,14 +676,17 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
             return Number(xScale(String(val))) || 0;
           })
           .attr("cy", d => yScale(Number(d[chart.yAxis!])))
-          .attr("r", 5)
+          .attr("r", d => d.isForecast ? 6 : 5)
           .attr("fill", d => {
+            if (d.isForecast) return "hsl(var(--primary))";
             const style = formattingEngine.evaluateCompiledRules(compiledFormattingRules, d, chart.yAxis || currentDimension);
             return style?.fill || style?.textColor || style?.backgroundColor || "hsl(var(--chart-1))";
           })
-          .attr("opacity", d => getOpacity(String(d[currentDimension]), 0.75))
+          .attr("stroke", d => d.isForecast ? "hsl(var(--background))" : "none")
+          .attr("stroke-width", d => d.isForecast ? 2 : 0)
+          .attr("opacity", d => getOpacity(String(d[currentDimension]), d.isForecast ? 0.9 : 0.75))
           .style("cursor", "pointer")
-          .attr("title", "Left-click to filter/drill, Right-click to view raw rows")
+          .attr("title", d => d.isForecast ? `Forecast (Projected): ${d[chart.yAxis!]}` : "Left-click to filter/drill, Right-click to view raw rows")
           .on("click", (event, d) => handlePointClick(String(d[currentDimension])))
           .on("contextmenu", (event, d) => handlePointRightClick(event, String(d[currentDimension])));
       }
@@ -919,8 +960,6 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
         .style("cursor", "pointer")
         .attr("title", "Left-click to filter/drill, Right-click to view raw rows")
         .on("click", (event, d) => handlePointClick(d.x))
-        .on("contextmenu", (event, d) => handlePointRightClick(event, d.x))
-        .append("title")
         .text(d => `${d.x}, ${d.y}: ${d.value}`);
 
       chartArea.append("g")
@@ -956,7 +995,7 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
     function renderAreaChart() {
       if (!currentDimension || !chart.yAxis) return;
 
-      const data = chartData
+      const data = processedChartData
         .filter(d => d[currentDimension] !== null && d[chart.yAxis!] !== null)
         .sort((a, b) => {
           const aVal = a[currentDimension];
@@ -997,7 +1036,7 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
         .nice()
         .range([chartHeight, 0]);
 
-      const area = d3.area<DataRow>()
+      const area = d3.area<ForecastPoint>()
         .x(d => {
           const val = d[currentDimension];
           if (xType === 'numeric') return Number(xScale(Number(val)));
@@ -1008,7 +1047,7 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
         .y1(d => yScale(Number(d[chart.yAxis!])))
         .curve(d3.curveMonotoneX);
 
-      const line = d3.line<DataRow>()
+      const line = d3.line<ForecastPoint>()
         .x(d => {
           const val = d[currentDimension];
           if (xType === 'numeric') return Number(xScale(Number(val)));
@@ -1038,18 +1077,42 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
       chartArea.append("g")
         .call(d3.axisLeft(yScale));
 
-      chartArea.append("path")
-        .datum(data)
-        .attr("fill", "hsl(var(--chart-1))")
-        .attr("fill-opacity", 0.45)
-        .attr("d", area);
+      const historicalData = data.filter(d => !d.isForecast);
+      const forecastStartIndex = data.findIndex(d => d.isForecast);
+      const forecastData = forecastStartIndex !== -1
+        ? data.slice(Math.max(0, forecastStartIndex - 1))
+        : [];
 
-      chartArea.append("path")
-        .datum(data)
-        .attr("fill", "none")
-        .attr("stroke", "hsl(var(--chart-1))")
-        .attr("stroke-width", 2)
-        .attr("d", line);
+      if (historicalData.length > 0) {
+        chartArea.append("path")
+          .datum(historicalData)
+          .attr("fill", "hsl(var(--chart-1))")
+          .attr("fill-opacity", 0.45)
+          .attr("d", area);
+
+        chartArea.append("path")
+          .datum(historicalData)
+          .attr("fill", "none")
+          .attr("stroke", "hsl(var(--chart-1))")
+          .attr("stroke-width", 2)
+          .attr("d", line);
+      }
+
+      if (forecastData.length > 1) {
+        chartArea.append("path")
+          .datum(forecastData)
+          .attr("fill", "hsl(var(--primary))")
+          .attr("fill-opacity", 0.2)
+          .attr("d", area);
+
+        chartArea.append("path")
+          .datum(forecastData)
+          .attr("fill", "none")
+          .attr("stroke", "hsl(var(--primary))")
+          .attr("stroke-width", 2)
+          .attr("stroke-dasharray", "5 4")
+          .attr("d", line);
+      }
 
       // Points (only draw if dataset is reasonably sized to avoid overlap crowding)
       if (data.length <= 250) {
@@ -1064,14 +1127,17 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
             return Number(xScale(String(val))) || 0;
           })
           .attr("cy", d => yScale(Number(d[chart.yAxis!])))
-          .attr("r", 4)
+          .attr("r", d => d.isForecast ? 5 : 4)
           .attr("fill", d => {
+            if (d.isForecast) return "hsl(var(--primary))";
             const style = formattingEngine.evaluateCompiledRules(compiledFormattingRules, d, chart.yAxis || currentDimension);
             return style?.fill || style?.textColor || style?.backgroundColor || "hsl(var(--chart-1))";
           })
-          .attr("opacity", d => getOpacity(String(d[currentDimension]), 0.85))
+          .attr("stroke", d => d.isForecast ? "hsl(var(--background))" : "none")
+          .attr("stroke-width", d => d.isForecast ? 2 : 0)
+          .attr("opacity", d => getOpacity(String(d[currentDimension]), d.isForecast ? 0.9 : 0.75))
           .style("cursor", "pointer")
-          .attr("title", "Left-click to filter/drill, Right-click to view raw rows")
+          .attr("title", d => d.isForecast ? `Forecast (Projected): ${d[chart.yAxis!]}` : "Left-click to filter/drill, Right-click to view raw rows")
           .on("click", (event, d) => handlePointClick(String(d[currentDimension])))
           .on("contextmenu", (event, d) => handlePointRightClick(event, String(d[currentDimension])));
       }
@@ -1257,6 +1323,16 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
 
       {/* SVG drawing area */}
       <div className="flex-1 min-h-0 w-full relative">
+        {chartAnomalies.length > 0 && (
+          <Badge
+            variant="outline"
+            className="absolute top-1 right-2 z-10 text-[9px] px-1.5 py-0.5 bg-amber-500/10 text-amber-600 border-amber-500/40 gap-1 font-medium pointer-events-none"
+            title={chartAnomalies.map((a) => a.description).join("\n")}
+          >
+            <AlertTriangle className="h-3 w-3 text-amber-500" />
+            {chartAnomalies.length} {chartAnomalies.length === 1 ? "Outlier" : "Outliers"}
+          </Badge>
+        )}
         <svg ref={svgRef} className="w-full h-auto" />
       </div>
     </div>

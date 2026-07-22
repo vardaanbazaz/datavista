@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/shared/components/ui/button";
 import { BarChart3, Database, Filter, PieChart, TrendingUp, Users, LayoutDashboard, Calendar, AlertCircle, Plus, LayoutTemplate, RotateCcw, RotateCw, Camera } from "lucide-react";
 import { GlobalFilterBar } from "@/features/dashboards/components/GlobalFilterBar";
+import { ExecutiveSummaryPanel } from "@/features/ai/components/ExecutiveSummaryPanel";
 import { DrillThroughModal } from "@/features/dashboards/components/DrillThroughModal";
 import { motion } from "framer-motion";
 import { KPIBuilder } from "@/features/kpi/components/KPIBuilder";
@@ -317,6 +318,9 @@ export function DashboardSummary() {
           )}
         </div>
       </div>
+
+      {/* AI Executive Summary Banner */}
+      <ExecutiveSummaryPanel />
 
       {/* Key Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

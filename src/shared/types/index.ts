@@ -3,9 +3,10 @@ import { CalculatedField } from "./formula";
 import { WindowQuery } from "../services/window/types";
 
 import { ConditionalFormatRule } from "./formatting";
+import { ForecastConfig } from "../services/forecasting/types";
 
 export interface DataRow {
-  [key: string]: string | number | null;
+  [key: string]: string | number | boolean | null;
 }
 
 export interface Dataset {
@@ -33,6 +34,7 @@ export interface ChartConfig {
   datasetId: string; // Tracks which dataset the chart belongs to
   drillPath?: string[]; // Dimension hierarchy for drill-down
   formattingRules?: ConditionalFormatRule[];
+  forecast?: ForecastConfig;
 }
 
 export interface FilterState {

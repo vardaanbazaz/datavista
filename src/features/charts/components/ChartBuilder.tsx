@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
 import { Badge } from "@/shared/components/ui/badge";
-import { Trash2, Plus, BarChart, LineChart, PieChart, ScatterChart, X, Palette, Gauge } from "lucide-react";
+import { Trash2, Plus, BarChart, LineChart, PieChart, ScatterChart, X, Palette, Gauge, TrendingUp } from "lucide-react";
 import { useMemo } from "react";
 import { Dataset, ChartConfig, ConditionalFormatRule } from "@/shared/types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/components/ui/dialog";
@@ -48,6 +48,11 @@ export function ChartBuilder() {
   const [sizeBy, setSizeBy] = useState('');
   const [formattingRules, setFormattingRules] = useState<ConditionalFormatRule[]>([]);
   const [isFormattingModalOpen, setIsFormattingModalOpen] = useState(false);
+
+  // Predictive Analytics Forecast State
+  const [forecastEnabled, setForecastEnabled] = useState(false);
+  const [forecastPeriods, setForecastPeriods] = useState(3);
+  const [forecastMethod, setForecastMethod] = useState<'linear' | 'moving_average'>('linear');
 
   const chartTypes = useMemo(() => {
     const coreTypes = [
@@ -134,6 +139,11 @@ export function ChartBuilder() {
       datasetId: activeDataset?.id || "",
       drillPath: xAxis ? [xAxis, ...drillPath] : undefined,
       formattingRules: formattingRules.length > 0 ? formattingRules : undefined,
+      forecast: (chartType === 'line' || chartType === 'area') && forecastEnabled ? {
+        enabled: true,
+        periodsToProject: forecastPeriods > 0 ? forecastPeriods : 3,
+        method: forecastMethod,
+      } : undefined,
     };
 
     createChart(newChart);
@@ -449,6 +459,63 @@ export function ChartBuilder() {
                 </DialogContent>
               </Dialog>
             </div>
+
+            {/* Predictive Analytics Section (Line & Area charts) */}
+            {(chartType === 'line' || chartType === 'area') && (
+              <div className="space-y-3 col-span-full p-4 rounded-lg bg-primary/5 border border-primary/20">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-sm font-semibold flex items-center gap-1.5 text-primary">
+                      <TrendingUp className="h-4 w-4" /> Predictive Analytics & Forecasting
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Extrapolate future data points using linear regression or moving average.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant={forecastEnabled ? "premium" : "outline"}
+                    size="sm"
+                    className="h-8 text-xs"
+                    onClick={() => setForecastEnabled(!forecastEnabled)}
+                  >
+                    {forecastEnabled ? "Forecast: ON" : "Forecast: OFF"}
+                  </Button>
+                </div>
+
+                {forecastEnabled && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-primary/10">
+                    <div className="space-y-1">
+                      <Label htmlFor="forecast-periods" className="text-xs">Periods to Project</Label>
+                      <Input
+                        id="forecast-periods"
+                        type="number"
+                        min={1}
+                        max={30}
+                        value={forecastPeriods}
+                        onChange={(e) => setForecastPeriods(parseInt(e.target.value, 10) || 3)}
+                        className="h-8 text-xs bg-background"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Method</Label>
+                      <Select
+                        value={forecastMethod}
+                        onValueChange={(val: 'linear' | 'moving_average') => setForecastMethod(val)}
+                      >
+                        <SelectTrigger className="h-8 text-xs bg-background">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="linear" className="text-xs">Linear Regression (Least Squares)</SelectItem>
+                          <SelectItem value="moving_average" className="text-xs">Moving Average Extrapolation</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <motion.div

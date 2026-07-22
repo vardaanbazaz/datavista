@@ -39,11 +39,15 @@ import { InstantiateTemplateModal } from "@/features/dashboards/components/Insta
 import { ThemeToggle } from "@/shared/components/ThemeToggle";
 import { motion } from "framer-motion";
 
+import { AiSettingsModal } from "@/features/ai/components/AiSettingsModal";
+import { Sparkles } from "lucide-react";
+
 export function Sidebar({ onOpenSearch }: { onOpenSearch?: () => void }) {
   const activeView = useUiStore((state) => state.activeView);
   const onViewChange = useUiStore((state) => state.setActiveView);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isInstantiateModalOpen, setIsInstantiateModalOpen] = useState(false);
+  const [isAiSettingsModalOpen, setIsAiSettingsModalOpen] = useState(false);
   
   const datasets = useDatasetStore((state) => state.datasets);
   const activeDataset = useDatasetStore((state) => state.activeDataset);
@@ -182,6 +186,15 @@ export function Sidebar({ onOpenSearch }: { onOpenSearch?: () => void }) {
             </h1>
             <p className="text-sm text-muted-foreground">Data Visualization</p>
           </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 text-primary hover:bg-primary/10"
+            onClick={() => setIsAiSettingsModalOpen(true)}
+            title="AI Co-Pilot Settings"
+          >
+            <Sparkles className="h-5 w-5" />
+          </Button>
           <ThemeToggle />
           <Button
             variant="ghost"
@@ -193,6 +206,12 @@ export function Sidebar({ onOpenSearch }: { onOpenSearch?: () => void }) {
             <Menu className="h-5 w-5" />
           </Button>
         </div>
+        
+        <AiSettingsModal
+          isOpen={isAiSettingsModalOpen}
+          onClose={() => setIsAiSettingsModalOpen(false)}
+        />
+
         
         <Button
           variant="outline"

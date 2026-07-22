@@ -4,8 +4,12 @@ import { KPICardConfig } from "@/features/kpi/types";
 import { toast } from "@/shared/hooks/use-toast";
 import { useDatasetStore } from "@/store/datasetStore";
 import { useFilterStore } from "@/store/filterStore";
+import { useChartStore } from "@/store/chartStore";
 import { useUiStore } from "@/store/uiStore";
 import { queryEngine } from "@/shared/services/queryEngine";
+import { summaryEngine } from "@/features/ai/summaryEngine";
+import { DetectedAnomaly } from "@/features/ai/anomalyDetector";
+
 
 export interface DashboardSnapshotState {
   dashboards: Dashboard[];
@@ -22,6 +26,14 @@ interface DashboardState {
   activeDashboardId: string | null;
   activeGlobalFilters: GlobalFilter[];
   
+  // AI Automated Analyst State
+  executiveSummary: string | null;
+  isGeneratingSummary: boolean;
+  executiveSummaryDismissed: boolean;
+  detectedAnomalies: DetectedAnomaly[];
+  generateExecutiveSummary: () => Promise<void>;
+  dismissExecutiveSummary: () => void;
+
   // Undo/Redo History
   past: DashboardSnapshotState[];
   future: DashboardSnapshotState[];
@@ -88,8 +100,39 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   dashboards: [],
   activeDashboardId: null,
   activeGlobalFilters: [],
+  executiveSummary: null,
+  isGeneratingSummary: false,
+  executiveSummaryDismissed: false,
+  detectedAnomalies: [],
   past: [],
   future: [],
+
+  dismissExecutiveSummary: () => set({ executiveSummaryDismissed: true }),
+
+  generateExecutiveSummary: async () => {
+    set({ isGeneratingSummary: true, executiveSummaryDismissed: false });
+    const dataset = useDatasetStore.getState().activeDataset;
+    const allCharts = useChartStore.getState().charts;
+    const activeDashboardId = get().activeDashboardId;
+    const activeDashboard = get().dashboards.find((d) => d.id === activeDashboardId);
+    const charts = activeDashboard
+      ? allCharts.filter((c) => c.datasetId === dataset?.id && activeDashboard.chartIds.includes(c.id))
+      : allCharts.filter((c) => c.datasetId === dataset?.id);
+
+    const { summary, anomalies } = await summaryEngine.generateExecutiveSummary(
+      dataset,
+      charts,
+      get().activeGlobalFilters
+    );
+
+    set({
+      executiveSummary: summary,
+      detectedAnomalies: anomalies,
+      isGeneratingSummary: false,
+      executiveSummaryDismissed: false,
+    });
+  },
+
 
   canUndo: () => get().past.length > 0,
   canRedo: () => get().future.length > 0,

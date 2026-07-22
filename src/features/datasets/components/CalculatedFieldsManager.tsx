@@ -6,10 +6,12 @@ import { Label } from "@/shared/components/ui/label";
 import { Badge } from "@/shared/components/ui/badge";
 import { ScrollArea } from "@/shared/components/ui/scroll-area";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
-import { Settings, Plus, Trash2, HelpCircle, AlertTriangle, Code } from "lucide-react";
+import { Settings, Plus, Trash2, HelpCircle, AlertTriangle, Code, Sparkles, Loader2 } from "lucide-react";
 import { useDatasetStore } from "@/store/datasetStore";
 import { formulaEngine } from "@/shared/services/formulaEngine";
 import { allFunctions } from "@/shared/services/formula/library";
+import { aiEngine } from "@/features/ai/aiEngine";
+import { toast } from "@/shared/hooks/use-toast";
 
 interface CalculatedFieldsManagerProps {
   trigger?: React.ReactNode;
@@ -23,6 +25,11 @@ export function CalculatedFieldsManager({ trigger }: CalculatedFieldsManagerProp
   const [isOpen, setIsOpen] = useState(false);
   const [fieldName, setFieldName] = useState("");
   const [expression, setExpression] = useState("");
+
+  // AI Formula state
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [isGeneratingAi, setIsGeneratingAi] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
 
   const existingColumns = useMemo(() => {
     if (!activeDataset) return [];
@@ -53,6 +60,39 @@ export function CalculatedFieldsManager({ trigger }: CalculatedFieldsManagerProp
     addCalculatedField(fieldName.trim(), expression.trim());
     setFieldName("");
     setExpression("");
+    setAiPrompt("");
+    setAiError(null);
+  };
+
+  const handleGenerateAiFormula = async () => {
+    if (!aiPrompt.trim()) return;
+    if (!activeDataset) {
+      setAiError("Please select a dataset first.");
+      return;
+    }
+
+    setIsGeneratingAi(true);
+    setAiError(null);
+
+    try {
+      const res = await aiEngine.generateFormula(aiPrompt.trim(), activeDataset);
+      setIsGeneratingAi(false);
+      setFieldName(res.fieldName);
+      setExpression(res.formula);
+      toast({
+        title: "AI Formula Generated",
+        description: `Generated [${res.fieldName}] = ${res.formula}`,
+      });
+    } catch (e: unknown) {
+      setIsGeneratingAi(false);
+      const errMsg = e instanceof Error ? e.message : "AI generated an invalid query. Please rephrase.";
+      setAiError(errMsg);
+      toast({
+        title: "Formula Generation Error",
+        description: errMsg,
+        variant: "destructive",
+      });
+    }
   };
 
   const functionsList = useMemo(() => {
@@ -94,6 +134,36 @@ export function CalculatedFieldsManager({ trigger }: CalculatedFieldsManagerProp
         <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mt-4">
           {/* Editor Column */}
           <div className="md:col-span-3 space-y-4">
+            {/* AI Generator Box */}
+            <div className="p-3 rounded-lg bg-primary/10 border border-primary/30 space-y-2">
+              <Label className="text-xs font-semibold text-primary flex items-center gap-1.5">
+                <Sparkles className="h-3.5 w-3.5" /> Generate Formula with AI
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="e.g. calculate profit margin or 10% tax on sales"
+                  value={aiPrompt}
+                  onChange={(e) => setAiPrompt(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleGenerateAiFormula()}
+                  disabled={isGeneratingAi}
+                  className="h-8 text-xs bg-background/80"
+                />
+                <Button
+                  size="sm"
+                  variant="premium"
+                  onClick={handleGenerateAiFormula}
+                  disabled={isGeneratingAi || !aiPrompt.trim()}
+                  className="h-8 text-xs shrink-0 gap-1"
+                >
+                  {isGeneratingAi ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  Generate
+                </Button>
+              </div>
+              {aiError && (
+                <p className="text-[11px] text-destructive font-medium">{aiError}</p>
+              )}
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="field-name">Field Name</Label>
               <Input
