@@ -12,6 +12,7 @@ import { ArrowUp, GitFork, X, AlertTriangle } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import { Badge } from "@/shared/components/ui/badge";
 import { toast } from "@/shared/hooks/use-toast";
+import { ErrorBoundary, WidgetError } from "@/shared/components/ErrorBoundary";
 
 import { pluginRegistry } from "@/shared/services/pluginRegistry";
 import { anomalyDetector } from "@/features/ai/anomalyDetector";
@@ -33,7 +34,7 @@ interface HeatmapCell {
   value: number;
 }
 
-export function ChartVisualization({ chart }: ChartVisualizationProps) {
+function ChartVisualizationContent({ chart }: ChartVisualizationProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(500);
@@ -1275,6 +1276,7 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
                 size="sm"
                 className="h-7 px-2 text-[10px] gap-1 shrink-0"
                 onClick={handleDrillUp}
+                aria-label="Drill up to previous hierarchy level"
               >
                 <ArrowUp className="h-3 w-3" />
                 Up
@@ -1313,6 +1315,8 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
               className="h-7 px-2 text-[10px] gap-1"
               onClick={() => setIsDrillMode(!isDrillMode)}
               title={isDrillMode ? "Clicking a point will drill down" : "Clicking a point will cross-filter"}
+              aria-label={`Toggle drill mode, currently ${isDrillMode ? "ON" : "OFF"}`}
+              aria-pressed={isDrillMode}
             >
               <GitFork className="h-3.5 w-3.5 rotate-90" />
               Drill Mode: {isDrillMode ? "ON" : "OFF"}
@@ -1333,8 +1337,41 @@ export function ChartVisualization({ chart }: ChartVisualizationProps) {
             {chartAnomalies.length} {chartAnomalies.length === 1 ? "Outlier" : "Outliers"}
           </Badge>
         )}
-        <svg ref={svgRef} className="w-full h-auto" />
+        <svg ref={svgRef} className="w-full h-auto" role="img" aria-label={chart.title ? `Chart: ${chart.title}` : `${chart.type} visualization`} />
+        
+        {/* Screen Reader Accessible Fallback Table */}
+        <div className="sr-only">
+          <h4>{chart.title || `${chart.type.toUpperCase()} Chart Data Summary`}</h4>
+          <p>{`Visualization of ${chart.yAxis || "Values"} grouped by ${currentDimension || "Categories"} containing ${chartData.length} records.`}</p>
+          {chartData.length > 0 && (
+            <table>
+              <caption>{`${chart.title || "Chart"} aggregated dataset view`}</caption>
+              <thead>
+                <tr>
+                  <th scope="col">{currentDimension || "Dimension"}</th>
+                  {chart.yAxis && <th scope="col">{chart.yAxis}</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {chartData.slice(0, 15).map((row, idx) => (
+                  <tr key={idx}>
+                    <td>{String(row[currentDimension] ?? "")}</td>
+                    {chart.yAxis && <td>{String(row[chart.yAxis] ?? "")}</td>}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
     </div>
+  );
+}
+
+export function ChartVisualization({ chart }: ChartVisualizationProps) {
+  return (
+    <ErrorBoundary fallback={(props) => <WidgetError {...props} />}>
+      <ChartVisualizationContent chart={chart} />
+    </ErrorBoundary>
   );
 }

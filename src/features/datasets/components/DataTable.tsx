@@ -304,7 +304,7 @@ export function DataTable({
   }
 
   return (
-    <div className="space-y-6">
+    <div data-testid="data-table-container" className="space-y-6">
       {/* Controls */}
       <Card className="glass">
         <CardHeader>
@@ -494,11 +494,13 @@ export function DataTable({
                     <TableHead 
                       key={column} 
                       className="bg-card/95 backdrop-blur-sm"
+                      aria-sort={sortColumn === column ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
                     >
                       <Button
                         variant="ghost"
                         className="h-auto p-2 justify-start font-medium"
                         onClick={() => handleSort(column)}
+                        aria-label={`Sort by ${column}, currently ${sortColumn === column ? (sortDirection === 'asc' ? 'sorted ascending' : 'sorted descending') : 'unsorted'}`}
                       >
                         <span className="truncate max-w-32">{column}</span>
                         <Badge variant="outline" className="ml-2 text-xs">

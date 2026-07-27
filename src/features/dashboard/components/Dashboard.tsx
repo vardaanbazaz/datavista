@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import { Sidebar } from "./Sidebar";
 import { GlobalSearchModal } from "./GlobalSearchModal";
 import { InstantiateTemplateModal } from "@/features/dashboards/components/InstantiateTemplateModal";
@@ -10,11 +10,13 @@ import { FilterPanel } from "@/features/filters/components/FilterPanel";
 import { ExportPanel } from "@/features/export/components/ExportPanel";
 import { ChartGrid } from "@/features/charts/components/ChartGrid";
 import { DashboardSummary } from "./DashboardSummary";
-import { PivotExplorer } from "@/features/pivot/components/PivotExplorer";
-import { StatsExplorer } from "@/features/stats/components/StatsExplorer";
-import { WindowExplorer } from "@/features/window/components/WindowExplorer";
 import { WelcomeOverlay } from "./WelcomeOverlay";
 import { LoadingState } from "@/shared/components/LoadingSpinner";
+import { ErrorBoundary, FullPageError } from "@/shared/components/ErrorBoundary";
+
+const PivotExplorer = lazy(() => import("@/features/pivot/components/PivotExplorer").then(m => ({ default: m.PivotExplorer })));
+const StatsExplorer = lazy(() => import("@/features/stats/components/StatsExplorer").then(m => ({ default: m.StatsExplorer })));
+const WindowExplorer = lazy(() => import("@/features/window/components/WindowExplorer").then(m => ({ default: m.WindowExplorer })));
 import { Button } from "@/shared/components/ui/button";
 import { motion } from "framer-motion";
 import { BarChart3, Upload, Filter } from "lucide-react";
@@ -205,6 +207,7 @@ export function Dashboard() {
                 >
                   <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                     <Button 
+                      data-testid="sample-data-button"
                       onClick={loadSampleData} 
                       variant="premium" 
                       size="lg"
@@ -413,7 +416,11 @@ export function Dashboard() {
                 </Button>
               )}
             </div>
-            <PivotExplorer />
+            <ErrorBoundary fallback={(props) => <FullPageError {...props} />}>
+              <Suspense fallback={<LoadingState title="Loading Pivot Analyzer..." description="Preparing pivot engine and view..." />}>
+                <PivotExplorer />
+              </Suspense>
+            </ErrorBoundary>
           </div>
         )}
 
@@ -430,7 +437,11 @@ export function Dashboard() {
                 </Button>
               )}
             </div>
-            <StatsExplorer />
+            <ErrorBoundary fallback={(props) => <FullPageError {...props} />}>
+              <Suspense fallback={<LoadingState title="Loading Statistical Engine..." description="Calculating summary statistics..." />}>
+                <StatsExplorer />
+              </Suspense>
+            </ErrorBoundary>
           </div>
         )}
 
@@ -447,7 +458,11 @@ export function Dashboard() {
                 </Button>
               )}
             </div>
-            <WindowExplorer />
+            <ErrorBoundary fallback={(props) => <FullPageError {...props} />}>
+              <Suspense fallback={<LoadingState title="Loading Window Builder..." description="Initializing window calculation module..." />}>
+                <WindowExplorer />
+              </Suspense>
+            </ErrorBoundary>
           </div>
         )}
 

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
+import { ErrorBoundary } from "@/shared/components/ErrorBoundary";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/components/ui/button";
 import { ScrollArea } from "@/shared/components/ui/scroll-area";
@@ -38,9 +39,9 @@ import { useDashboardStore } from "@/features/dashboards/store/dashboardStore";
 import { InstantiateTemplateModal } from "@/features/dashboards/components/InstantiateTemplateModal";
 import { ThemeToggle } from "@/shared/components/ThemeToggle";
 import { motion } from "framer-motion";
-
-import { AiSettingsModal } from "@/features/ai/components/AiSettingsModal";
 import { Sparkles } from "lucide-react";
+
+const AiSettingsModal = lazy(() => import("@/features/ai/components/AiSettingsModal").then(m => ({ default: m.AiSettingsModal })));
 
 export function Sidebar({ onOpenSearch }: { onOpenSearch?: () => void }) {
   const activeView = useUiStore((state) => state.activeView);
@@ -170,6 +171,7 @@ export function Sidebar({ onOpenSearch }: { onOpenSearch?: () => void }) {
 
   return (
     <motion.div 
+      data-testid="sidebar"
       initial={{ x: -100, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       transition={{ duration: 0.3 }}
@@ -192,6 +194,7 @@ export function Sidebar({ onOpenSearch }: { onOpenSearch?: () => void }) {
             className="h-9 w-9 text-primary hover:bg-primary/10"
             onClick={() => setIsAiSettingsModalOpen(true)}
             title="AI Co-Pilot Settings"
+            aria-label="AI Co-Pilot Settings"
           >
             <Sparkles className="h-5 w-5" />
           </Button>
@@ -202,15 +205,21 @@ export function Sidebar({ onOpenSearch }: { onOpenSearch?: () => void }) {
             className="lg:hidden ml-2 h-9 w-9"
             onClick={() => setIsMobileOpen(!isMobileOpen)}
             title="Toggle Menu"
+            aria-label="Toggle navigation menu"
+            aria-expanded={isMobileOpen}
           >
             <Menu className="h-5 w-5" />
           </Button>
         </div>
         
-        <AiSettingsModal
-          isOpen={isAiSettingsModalOpen}
-          onClose={() => setIsAiSettingsModalOpen(false)}
-        />
+        <ErrorBoundary fallback={null}>
+          <Suspense fallback={null}>
+            <AiSettingsModal
+              isOpen={isAiSettingsModalOpen}
+              onClose={() => setIsAiSettingsModalOpen(false)}
+            />
+          </Suspense>
+        </ErrorBoundary>
 
         
         <Button
@@ -243,6 +252,7 @@ export function Sidebar({ onOpenSearch }: { onOpenSearch?: () => void }) {
                 transition={{ delay: index * 0.1, duration: 0.3 }}
               >
                 <Button
+                  data-testid={`sidebar-nav-${item.id}`}
                   variant={isActive ? "premium" : "ghost"}
                   className="w-full justify-start h-auto p-4 transition-all duration-200"
                   onClick={() => onViewChange(item.id)}
@@ -358,6 +368,7 @@ export function Sidebar({ onOpenSearch }: { onOpenSearch?: () => void }) {
             className="h-6 w-6 hover:bg-muted"
             onClick={() => setIsInstantiateModalOpen(true)}
             title="Create from Template"
+            aria-label="Create dashboard from template"
           >
             <LayoutTemplate className="h-3.5 w-3.5 text-primary" />
           </Button>
@@ -368,6 +379,7 @@ export function Sidebar({ onOpenSearch }: { onOpenSearch?: () => void }) {
             className="h-6 w-6 hover:bg-muted"
             onClick={handleCreateDashboard}
             title="Create New Blank Dashboard"
+            aria-label="Create new blank dashboard"
           >
             <Plus className="h-4 w-4" />
           </Button>

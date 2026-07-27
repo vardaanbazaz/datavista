@@ -210,6 +210,7 @@ export function FileUpload() {
                 <input
                   type="file"
                   id="file-upload"
+                  data-testid="file-upload-input"
                   className="hidden"
                   accept=".csv,.tsv,.xlsx,.xls"
                   onChange={handleFileSelect}
