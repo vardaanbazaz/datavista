@@ -465,8 +465,8 @@ export function DataTable({
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {Object.entries(summaryStats).map(([column, stats]) => (
-                <div key={column} className="p-3 bg-muted/50 rounded-lg">
-                  <h4 className="font-medium mb-2">{column}</h4>
+                <div key={column} className="p-3 bg-gray-50 dark:bg-zinc-900/50 border border-gray-200 dark:border-white/5 rounded-lg">
+                  <h4 className="font-semibold text-xs uppercase tracking-wider text-gray-700 dark:text-zinc-300 mb-2">{column}</h4>
                   <div className="space-y-1 text-sm">
                     <div>Count: {stats.count}</div>
                     <div>Min: {stats.min.toFixed(2)}</div>
@@ -485,25 +485,25 @@ export function DataTable({
         <CardContent className="p-0">
           <div 
             ref={parentRef} 
-            className="h-[500px] overflow-auto border rounded-md relative scroll-container"
+            className="h-[500px] overflow-auto border border-gray-200 dark:border-white/10 rounded-md relative scroll-container bg-white dark:bg-zinc-950"
           >
             <Table className="relative">
-              <TableHeader className="sticky top-0 bg-card/95 backdrop-blur-sm z-10 shadow-[0_1px_0_0_rgba(0,0,0,0.1)]">
+              <TableHeader className="sticky top-0 bg-gray-50 dark:bg-zinc-900/95 backdrop-blur-sm z-10 border-b border-gray-200 dark:border-white/10">
                 <TableRow>
                   {dataset.columns.map((column) => (
                     <TableHead 
                       key={column} 
-                      className="bg-card/95 backdrop-blur-sm"
+                      className="bg-gray-50 dark:bg-zinc-900/95 backdrop-blur-sm text-xs uppercase tracking-wider text-gray-500 dark:text-zinc-400 font-semibold py-2"
                       aria-sort={sortColumn === column ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
                     >
                       <Button
                         variant="ghost"
-                        className="h-auto p-2 justify-start font-medium"
+                        className="h-auto p-2 justify-start font-semibold text-xs uppercase tracking-wider text-gray-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white"
                         onClick={() => handleSort(column)}
                         aria-label={`Sort by ${column}, currently ${sortColumn === column ? (sortDirection === 'asc' ? 'sorted ascending' : 'sorted descending') : 'unsorted'}`}
                       >
                         <span className="truncate max-w-32">{column}</span>
-                        <Badge variant="outline" className="ml-2 text-xs">
+                        <Badge variant="outline" className="ml-2 text-[10px] uppercase font-normal border-gray-300 dark:border-zinc-700 text-gray-500 dark:text-zinc-400">
                           {dataset.columnTypes[column]}
                         </Badge>
                         <ArrowUpDown className="ml-2 h-3 w-3" />
@@ -515,7 +515,7 @@ export function DataTable({
               <TableBody>
                 {rowVirtualizer.getVirtualItems().length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={dataset.columns.length} className="h-24 text-center">
+                    <TableCell colSpan={dataset.columns.length} className="h-24 text-center text-gray-500 dark:text-zinc-400">
                       No rows match the current filters.
                     </TableCell>
                   </TableRow>
@@ -533,7 +533,7 @@ export function DataTable({
                         <TableRow 
                           key={virtualRow.key} 
                           data-index={virtualRow.index} 
-                          className="h-[52px]"
+                          className="h-[52px] border-b border-gray-100 dark:border-white/5 hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors"
                           ref={rowVirtualizer.measureElement}
                         >
                           {dataset.columns.map((column) => {
