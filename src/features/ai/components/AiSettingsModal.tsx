@@ -66,10 +66,10 @@ export function AiSettingsModal({ isOpen: externalIsOpen, onClose: externalOnClo
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
 
-      <DialogContent className="max-w-md glass border-border shadow-2xl p-6">
+      <DialogContent className="max-w-md bg-white dark:bg-zinc-950 border border-gray-200 dark:border-zinc-800 shadow-2xl p-6 text-zinc-900 dark:text-zinc-100">
         <DialogHeader className="space-y-2">
-          <DialogTitle className="text-xl font-bold flex items-center gap-2 gradient-primary bg-clip-text text-transparent">
-            <Sparkles className="h-5 w-5 text-primary animate-pulse" />
+          <DialogTitle className="text-xl font-bold flex items-center gap-2 bg-gradient-to-r from-zinc-900 to-zinc-600 dark:from-white dark:to-zinc-400 bg-clip-text text-transparent">
+            <Sparkles className="h-5 w-5 text-zinc-700 dark:text-zinc-300 animate-pulse" />
             AI Co-Pilot Settings
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground">
