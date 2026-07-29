@@ -160,7 +160,7 @@ export function DashboardGrid({ charts, activeDashboardId, onEditKpi }: Dashboar
         {widgets.map((widget) => (
           <div key={widget.id}>
             {widget.type === "chart" ? (
-              <Card className="h-full w-full glass border-border flex flex-col overflow-hidden shadow-sm group">
+              <Card className="h-full w-full bg-white dark:bg-zinc-900 border border-gray-200 dark:border-white/5 flex flex-col overflow-hidden shadow-none group transition-colors">
                 <CardHeader className="p-3 pb-2 flex flex-row items-center justify-between border-b flex-shrink-0 drag-handle select-none">
                   <div className="flex items-center gap-2 min-w-0">
                     {!isMobile && (
@@ -180,7 +180,7 @@ export function DashboardGrid({ charts, activeDashboardId, onEditKpi }: Dashboar
                     <X className="h-3.5 w-3.5" />
                   </Button>
                 </CardHeader>
-                <CardContent className="p-4 flex-1 min-h-0 w-full relative bg-card/10">
+                <CardContent className="p-3 sm:p-4 flex-1 min-w-0 min-h-0 w-full relative overflow-hidden flex flex-col justify-between">
                   <ChartVisualization chart={widget.data} />
                 </CardContent>
               </Card>

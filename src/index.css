@@ -125,16 +125,16 @@
   }
 
   .dark {
-    /* Dark Mode - Professional Night Theme */
-    --background: 220 25% 8%;
-    --foreground: 220 15% 92%;
+    /* Dark Mode - Series-A Dark Depth */
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
 
-    --card: 220 20% 12%;
-    --card-foreground: 220 15% 92%;
-    --glass: 220 25% 15%;
+    --card: 240 5.9% 10%;
+    --card-foreground: 0 0% 98%;
+    --glass: 240 5.9% 10%;
 
-    --popover: 220 20% 12%;
-    --popover-foreground: 220 15% 92%;
+    --popover: 240 5.9% 10%;
+    --popover-foreground: 0 0% 98%;
 
     --primary: 220 90% 65%;
     --primary-foreground: 220 25% 8%;
@@ -151,26 +151,26 @@
     --chart-4: 340 80% 65%;
     --chart-5: 30 90% 60%;
 
-    --muted: 220 15% 18%;
-    --muted-foreground: 220 10% 65%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
 
     --destructive: 0 84% 65%;
-    --destructive-foreground: 220 25% 8%;
+    --destructive-foreground: 0 0% 98%;
 
-    --border: 220 13% 22%;
-    --input: 220 13% 22%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
     --ring: 220 90% 65%;
 
-    --gradient-glass: linear-gradient(135deg, hsl(var(--glass) / 0.6), hsl(var(--card) / 0.8));
-    --shadow-glass: 0 8px 32px hsl(220 30% 5% / 0.3);
+    --gradient-glass: linear-gradient(135deg, rgba(24, 24, 27, 0.9), rgba(24, 24, 27, 0.95));
+    --shadow-glass: none;
 
-    --sidebar-background: 220 25% 10%;
-    --sidebar-foreground: 220 15% 85%;
+    --sidebar-background: 240 10% 3.9%;
+    --sidebar-foreground: 0 0% 98%;
     --sidebar-primary: 220 90% 65%;
     --sidebar-primary-foreground: 220 25% 8%;
-    --sidebar-accent: 220 15% 18%;
-    --sidebar-accent-foreground: 220 15% 85%;
-    --sidebar-border: 220 13% 22%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 220 90% 65%;
   }
 }
@@ -181,17 +181,14 @@
   }
 
   body {
-    @apply bg-background text-foreground font-sans antialiased;
+    @apply bg-gray-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans antialiased transition-colors duration-200;
   }
 }
 
 /* Custom Utilities */
 @layer utilities {
   .glass {
-    background: var(--gradient-glass);
-    backdrop-filter: blur(12px);
-    border: 1px solid hsl(var(--border) / 0.5);
-    box-shadow: var(--shadow-glass);
+    @apply bg-white dark:bg-zinc-900 border border-gray-200 dark:border-white/5 shadow-none;
   }
 
   .gradient-primary {

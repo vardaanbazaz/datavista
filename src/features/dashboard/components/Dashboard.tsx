@@ -130,7 +130,7 @@ export function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col lg:flex-row">
+    <div className="min-h-screen bg-gray-50 dark:bg-zinc-950 flex flex-col lg:flex-row text-zinc-900 dark:text-zinc-100 transition-colors">
       <Sidebar onOpenSearch={() => setIsSearchOpen(true)} />
       
       <MainContent>
@@ -157,13 +157,13 @@ export function Dashboard() {
                   transition={{ delay: 0.2, duration: 0.5 }}
                   className="mb-12"
                 >
-                  <div className="w-20 h-20 gradient-primary rounded-2xl flex items-center justify-center mx-auto mb-6">
-                    <BarChart3 className="w-10 h-10 text-primary-foreground" />
+                  <div className="w-20 h-20 bg-gray-200 dark:bg-zinc-900 border border-gray-300 dark:border-zinc-800 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                    <BarChart3 className="w-10 h-10 text-zinc-800 dark:text-zinc-200" />
                   </div>
-                  <h1 className="text-5xl font-bold mb-4 gradient-primary bg-clip-text text-transparent">
+                  <h1 className="text-5xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-zinc-900 to-zinc-600 dark:from-white dark:to-zinc-400">
                     DataVista Dashboard
                   </h1>
-                  <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
+                  <p className="text-xl text-zinc-500 dark:text-zinc-400 mb-8 max-w-2xl mx-auto">
                     Transform your data into beautiful, interactive visualizations with professional-grade analytics tools
                   </p>
                 </motion.div>
@@ -174,26 +174,26 @@ export function Dashboard() {
                   transition={{ delay: 0.4, duration: 0.5 }}
                   className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12"
                 >
-                  <div className="glass p-6 rounded-xl text-center hover:shadow-glow transition-all duration-300">
-                    <Upload className="w-12 h-12 mx-auto mb-4 text-primary" />
+                  <div className="glass p-6 rounded-xl text-center hover:shadow-md transition-all duration-300">
+                    <Upload className="w-12 h-12 mx-auto mb-4 text-zinc-700 dark:text-zinc-300" />
                     <h3 className="text-lg font-semibold mb-2">Import Data</h3>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400">
                       Upload CSV, TSV, or XLSX files to get started
                     </p>
                   </div>
                   
-                  <div className="glass p-6 rounded-xl text-center hover:shadow-glow transition-all duration-300">
-                    <Filter className="w-12 h-12 mx-auto mb-4 text-secondary" />
+                  <div className="glass p-6 rounded-xl text-center hover:shadow-md transition-all duration-300">
+                    <Filter className="w-12 h-12 mx-auto mb-4 text-zinc-700 dark:text-zinc-300" />
                     <h3 className="text-lg font-semibold mb-2">Smart Filtering</h3>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400">
                       Advanced filters with real-time data grouping
                     </p>
                   </div>
                   
-                  <div className="glass p-6 rounded-xl text-center hover:shadow-glow transition-all duration-300">
-                    <BarChart3 className="w-12 h-12 mx-auto mb-4 text-accent" />
+                  <div className="glass p-6 rounded-xl text-center hover:shadow-md transition-all duration-300">
+                    <BarChart3 className="w-12 h-12 mx-auto mb-4 text-zinc-700 dark:text-zinc-300" />
                     <h3 className="text-lg font-semibold mb-2">8 Chart Types</h3>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400">
                       Create stunning visualizations with our chart library
                     </p>
                   </div>
@@ -246,10 +246,10 @@ export function Dashboard() {
               transition={{ delay: 0.2, duration: 0.5 }}
               className="text-center mb-8"
             >
-              <h1 className="text-4xl font-bold mb-4 gradient-primary bg-clip-text text-transparent">
+              <h1 className="text-4xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-zinc-900 to-zinc-600 dark:from-white dark:to-zinc-400">
                 Welcome to DataVista
               </h1>
-              <p className="text-xl text-muted-foreground mb-6">
+              <p className="text-xl text-zinc-500 dark:text-zinc-400 mb-6">
                 Upload your data and create stunning visualizations
               </p>
               <motion.div

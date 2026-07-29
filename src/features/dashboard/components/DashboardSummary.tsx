@@ -196,18 +196,18 @@ export function DashboardSummary() {
       className="space-y-6"
     >
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 bg-transparent">
           {activeDashboard ? (
-            <LayoutDashboard className="h-6 w-6 text-primary" />
+            <LayoutDashboard className="h-6 w-6 text-zinc-700 dark:text-zinc-300" />
           ) : (
-            <TrendingUp className="h-6 w-6 text-primary" />
+            <TrendingUp className="h-6 w-6 text-zinc-700 dark:text-zinc-300" />
           )}
-          <div>
-            <h2 className="text-3xl font-bold gradient-primary bg-clip-text text-transparent">
+          <div className="bg-transparent">
+            <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-zinc-900 to-zinc-600 dark:from-white dark:to-zinc-400">
               {activeDashboard ? activeDashboard.name : "Dashboard Overview"}
             </h2>
-            {activeDashboard && (
-              <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
+            {activeDashboard ? (
+              <div className="flex items-center gap-4 mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                 <span className="flex items-center gap-1">
                   <Calendar className="h-3 w-3" />
                   Created {new Date(activeDashboard.createdAt).toLocaleDateString()}
@@ -217,17 +217,21 @@ export function DashboardSummary() {
                   Updated {new Date(activeDashboard.updatedAt).toLocaleDateString()}
                 </span>
               </div>
+            ) : (
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">
+                Executive summary and interactive analytics
+              </p>
             )}
           </div>
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
           {/* Undo/Redo & Snapshot Toolbar Controls */}
-          <div className="flex items-center gap-1.5 border-r border-border/40 pr-3 mr-1">
+          <div className="flex items-center gap-1.5 border-r border-gray-200 dark:border-zinc-800 pr-3 mr-1">
             <Button
               variant="outline"
               size="icon"
-              className="h-8 w-8 glass hover:bg-primary/10 border-border"
+              className="h-8 w-8 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 hover:bg-gray-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300"
               onClick={undo}
               disabled={past.length === 0}
               title="Undo (Ctrl+Z)"
@@ -237,7 +241,7 @@ export function DashboardSummary() {
             <Button
               variant="outline"
               size="icon"
-              className="h-8 w-8 glass hover:bg-primary/10 border-border"
+              className="h-8 w-8 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 hover:bg-gray-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300"
               onClick={redo}
               disabled={future.length === 0}
               title="Redo (Ctrl+Shift+Z)"
@@ -247,11 +251,11 @@ export function DashboardSummary() {
             <Button
               variant="outline"
               size="sm"
-              className="gap-1.5 glass hover:bg-primary/5 border-primary/20 text-foreground ml-1"
+              className="gap-1.5 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 hover:bg-gray-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 ml-1"
               onClick={() => setIsSnapshotManagerOpen(true)}
               title="Manage Workspace Snapshots & History"
             >
-              <Camera className="h-4 w-4 text-primary" />
+              <Camera className="h-4 w-4 text-zinc-700 dark:text-zinc-300" />
               Snapshots
             </Button>
           </div>
@@ -261,23 +265,23 @@ export function DashboardSummary() {
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-1.5 glass hover:bg-primary/5 border-primary/20 text-foreground"
+                className="gap-1.5 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 hover:bg-gray-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300"
                 onClick={() => setIsCreateTemplateOpen(true)}
               >
-                <LayoutTemplate className="h-4 w-4 text-primary" />
+                <LayoutTemplate className="h-4 w-4 text-zinc-700 dark:text-zinc-300" />
                 Save as Template
               </Button>
 
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-1.5 glass hover:bg-primary/5 border-primary/20 text-foreground"
+                className="gap-1.5 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 hover:bg-gray-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300"
                 onClick={() => {
                   setEditKpi(null);
                   setIsKpiBuilderOpen(true);
                 }}
               >
-                <Plus className="h-4 w-4 text-primary" />
+                <Plus className="h-4 w-4 text-zinc-700 dark:text-zinc-300" />
                 Add KPI Card
               </Button>
 
@@ -291,7 +295,7 @@ export function DashboardSummary() {
 
           {dashboards.length > 0 && (
             <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground whitespace-nowrap">Switch Dashboard:</span>
+              <span className="text-sm text-zinc-500 dark:text-zinc-400 whitespace-nowrap">Switch Dashboard:</span>
               <Select
                 value={activeDashboardId || "none"}
                 onValueChange={(val) => {
@@ -302,10 +306,10 @@ export function DashboardSummary() {
                   }
                 }}
               >
-                <SelectTrigger className="w-[200px] glass">
+                <SelectTrigger className="w-[200px] bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800">
                   <SelectValue placeholder="Select dashboard" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-200">
                   <SelectItem value="none">None (Dataset Overview)</SelectItem>
                   {dashboards.map((d) => (
                     <SelectItem key={d.id} value={d.id}>
@@ -329,15 +333,15 @@ export function DashboardSummary() {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.1 }}
         >
-          <Card className="glass">
+          <Card className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-white/5 shadow-none transition-colors">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-primary/10">
-                  <Database className="h-5 w-5 text-primary" />
+                <div className="p-2 rounded-lg bg-gray-100 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700/50">
+                  <Database className="h-5 w-5 text-zinc-700 dark:text-zinc-300" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Total Rows</p>
-                  <p className="text-2xl font-bold">{insights.totalRows.toLocaleString()}</p>
+                  <p className="text-xs uppercase tracking-wider text-zinc-500 dark:text-zinc-400 font-semibold">Total Rows</p>
+                  <p className="text-3xl font-bold text-zinc-900 dark:text-white tracking-tight">{insights.totalRows.toLocaleString()}</p>
                 </div>
               </div>
             </CardContent>
@@ -349,20 +353,20 @@ export function DashboardSummary() {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.2 }}
         >
-          <Card className="glass">
+          <Card className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-white/5 shadow-none transition-colors">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-secondary/10">
-                  <Users className="h-5 w-5 text-secondary" />
+                <div className="p-2 rounded-lg bg-gray-100 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700/50">
+                  <Users className="h-5 w-5 text-zinc-700 dark:text-zinc-300" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Columns</p>
-                  <p className="text-2xl font-bold">{insights.totalColumns}</p>
+                  <p className="text-xs uppercase tracking-wider text-zinc-500 dark:text-zinc-400 font-semibold">Columns</p>
+                  <p className="text-3xl font-bold text-zinc-900 dark:text-white tracking-tight">{insights.totalColumns}</p>
                   <div className="flex gap-1 mt-1">
-                    <Badge variant="outline" className="text-xs">
+                    <Badge variant="outline" className="text-[10px] border-gray-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400">
                       {insights.numericColumns} numeric
                     </Badge>
-                    <Badge variant="outline" className="text-xs">
+                    <Badge variant="outline" className="text-[10px] border-gray-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400">
                       {insights.categoricalColumns} categorical
                     </Badge>
                   </div>
@@ -377,16 +381,16 @@ export function DashboardSummary() {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.3 }}
         >
-          <Card className="glass">
+          <Card className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-white/5 shadow-none transition-colors">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-accent/10">
-                  <Filter className="h-5 w-5 text-accent" />
+                <div className="p-2 rounded-lg bg-gray-100 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700/50">
+                  <Filter className="h-5 w-5 text-zinc-700 dark:text-zinc-300" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Filtered Rows</p>
-                  <p className="text-2xl font-bold">{insights.filteredRows.toLocaleString()}</p>
-                  <Progress value={insights.filterProgress} className="h-1 mt-2" />
+                  <p className="text-xs uppercase tracking-wider text-zinc-500 dark:text-zinc-400 font-semibold">Filtered Rows</p>
+                  <p className="text-3xl font-bold text-zinc-900 dark:text-white tracking-tight">{insights.filteredRows.toLocaleString()}</p>
+                  <Progress value={insights.filterProgress} className="h-1 mt-2 bg-gray-200 dark:bg-zinc-800" />
                 </div>
               </div>
             </CardContent>
@@ -398,17 +402,17 @@ export function DashboardSummary() {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.4 }}
         >
-          <Card className="glass">
+          <Card className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-white/5 shadow-none transition-colors">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-chart-1/10">
-                  <PieChart className="h-5 w-5 text-chart-1" />
+                <div className="p-2 rounded-lg bg-gray-100 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700/50">
+                  <PieChart className="h-5 w-5 text-zinc-700 dark:text-zinc-300" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Charts Created</p>
-                  <p className="text-2xl font-bold">{insights.chartsCreated}</p>
+                  <p className="text-xs uppercase tracking-wider text-zinc-500 dark:text-zinc-400 font-semibold">Charts Created</p>
+                  <p className="text-3xl font-bold text-zinc-900 dark:text-white tracking-tight">{insights.chartsCreated}</p>
                   {insights.activeFilterCount > 0 && (
-                    <Badge className="mt-1 text-xs">
+                    <Badge className="mt-1 text-[10px] bg-gray-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-gray-300 dark:border-zinc-700">
                       {insights.activeFilterCount} filters active
                     </Badge>
                   )}

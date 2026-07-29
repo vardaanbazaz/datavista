@@ -69,7 +69,8 @@ export function CommandPalette({
 
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const commands = useCommandRegistry((state) => Object.values(state.commands));
+  const commandMap = useCommandRegistry((state) => state.commands);
+  const commands = useMemo(() => Object.values(commandMap), [commandMap]);
   const setActiveView = useUiStore((state) => state.setActiveView);
   const activeDataset = useDatasetStore((state) => state.activeDataset);
   const datasets = useDatasetStore((state) => state.datasets);
@@ -289,33 +290,34 @@ export function CommandPalette({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-        <DialogContent className="max-w-2xl max-h-[85vh] p-0 overflow-hidden glass border-border shadow-2xl gap-0">
-          <DialogHeader className="p-4 pb-2 border-b border-border/40 flex flex-row items-center justify-between">
+        <DialogContent className="max-w-2xl max-h-[85vh] p-0 overflow-hidden bg-white dark:bg-zinc-950 border border-gray-200 dark:border-zinc-800 shadow-2xl gap-0 text-zinc-900 dark:text-zinc-100">
+          <DialogHeader className="p-4 pb-2 border-b border-gray-200 dark:border-zinc-800 flex flex-row items-center justify-between">
             <DialogTitle className="sr-only">Command Palette</DialogTitle>
             <div className="relative flex-1 flex items-center pr-2">
-              <Search className="absolute left-3 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 h-4 w-4 text-zinc-400" />
               <Input
                 ref={inputRef}
-                placeholder="Type '/ai ...' for AI Co-Pilot, or search commands, datasets... (⌘K)"
+                placeholder="Type '/ai ...' for AI Co-Pilot, or search commands, datasets..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={handleKeyDown}
                 disabled={isAiExecuting}
-                className="pl-9 pr-24 h-11 bg-muted/20 border-border/50 text-sm focus-visible:ring-primary"
+                className="pl-9 pr-36 h-11 bg-gray-100 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 text-sm text-zinc-900 dark:text-zinc-100 focus-visible:ring-primary"
               />
-              <div className="absolute right-3 flex items-center gap-1">
+              <div className="absolute right-3 flex items-center gap-1.5">
+                <kbd className="hidden sm:inline-block border border-gray-300 dark:border-zinc-700 bg-gray-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 text-[10px] rounded px-1.5 py-0.5 font-mono">⌘K</kbd>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 text-[11px] px-2 gap-1 text-primary hover:bg-primary/10"
+                  className="h-7 text-[11px] px-2 gap-1 text-zinc-600 dark:text-zinc-300 hover:bg-gray-200 dark:hover:bg-zinc-800"
                   onClick={() => setQuery("/ai ")}
                 >
-                  <Sparkles className="h-3.5 w-3.5" /> /ai
+                  <Sparkles className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-300" /> /ai
                 </Button>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                  className="h-7 w-7 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
                   onClick={() => setIsSettingsOpen(true)}
                   title="AI Co-Pilot Settings"
                 >

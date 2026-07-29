@@ -175,23 +175,23 @@ export function Sidebar({ onOpenSearch }: { onOpenSearch?: () => void }) {
       initial={{ x: -100, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       transition={{ duration: 0.3 }}
-      className="w-full lg:w-80 glass border-b lg:border-b-0 lg:border-r flex flex-col shrink-0"
+      className="w-full lg:w-80 bg-white dark:bg-zinc-950 border-b lg:border-b-0 lg:border-r border-gray-200 dark:border-zinc-800 flex flex-col shrink-0 transition-colors"
     >
-      <div className="p-6 border-b">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 gradient-primary rounded-lg flex items-center justify-center">
-            <TrendingUp className="w-6 h-6 text-primary-foreground" />
+      <div className="p-6 border-b border-gray-200 dark:border-zinc-800">
+        <div className="flex items-center gap-3 bg-transparent">
+          <div className="w-10 h-10 bg-gray-100 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-lg flex items-center justify-center">
+            <TrendingUp className="w-5 h-5 text-zinc-800 dark:text-zinc-200" />
           </div>
-          <div className="flex-1">
-            <h1 className="text-xl font-bold gradient-primary bg-clip-text text-transparent">
+          <div className="flex-1 bg-transparent">
+            <h1 className="text-transparent bg-clip-text bg-gradient-to-r from-zinc-900 to-zinc-600 dark:from-white dark:to-zinc-400 font-bold text-xl">
               DataVista
             </h1>
-            <p className="text-sm text-muted-foreground">Data Visualization</p>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">Data Visualization</p>
           </div>
           <Button
             variant="ghost"
             size="icon"
-            className="h-9 w-9 text-primary hover:bg-primary/10"
+            className="h-9 w-9 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-zinc-900"
             onClick={() => setIsAiSettingsModalOpen(true)}
             title="AI Co-Pilot Settings"
             aria-label="AI Co-Pilot Settings"
@@ -224,16 +224,14 @@ export function Sidebar({ onOpenSearch }: { onOpenSearch?: () => void }) {
         
         <Button
           variant="outline"
-          className="w-full mt-4 justify-between h-9 px-3 text-muted-foreground hover:text-foreground text-xs glass border-border/60"
+          className="w-full mt-4 justify-between h-9 px-3 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 text-xs bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800"
           onClick={() => onOpenSearch?.()}
         >
           <div className="flex items-center gap-2">
-            <Search className="h-3.5 w-3.5 text-primary" />
+            <Search className="h-3.5 w-3.5 text-zinc-400" />
             <span>Global Search...</span>
           </div>
-          <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
-            <span className="text-[10px]">⌘</span>K
-          </kbd>
+          <kbd className="hidden sm:inline-block border border-gray-300 dark:border-zinc-700 bg-gray-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 text-[10px] rounded px-1.5 py-0.5 font-mono">⌘K</kbd>
         </Button>
       </div>
 

@@ -164,16 +164,16 @@ export function KPICard({ config, onRemove, onEdit, isMobile = false }: KPICardP
 
   return (
     <Card
-      className="h-full w-full glass border-border flex flex-col overflow-hidden shadow-sm group transition-colors"
+      className="h-full w-full bg-white dark:bg-zinc-900 border border-gray-200 dark:border-white/5 flex flex-col overflow-hidden shadow-none group transition-colors"
       style={formatStyle?.backgroundColor ? { backgroundColor: formatStyle.backgroundColor } : undefined}
     >
       {/* Header / Drag Handle */}
       <div className="p-3 pb-1 flex flex-row items-center justify-between drag-handle select-none flex-shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           {!isMobile && (
-            <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab active:cursor-grabbing shrink-0" />
+            <GripVertical className="h-4 w-4 text-zinc-400 dark:text-zinc-500 cursor-grab active:cursor-grabbing shrink-0" />
           )}
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider truncate">
+          <span className="text-xs uppercase tracking-wider text-zinc-500 dark:text-zinc-400 font-semibold truncate">
             {config.title}
           </span>
         </div>
@@ -181,7 +181,7 @@ export function KPICard({ config, onRemove, onEdit, isMobile = false }: KPICardP
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6 text-muted-foreground hover:text-foreground shrink-0"
+            className="h-6 w-6 text-zinc-400 hover:text-zinc-900 dark:hover:text-white shrink-0"
             onClick={onEdit}
             title="Edit KPI Card"
           >
@@ -190,7 +190,7 @@ export function KPICard({ config, onRemove, onEdit, isMobile = false }: KPICardP
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
+            className="h-6 w-6 text-zinc-400 hover:text-rose-500 shrink-0"
             onClick={onRemove}
             title="Remove KPI Card"
           >
@@ -201,13 +201,13 @@ export function KPICard({ config, onRemove, onEdit, isMobile = false }: KPICardP
 
       {/* Main Metric Content */}
       <CardContent 
-        className="p-4 pt-1 flex-1 flex flex-row items-center justify-between min-h-0 w-full relative bg-card/10 cursor-context-menu"
+        className="p-4 pt-1 flex-1 flex flex-row items-center justify-between min-h-0 w-full relative bg-gray-50/50 dark:bg-zinc-900/50 cursor-context-menu"
         onContextMenu={handleContextMenu}
         title="Right-click to view raw data records"
       >
         <div className="flex flex-col justify-center min-w-0 pr-4">
           <span
-            className="text-3xl font-extrabold tracking-tight truncate leading-none mb-2"
+            className="text-3xl font-bold text-zinc-900 dark:text-white tracking-tight truncate leading-none mb-2"
             style={formatStyle?.textColor ? { color: formatStyle.textColor } : undefined}
           >
             {formattedValue}
