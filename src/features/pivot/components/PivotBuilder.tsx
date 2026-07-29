@@ -1,4 +1,5 @@
 import React from "react";
+import { cn } from "@/shared/lib/utils";
 import { Dataset, ColumnMetadata, AggregationOperator } from "@/shared/types";
 import { PivotConfig, PivotValueField } from "@/shared/services/pivot";
 import { usePivotStore } from "@/store/pivotStore";
@@ -244,7 +245,7 @@ export const PivotBuilder: React.FC<PivotBuilderProps> = ({ dataset }) => {
                   </div>
                   <div className="flex gap-1 shrink-0">
                     <Button
-                      size="xs"
+                      size="sm"
                       variant="outline"
                       onClick={() => addRowDimension(col.name)}
                       className={cn("text-[9px] px-1.5 h-6", inRows && "bg-primary/20 hover:bg-primary/30 border-primary text-primary")}
@@ -253,7 +254,7 @@ export const PivotBuilder: React.FC<PivotBuilderProps> = ({ dataset }) => {
                       Row
                     </Button>
                     <Button
-                      size="xs"
+                      size="sm"
                       variant="outline"
                       onClick={() => addColumnDimension(col.name)}
                       className={cn("text-[9px] px-1.5 h-6", inCols && "bg-secondary/20 hover:bg-secondary/30 border-secondary text-secondary")}
@@ -262,7 +263,7 @@ export const PivotBuilder: React.FC<PivotBuilderProps> = ({ dataset }) => {
                       Col
                     </Button>
                     <Button
-                      size="xs"
+                      size="sm"
                       variant="outline"
                       onClick={() => addValueField(col.name, col.type === 'numeric' ? 'sum' : 'count')}
                       className="text-[9px] px-1.5 h-6"
