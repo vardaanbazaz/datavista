@@ -116,7 +116,7 @@ export function ChartGrid() {
                 </Button>
               </div>
               
-              <div className="h-64 w-full">
+              <div className="h-[340px] w-full min-w-0 min-h-0 relative overflow-hidden flex flex-col justify-between">
                 <ChartVisualization chart={chart} />
               </div>
             </div>

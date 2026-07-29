@@ -203,9 +203,13 @@ function ChartVisualizationContent({ chart }: ChartVisualizationProps) {
     svg.selectAll("*").remove();
 
     const height = 300;
-    const margin = { top: 20, right: 30, bottom: 65, left: 60 };
+    const margin = { top: 20, right: 30, bottom: 75, left: 60 };
 
-    svg.attr("width", width).attr("height", height);
+    svg
+      .attr("width", "100%")
+      .attr("height", "100%")
+      .attr("viewBox", `0 0 ${width} ${height}`)
+      .attr("preserveAspectRatio", "xMidYMid meet");
 
     const chartArea = svg
       .append("g")
@@ -467,6 +471,15 @@ function ChartVisualizationContent({ chart }: ChartVisualizationProps) {
         .attr("dy", ".15em")
         .attr("transform", "rotate(-45)");
 
+      // Horizontal grid lines - faint and dashed (no vertical grid lines)
+      chartArea.append("g")
+        .attr("class", "grid-horizontal")
+        .call(d3.axisLeft(yScale).tickSize(-chartWidth).tickFormat(() => ""))
+        .selectAll("line")
+        .attr("stroke", "rgba(255, 255, 255, 0.05)")
+        .attr("stroke-dasharray", "4 4");
+      chartArea.selectAll(".grid-horizontal .domain").remove();
+
       // Y axis
       chartArea.append("g")
         .call(d3.axisLeft(yScale));
@@ -486,6 +499,8 @@ function ChartVisualizationContent({ chart }: ChartVisualizationProps) {
           .data(data)
           .enter().append("rect")
           .attr("class", "bar")
+          .attr("rx", 4)
+          .attr("ry", 4)
           .attr("x", d => (xScale(d.key) || 0) + (xSubScale(d.group!) || 0))
           .attr("y", d => yScale(d.value))
           .attr("width", xSubScale.bandwidth())
@@ -525,6 +540,8 @@ function ChartVisualizationContent({ chart }: ChartVisualizationProps) {
           .data(data)
           .enter().append("rect")
           .attr("class", "bar")
+          .attr("rx", 4)
+          .attr("ry", 4)
           .attr("x", d => xScale(d.key) || 0)
           .attr("y", d => yScale(d.value))
           .attr("width", xScale.bandwidth())
@@ -631,6 +648,15 @@ function ChartVisualizationContent({ chart }: ChartVisualizationProps) {
           .attr("dy", ".15em")
           .attr("transform", "rotate(-45)");
       }
+
+      // Horizontal grid lines - faint and dashed
+      chartArea.append("g")
+        .attr("class", "grid-horizontal")
+        .call(d3.axisLeft(yScale).tickSize(-chartWidth).tickFormat(() => ""))
+        .selectAll("line")
+        .attr("stroke", "rgba(255, 255, 255, 0.05)")
+        .attr("stroke-dasharray", "4 4");
+      chartArea.selectAll(".grid-horizontal .domain").remove();
 
       chartArea.append("g")
         .call(d3.axisLeft(yScale));
@@ -1326,7 +1352,7 @@ function ChartVisualizationContent({ chart }: ChartVisualizationProps) {
       )}
 
       {/* SVG drawing area */}
-      <div className="flex-1 min-h-0 w-full relative">
+      <div className="flex-1 min-w-0 min-h-[250px] w-full relative overflow-hidden flex items-center justify-center">
         {chartAnomalies.length > 0 && (
           <Badge
             variant="outline"
@@ -1337,7 +1363,7 @@ function ChartVisualizationContent({ chart }: ChartVisualizationProps) {
             {chartAnomalies.length} {chartAnomalies.length === 1 ? "Outlier" : "Outliers"}
           </Badge>
         )}
-        <svg ref={svgRef} className="w-full h-auto" role="img" aria-label={chart.title ? `Chart: ${chart.title}` : `${chart.type} visualization`} />
+        <svg ref={svgRef} className="w-full h-full max-w-full max-h-full block overflow-visible" role="img" aria-label={chart.title ? `Chart: ${chart.title}` : `${chart.type} visualization`} />
         
         {/* Screen Reader Accessible Fallback Table */}
         <div className="sr-only">
