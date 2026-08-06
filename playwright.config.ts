@@ -1,4 +1,3 @@
-// @ts-ignore - Handle environment where @playwright/test node_modules is pending npm install
 import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({

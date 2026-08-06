@@ -1263,6 +1263,7 @@ function ChartVisualizationContent({ chart }: ChartVisualizationProps) {
         .text(currentDimension);
     }
 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     chart,
     width,

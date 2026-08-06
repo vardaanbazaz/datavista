@@ -1,5 +1,5 @@
+/// <reference lib="dom" />
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// @ts-ignore - Handle environment where @playwright/test node_modules is pending npm install
 import { test, expect } from "@playwright/test";
 
 test.describe("DataVista End-to-End Core User Journeys", () => {
