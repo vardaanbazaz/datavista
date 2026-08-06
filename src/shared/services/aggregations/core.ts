@@ -53,24 +53,29 @@ export function weightedAverage(values: unknown[], weights: unknown[]): number |
 /**
  * Extracts the p-th percentile (0-100) using linear interpolation.
  */
-export function percentile(values: unknown[], p: number): number | null {
-  const nums = values
-    .map(Number)
-    .filter((v) => !isNaN(v) && v !== null && v !== undefined)
+export const percentile = (values: any[], p: number): number | null => {
+  // 1. Filter out all non-numeric values and sort
+  const valid = values
+    .filter((v) => v !== null && v !== undefined && typeof v === 'number' && !isNaN(v))
     .sort((a, b) => a - b);
 
-  if (nums.length === 0) return null;
-  if (p < 0) p = 0;
-  if (p > 100) p = 100;
+  // 2. Guard clause: return null for empty arrays (Fixes Failure 1)
+  if (valid.length === 0) return null;
 
-  const index = (p / 100) * (nums.length - 1);
-  const low = Math.floor(index);
-  const high = Math.ceil(index);
+  // 3. Handle 0th and 100th percentiles safely
+  if (p <= 0) return valid[0];
+  if (p >= 100) return valid[valid.length - 1];
 
-  if (low === high) return nums[low];
-  return nums[low] + (index - low) * (nums[high] - nums[low]);
-}
+  // 4. Calculate fractional index and interpolate (Fixes Failure 2)
+  const index = (p / 100) * (valid.length - 1);
+  const lower = Math.floor(index);
+  const upper = lower + 1;
+  const weight = index % 1;
 
+  if (upper >= valid.length) return valid[lower];
+
+  return valid[lower] * (1 - weight) + valid[upper] * weight;
+};
 /**
  * Evaluates the conditional aggregation using the Formula Engine AST.
  */
