@@ -6,6 +6,7 @@ import { Badge } from "@/shared/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/components/ui/dialog";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/components/ui/tooltip";
 import { Search, ArrowUpDown, Download, Palette, RefreshCw } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import Papa from "papaparse";
@@ -304,7 +305,7 @@ export function DataTable({
   }
 
   return (
-    <div data-testid="data-table-container" className="space-y-6">
+    <div data-testid="data-table-container" data-tour="dataset-grid" className="space-y-6">
       {/* Controls */}
       <Card className="glass">
         <CardHeader>
@@ -317,20 +318,26 @@ export function DataTable({
               {!hideCalculatedFields && <CalculatedFieldsManager />}
               {activeDataset && (
                 <>
-                  <Button
-                    onClick={() => fileInputRef.current?.click()}
-                    variant="outline"
-                    className="gap-2 glass border-primary/20 text-foreground hover:bg-primary/5"
-                    title="Upload new file version to update data while preserving calculated fields & dashboard links"
-                  >
-                    <RefreshCw className="w-4 h-4 text-primary" />
-                    Update Version
-                    {activeDataset.version && activeDataset.version > 1 && (
-                      <Badge variant="secondary" className="ml-0.5 text-[10px] px-1.5 py-0">
-                        v{activeDataset.version}
-                      </Badge>
-                    )}
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        onClick={() => fileInputRef.current?.click()}
+                        variant="outline"
+                        className="gap-2 glass border-primary/20 text-foreground hover:bg-primary/5"
+                      >
+                        <RefreshCw className="w-4 h-4 text-primary" />
+                        Update Version
+                        {activeDataset.version && activeDataset.version > 1 && (
+                          <Badge variant="secondary" className="ml-0.5 text-[10px] px-1.5 py-0">
+                            v{activeDataset.version}
+                          </Badge>
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-xs">Upload new data version while preserving calculated fields & dashboard links</p>
+                    </TooltipContent>
+                  </Tooltip>
                   <input
                     type="file"
                     ref={fileInputRef}
@@ -340,23 +347,38 @@ export function DataTable({
                   />
                 </>
               )}
-              <Button
-                onClick={() => setIsFormattingOpen(true)}
-                variant={formattingRules.length > 0 ? "default" : "outline"}
-                className="gap-2"
-              >
-                <Palette className="w-4 h-4" />
-                Conditional Formatting
-                {formattingRules.length > 0 && (
-                  <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">
-                    {formattingRules.length}
-                  </Badge>
-                )}
-              </Button>
-              <Button onClick={handleExport} variant="outline" className="gap-2">
-                <Download className="w-4 h-4" />
-                Export CSV
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={() => setIsFormattingOpen(true)}
+                    variant={formattingRules.length > 0 ? "default" : "outline"}
+                    className="gap-2"
+                  >
+                    <Palette className="w-4 h-4" />
+                    Conditional Formatting
+                    {formattingRules.length > 0 && (
+                      <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">
+                        {formattingRules.length}
+                      </Badge>
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="text-xs">Configure custom cell highlight rules based on thresholds</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button onClick={handleExport} variant="outline" className="gap-2">
+                    <Download className="w-4 h-4" />
+                    Export CSV
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="text-xs">Download current filtered data as a CSV file</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
           </CardTitle>
         </CardHeader>

@@ -9,6 +9,7 @@ import * as XLSX from "xlsx";
 import { Dataset } from "@/shared/types";
 import { useDatasetStore } from "@/store/datasetStore";
 import { processRawData } from "@/shared/services/parsingService";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/components/ui/tooltip";
 
 export function FileUpload() {
   const onDatasetUpload = useDatasetStore((state) => state.uploadDataset);
@@ -163,7 +164,7 @@ export function FileUpload() {
   }, [handleFile]);
 
   return (
-    <Card className="glass shadow-elegant">
+    <Card className="glass shadow-elegant" data-tour="sidebar-upload">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Upload className="w-5 h-5" />
@@ -215,11 +216,18 @@ export function FileUpload() {
                   accept=".csv,.tsv,.xlsx,.xls"
                   onChange={handleFileSelect}
                 />
-                <Button asChild variant="premium">
-                  <label htmlFor="file-upload" className="cursor-pointer">
-                    Select File
-                  </label>
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button asChild variant="premium">
+                      <label htmlFor="file-upload" className="cursor-pointer">
+                        Select File
+                      </label>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="text-xs">Browse local files (CSV, TSV, or XLSX)</p>
+                  </TooltipContent>
+                </Tooltip>
               </div>
             </div>
           )}

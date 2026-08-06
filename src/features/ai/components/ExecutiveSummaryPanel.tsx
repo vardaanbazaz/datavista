@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Card, CardContent } from "@/shared/components/ui/card";
 import { Button } from "@/shared/components/ui/button";
 import { Badge } from "@/shared/components/ui/badge";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/components/ui/tooltip";
 import { Sparkles, RefreshCw, X, AlertTriangle, TrendingUp, TrendingDown } from "lucide-react";
 import { useDashboardStore } from "@/features/dashboards/store/dashboardStore";
 import { useDatasetStore } from "@/store/datasetStore";
@@ -102,17 +103,23 @@ export function ExecutiveSummaryPanel() {
 
               {/* Action Buttons */}
               <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-start">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => generateExecutiveSummary()}
-                  disabled={isGeneratingSummary}
-                  className="h-8 px-2.5 text-xs gap-1.5 text-zinc-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800"
-                  title="Re-run statistical anomaly detection & AI summary"
-                >
-                  <RefreshCw className={`h-3.5 w-3.5 ${isGeneratingSummary ? "animate-spin" : ""}`} />
-                  Refresh
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => generateExecutiveSummary()}
+                      disabled={isGeneratingSummary}
+                      className="h-8 px-2.5 text-xs gap-1.5 text-zinc-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800"
+                    >
+                      <RefreshCw className={`h-3.5 w-3.5 ${isGeneratingSummary ? "animate-spin" : ""}`} />
+                      Refresh
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="text-xs">Re-run statistical anomaly detection & AI summary</p>
+                  </TooltipContent>
+                </Tooltip>
 
                 <Button
                   variant="ghost"

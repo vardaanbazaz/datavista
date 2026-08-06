@@ -11,7 +11,8 @@ import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
 import { Badge } from "@/shared/components/ui/badge";
-import { Sparkles, Key, Eye, EyeOff, Check, Cpu } from "lucide-react";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/components/ui/tooltip";
+import { Sparkles, Key, Eye, EyeOff, Check, Cpu, HelpCircle } from "lucide-react";
 import { useUiStore, LlmProvider } from "@/store/uiStore";
 import { toast } from "@/shared/hooks/use-toast";
 
@@ -32,7 +33,7 @@ export function AiSettingsModal({ isOpen: externalIsOpen, onClose: externalOnClo
     setInternalIsOpen(open);
   };
 
-  const { llmApiKey, llmProvider, setLlmApiKey, setLlmProvider } = useUiStore();
+  const { llmApiKey, llmProvider, setLlmApiKey, setLlmProvider, startTour } = useUiStore();
 
   const [apiKeyInput, setApiKeyInput] = useState(llmApiKey);
   const [providerInput, setProviderInput] = useState<LlmProvider>(llmProvider);
@@ -84,25 +85,39 @@ export function AiSettingsModal({ isOpen: externalIsOpen, onClose: externalOnClo
               <Cpu className="h-3.5 w-3.5 text-primary" /> LLM Provider
             </Label>
             <div className="grid grid-cols-2 gap-2">
-              <Button
-                type="button"
-                variant={providerInput === "gemini" ? "premium" : "outline"}
-                className="justify-center gap-2 h-10 text-xs"
-                onClick={() => setProviderInput("gemini")}
-              >
-                Google Gemini
-                {providerInput === "gemini" && <Badge variant="secondary" className="text-[9px] px-1 py-0">Active</Badge>}
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant={providerInput === "gemini" ? "premium" : "outline"}
+                    className="justify-center gap-2 h-10 text-xs"
+                    onClick={() => setProviderInput("gemini")}
+                  >
+                    Google Gemini
+                    {providerInput === "gemini" && <Badge variant="secondary" className="text-[9px] px-1 py-0">Active</Badge>}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="text-xs">Use Google Gemini model API</p>
+                </TooltipContent>
+              </Tooltip>
 
-              <Button
-                type="button"
-                variant={providerInput === "openai" ? "premium" : "outline"}
-                className="justify-center gap-2 h-10 text-xs"
-                onClick={() => setProviderInput("openai")}
-              >
-                OpenAI GPT-4o
-                {providerInput === "openai" && <Badge variant="secondary" className="text-[9px] px-1 py-0">Active</Badge>}
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant={providerInput === "openai" ? "premium" : "outline"}
+                    className="justify-center gap-2 h-10 text-xs"
+                    onClick={() => setProviderInput("openai")}
+                  >
+                    OpenAI GPT-4o
+                    {providerInput === "openai" && <Badge variant="secondary" className="text-[9px] px-1 py-0">Active</Badge>}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="text-xs">Use OpenAI GPT-4o model API</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
           </div>
 
@@ -120,15 +135,22 @@ export function AiSettingsModal({ isOpen: externalIsOpen, onClose: externalOnClo
                 onChange={(e) => setApiKeyInput(e.target.value)}
                 className="pr-10 text-xs font-mono"
               />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="absolute right-1 h-7 w-7 text-muted-foreground hover:text-foreground"
-                onClick={() => setShowKey(!showKey)}
-              >
-                {showKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-1 h-7 w-7 text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowKey(!showKey)}
+                  >
+                    {showKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="text-xs">{showKey ? "Hide API key" : "Show API key"}</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
             <p className="text-[11px] text-muted-foreground">
               {apiKeyInput ? (
@@ -142,14 +164,37 @@ export function AiSettingsModal({ isOpen: externalIsOpen, onClose: externalOnClo
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-2 justify-end pt-2">
-            <Button variant="outline" size="sm" onClick={() => setIsOpen(false)}>
-              Cancel
+          <div className="flex items-center gap-2 justify-between pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1.5 text-xs text-muted-foreground"
+              onClick={() => {
+                setIsOpen(false);
+                startTour();
+              }}
+            >
+              <HelpCircle className="h-3.5 w-3.5 text-primary" />
+              Restart Tutorial
             </Button>
-            <Button variant="premium" size="sm" onClick={handleSave} className="gap-1.5">
-              {isSaved ? <Check className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
-              Save Configuration
-            </Button>
+            
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setIsOpen(false)}>
+                Cancel
+              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="premium" size="sm" onClick={handleSave} className="gap-1.5">
+                    {isSaved ? <Check className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
+                    Save Configuration
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="text-xs">Save provider choice and key to local storage</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
           </div>
         </div>
       </DialogContent>

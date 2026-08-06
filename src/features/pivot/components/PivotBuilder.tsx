@@ -9,6 +9,7 @@ import { ScrollArea } from "@/shared/components/ui/scroll-area";
 import { Separator } from "@/shared/components/ui/separator";
 import { Label } from "@/shared/components/ui/label";
 import { Badge } from "@/shared/components/ui/badge";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/components/ui/tooltip";
 import {
   Select,
   SelectContent,
@@ -244,33 +245,53 @@ export const PivotBuilder: React.FC<PivotBuilderProps> = ({ dataset }) => {
                     </span>
                   </div>
                   <div className="flex gap-1 shrink-0">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => addRowDimension(col.name)}
-                      className={cn("text-[9px] px-1.5 h-6", inRows && "bg-primary/20 hover:bg-primary/30 border-primary text-primary")}
-                      title="Add to Rows"
-                    >
-                      Row
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => addColumnDimension(col.name)}
-                      className={cn("text-[9px] px-1.5 h-6", inCols && "bg-secondary/20 hover:bg-secondary/30 border-secondary text-secondary")}
-                      title="Add to Columns"
-                    >
-                      Col
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => addValueField(col.name, col.type === 'numeric' ? 'sum' : 'count')}
-                      className="text-[9px] px-1.5 h-6"
-                      title="Add to Values"
-                    >
-                      + Val
-                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => addRowDimension(col.name)}
+                          className={cn("text-[9px] px-1.5 h-6", inRows && "bg-primary/20 hover:bg-primary/30 border-primary text-primary")}
+                        >
+                          Row
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="text-xs">Add field as a row dimension</p>
+                      </TooltipContent>
+                    </Tooltip>
+
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => addColumnDimension(col.name)}
+                          className={cn("text-[9px] px-1.5 h-6", inCols && "bg-secondary/20 hover:bg-secondary/30 border-secondary text-secondary")}
+                        >
+                          Col
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="text-xs">Add field as a column dimension</p>
+                      </TooltipContent>
+                    </Tooltip>
+
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => addValueField(col.name, col.type === 'numeric' ? 'sum' : 'count')}
+                          className="text-[9px] px-1.5 h-6"
+                        >
+                          + Val
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="text-xs">Add field to aggregate value metrics</p>
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
                 </div>
               );

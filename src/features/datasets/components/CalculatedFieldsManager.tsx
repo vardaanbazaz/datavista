@@ -7,6 +7,7 @@ import { Badge } from "@/shared/components/ui/badge";
 import { ScrollArea } from "@/shared/components/ui/scroll-area";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
 import { Settings, Plus, Trash2, HelpCircle, AlertTriangle, Code, Sparkles, Loader2 } from "lucide-react";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/components/ui/tooltip";
 import { useDatasetStore } from "@/store/datasetStore";
 import { formulaEngine } from "@/shared/services/formulaEngine";
 import { allFunctions } from "@/shared/services/formula/library";
@@ -116,10 +117,17 @@ export function CalculatedFieldsManager({ trigger }: CalculatedFieldsManagerProp
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         {trigger || (
-          <Button variant="outline" size="sm" className="gap-2">
-            <Settings className="h-4 w-4" />
-            Calculated Fields
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Settings className="h-4 w-4" />
+                Calculated Fields
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="text-xs">Create or manage formula-based columns</p>
+            </TooltipContent>
+          </Tooltip>
         )}
       </DialogTrigger>
       
@@ -148,16 +156,23 @@ export function CalculatedFieldsManager({ trigger }: CalculatedFieldsManagerProp
                   disabled={isGeneratingAi}
                   className="h-8 text-xs bg-background/80"
                 />
-                <Button
-                  size="sm"
-                  variant="premium"
-                  onClick={handleGenerateAiFormula}
-                  disabled={isGeneratingAi || !aiPrompt.trim()}
-                  className="h-8 text-xs shrink-0 gap-1"
-                >
-                  {isGeneratingAi ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                  Generate
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="premium"
+                      onClick={handleGenerateAiFormula}
+                      disabled={isGeneratingAi || !aiPrompt.trim()}
+                      className="h-8 text-xs shrink-0 gap-1"
+                    >
+                      {isGeneratingAi ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                      Generate
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="text-xs">Generate formula expression using AI</p>
+                  </TooltipContent>
+                </Tooltip>
               </div>
               {aiError && (
                 <p className="text-[11px] text-destructive font-medium">{aiError}</p>
@@ -199,14 +214,21 @@ export function CalculatedFieldsManager({ trigger }: CalculatedFieldsManagerProp
               </Alert>
             )}
 
-            <Button
-              onClick={handleAdd}
-              disabled={!isValid}
-              className="w-full gap-2 transition-all duration-200"
-            >
-              <Plus className="h-4 w-4" />
-              Add Calculated Field
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  onClick={handleAdd}
+                  disabled={!isValid}
+                  className="w-full gap-2 transition-all duration-200"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Calculated Field
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs">Save and calculate new column in dataset</p>
+              </TooltipContent>
+            </Tooltip>
 
             {/* Existing Calculated Fields */}
             <div className="pt-4 border-t border-white/10">
@@ -225,14 +247,21 @@ export function CalculatedFieldsManager({ trigger }: CalculatedFieldsManagerProp
                           <span className="font-semibold text-primary">{field.name}</span>
                           <code className="block text-[10px] text-muted-foreground">{field.expression}</code>
                         </div>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                          onClick={() => deleteCalculatedField(field.name)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                              onClick={() => deleteCalculatedField(field.name)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="text-xs">Delete this calculated field</p>
+                          </TooltipContent>
+                        </Tooltip>
                       </div>
                     ))}
                   </div>

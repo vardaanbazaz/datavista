@@ -1,148 +1,136 @@
-import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { Button } from "@/shared/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { Badge } from "@/shared/components/ui/badge";
-import { X, Upload, Filter, BarChart3, Download, Sparkles } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/shared/components/ui/dialog";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/components/ui/tooltip";
+import { Upload, Filter, BarChart3, Download, Sparkles } from "lucide-react";
 
 import { useUiStore } from "@/store/uiStore";
 
 export function WelcomeOverlay() {
   const isVisible = useUiStore((state) => state.showWelcome);
   const onClose = () => useUiStore.getState().setShowWelcome(false);
+
   const features = [
     {
       icon: Upload,
       title: "Upload Data",
-      description: "Import CSV files or use sample data to get started",
-      color: "text-blue-500"
+      description: "Import CSV, TSV, or XLSX files to get started",
+      color: "text-blue-500",
+      tooltip: "Supports drag and drop up to 100MB"
     },
     {
       icon: Filter,
       title: "Advanced Filtering",
       description: "Multi-select filters, date ranges, and real-time grouping",
-      color: "text-purple-500"
+      color: "text-purple-500",
+      tooltip: "Filter across any column dynamically"
     },
     {
       icon: BarChart3,
-      title: "8 Chart Types",
+      title: "Interactive Charts",
       description: "Bar, line, pie, scatter, histogram, heatmap, area, and bubble charts",
-      color: "text-green-500"
+      color: "text-green-500",
+      tooltip: "8+ chart types with custom formatting"
     },
     {
       icon: Download,
-      title: "Export Everything",
-      description: "PNG, SVG, CSV, and comprehensive PDF reports",
-      color: "text-orange-500"
+      title: "Export & Share",
+      description: "PNG, SVG, CSV, and comprehensive PDF report exports",
+      color: "text-orange-500",
+      tooltip: "Export clean vector charts or raw data"
     }
   ];
 
   return (
-    <AnimatePresence>
-      {isVisible && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-background/95 backdrop-blur-md z-[100] flex items-center justify-center p-4"
-        >
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.9, opacity: 0 }}
-            transition={{ type: "spring", damping: 20, stiffness: 300 }}
-            className="max-w-2xl w-full"
-          >
-            <Card className="glass shadow-glow border-primary/20">
-              <CardHeader className="text-center relative">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={onClose}
-                  className="absolute right-2 top-2"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-                
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ delay: 0.2, type: "spring" }}
-                  className="mx-auto mb-4 p-3 rounded-full gradient-primary w-fit"
-                >
-                  <Sparkles className="h-8 w-8 text-white" />
-                </motion.div>
-                
-                <CardTitle className="text-3xl font-bold mb-2">
-                  Welcome to{" "}
-                  <span className="gradient-primary bg-clip-text text-transparent">
-                    DataVista
-                  </span>
-                </CardTitle>
-                
-                <p className="text-muted-foreground text-lg">
-                  Your professional data visualization platform
-                </p>
-                
-                <div className="flex justify-center mt-4">
-                  <Badge variant="outline" className="px-3 py-1">
-                    🚀 Now with AI-powered insights
-                  </Badge>
-                </div>
-              </CardHeader>
-              
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {features.map((feature, index) => {
-                    const Icon = feature.icon;
-                    return (
-                      <motion.div
-                        key={feature.title}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.3 + index * 0.1 }}
-                        className="p-4 rounded-lg border border-border/50 bg-muted/30 hover:bg-muted/50 transition-all"
-                      >
-                        <div className="flex items-start gap-3">
-                          <div className={`p-2 rounded-lg bg-background ${feature.color}`}>
-                            <Icon className="h-5 w-5" />
-                          </div>
-                          <div>
-                            <h4 className="font-semibold mb-1">{feature.title}</h4>
-                            <p className="text-sm text-muted-foreground">
-                              {feature.description}
-                            </p>
-                          </div>
-                        </div>
-                      </motion.div>
-                    );
-                  })}
-                </div>
-                
-                <div className="text-center pt-4 border-t border-border/50">
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Ready to transform your data into beautiful visualizations?
-                  </p>
-                  
-                  <motion.div
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    <Button 
-                      onClick={onClose}
-                      variant="premium"
-                      size="lg"
-                      className="text-lg px-8"
+    <Dialog open={isVisible} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-2xl bg-white dark:bg-zinc-950 border border-gray-200 dark:border-zinc-800 shadow-2xl p-6 sm:p-8 text-zinc-900 dark:text-zinc-100">
+        <DialogHeader className="text-center sm:text-center space-y-3">
+          <div className="flex items-center justify-center gap-2">
+            <Sparkles className="h-6 w-6 text-primary animate-pulse" />
+            <DialogTitle className="text-3xl font-bold bg-gradient-to-r from-zinc-900 to-zinc-600 dark:from-white dark:to-zinc-400 bg-clip-text text-transparent">
+              DataVista
+            </DialogTitle>
+          </div>
+          <DialogDescription className="text-muted-foreground text-base">
+            Your professional data visualization & analytics platform
+          </DialogDescription>
+          <div className="flex justify-center pt-1">
+            <Badge variant="outline" className="px-3 py-1 text-xs">
+              🚀 Powered by AI Insights & High-Performance Pivot Engine
+            </Badge>
+          </div>
+        </DialogHeader>
+
+        <div className="space-y-6 mt-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {features.map((feature, index) => {
+              const Icon = feature.icon;
+              return (
+                <Tooltip key={feature.title}>
+                  <TooltipTrigger asChild>
+                    <motion.div
+                      initial={{ opacity: 0, y: 15 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.1 + index * 0.08 }}
+                      className="p-4 rounded-xl border border-gray-200 dark:border-zinc-800/80 bg-gray-50/50 dark:bg-zinc-900/50 hover:bg-gray-100/80 dark:hover:bg-zinc-800/80 transition-all cursor-default"
                     >
-                      Let's Get Started! ✨
-                    </Button>
-                  </motion.div>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+                      <div className="flex items-start gap-3">
+                        <div className={`p-2 rounded-lg bg-white dark:bg-zinc-950 border border-gray-200 dark:border-zinc-800 ${feature.color}`}>
+                          <Icon className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-sm mb-1">{feature.title}</h4>
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            {feature.description}
+                          </p>
+                        </div>
+                      </div>
+                    </motion.div>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    <p className="text-xs">{feature.tooltip}</p>
+                  </TooltipContent>
+                </Tooltip>
+              );
+            })}
+          </div>
+
+          <div className="text-center pt-4 border-t border-gray-200 dark:border-zinc-800">
+            <p className="text-xs text-muted-foreground mb-4">
+              Ready to transform raw datasets into actionable visualizations?
+            </p>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <motion.div
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  className="inline-block"
+                >
+                  <Button
+                    onClick={onClose}
+                    variant="premium"
+                    size="lg"
+                    className="text-base px-8 py-6 font-semibold shadow-lg"
+                  >
+                    Let's Get Started! ✨
+                  </Button>
+                </motion.div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs">Close welcome guide and enter DataVista workspace</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

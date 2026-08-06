@@ -11,6 +11,7 @@ import { ExportPanel } from "@/features/export/components/ExportPanel";
 import { ChartGrid } from "@/features/charts/components/ChartGrid";
 import { DashboardSummary } from "./DashboardSummary";
 import { WelcomeOverlay } from "./WelcomeOverlay";
+import { OnboardingTour } from "@/features/ui/components/OnboardingTour";
 import { LoadingState } from "@/shared/components/LoadingSpinner";
 import { ErrorBoundary, FullPageError } from "@/shared/components/ErrorBoundary";
 
@@ -474,6 +475,7 @@ export function Dashboard() {
       </MainContent>
       
       <WelcomeOverlay />
+      <OnboardingTour />
       
       <GlobalSearchModal
         isOpen={isSearchOpen}

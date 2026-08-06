@@ -30,7 +30,8 @@ import {
   Sigma,
   Columns,
   LayoutTemplate,
-  Search
+  Search,
+  HelpCircle
 } from "lucide-react";
 import { Dataset } from "@/shared/types";
 import { useUiStore, ViewType } from "@/store/uiStore";
@@ -38,6 +39,7 @@ import { useDatasetStore } from "@/store/datasetStore";
 import { useDashboardStore } from "@/features/dashboards/store/dashboardStore";
 import { InstantiateTemplateModal } from "@/features/dashboards/components/InstantiateTemplateModal";
 import { ThemeToggle } from "@/shared/components/ThemeToggle";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/components/ui/tooltip";
 import { motion } from "framer-motion";
 import { Sparkles } from "lucide-react";
 
@@ -46,6 +48,7 @@ const AiSettingsModal = lazy(() => import("@/features/ai/components/AiSettingsMo
 export function Sidebar({ onOpenSearch }: { onOpenSearch?: () => void }) {
   const activeView = useUiStore((state) => state.activeView);
   const onViewChange = useUiStore((state) => state.setActiveView);
+  const startTour = useUiStore((state) => state.startTour);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isInstantiateModalOpen, setIsInstantiateModalOpen] = useState(false);
   const [isAiSettingsModalOpen, setIsAiSettingsModalOpen] = useState(false);
@@ -188,16 +191,41 @@ export function Sidebar({ onOpenSearch }: { onOpenSearch?: () => void }) {
             </h1>
             <p className="text-sm text-zinc-500 dark:text-zinc-400">Data Visualization</p>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-zinc-900"
-            onClick={() => setIsAiSettingsModalOpen(true)}
-            title="AI Co-Pilot Settings"
-            aria-label="AI Co-Pilot Settings"
-          >
-            <Sparkles className="h-5 w-5" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-zinc-900"
+                onClick={() => setIsAiSettingsModalOpen(true)}
+                aria-label="AI Co-Pilot Settings"
+                data-tour="ai-copilot"
+              >
+                <Sparkles className="h-5 w-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="text-xs">Configure AI Co-Pilot settings and API keys</p>
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-zinc-900"
+                onClick={startTour}
+                aria-label="Restart Onboarding Tour"
+              >
+                <HelpCircle className="h-5 w-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="text-xs">Restart Onboarding Tutorial</p>
+            </TooltipContent>
+          </Tooltip>
+
           <ThemeToggle />
           <Button
             variant="ghost"
@@ -221,18 +249,25 @@ export function Sidebar({ onOpenSearch }: { onOpenSearch?: () => void }) {
           </Suspense>
         </ErrorBoundary>
 
-        
-        <Button
-          variant="outline"
-          className="w-full mt-4 justify-between h-9 px-3 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 text-xs bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800"
-          onClick={() => onOpenSearch?.()}
-        >
-          <div className="flex items-center gap-2">
-            <Search className="h-3.5 w-3.5 text-zinc-400" />
-            <span>Global Search...</span>
-          </div>
-          <kbd className="hidden sm:inline-block border border-gray-300 dark:border-zinc-700 bg-gray-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 text-[10px] rounded px-1.5 py-0.5 font-mono">⌘K</kbd>
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="outline"
+              data-tour="global-search"
+              className="w-full mt-4 justify-between h-9 px-3 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 text-xs bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800"
+              onClick={() => onOpenSearch?.()}
+            >
+              <div className="flex items-center gap-2">
+                <Search className="h-3.5 w-3.5 text-zinc-400" />
+                <span>Global Search...</span>
+              </div>
+              <kbd className="hidden sm:inline-block border border-gray-300 dark:border-zinc-700 bg-gray-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 text-[10px] rounded px-1.5 py-0.5 font-mono">⌘K</kbd>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p className="text-xs">Search charts, datasets, and views (Cmd+K)</p>
+          </TooltipContent>
+        </Tooltip>
       </div>
 
       <div className={cn("flex-col flex-1", isMobileOpen ? "flex" : "hidden lg:flex")}>
@@ -241,6 +276,7 @@ export function Sidebar({ onOpenSearch }: { onOpenSearch?: () => void }) {
           {navItems.map((item, index) => {
             const Icon = item.icon;
             const isActive = activeView === item.id;
+            const tourAttr = item.id === 'upload' ? 'sidebar-upload' : item.id === 'data' ? 'dataset-grid' : item.id === 'pivot' ? 'pivot-explorer' : undefined;
             
             return (
               <motion.div
@@ -251,6 +287,7 @@ export function Sidebar({ onOpenSearch }: { onOpenSearch?: () => void }) {
               >
                 <Button
                   data-testid={`sidebar-nav-${item.id}`}
+                  data-tour={tourAttr}
                   variant={isActive ? "premium" : "ghost"}
                   className="w-full justify-start h-auto p-4 transition-all duration-200"
                   onClick={() => onViewChange(item.id)}
@@ -360,27 +397,39 @@ export function Sidebar({ onOpenSearch }: { onOpenSearch?: () => void }) {
           <Badge variant="secondary" className="ml-auto">
             {dashboards.length}
           </Badge>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-6 w-6 hover:bg-muted"
-            onClick={() => setIsInstantiateModalOpen(true)}
-            title="Create from Template"
-            aria-label="Create dashboard from template"
-          >
-            <LayoutTemplate className="h-3.5 w-3.5 text-primary" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-6 w-6 hover:bg-muted"
+                onClick={() => setIsInstantiateModalOpen(true)}
+                aria-label="Create dashboard from template"
+              >
+                <LayoutTemplate className="h-3.5 w-3.5 text-primary" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="text-xs">Create dashboard from pre-built templates</p>
+            </TooltipContent>
+          </Tooltip>
 
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-6 w-6 hover:bg-muted"
-            onClick={handleCreateDashboard}
-            title="Create New Blank Dashboard"
-            aria-label="Create new blank dashboard"
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-6 w-6 hover:bg-muted"
+                onClick={handleCreateDashboard}
+                aria-label="Create new blank dashboard"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="text-xs">Create a new blank dashboard</p>
+            </TooltipContent>
+          </Tooltip>
 
           <InstantiateTemplateModal
             isOpen={isInstantiateModalOpen}

@@ -12,7 +12,7 @@ const queryClient = new QueryClient();
 const App = () => (
   <ErrorBoundary fallback={(props) => <FullPageError {...props} />}>
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
+      <TooltipProvider delayDuration={200}>
         <Toaster />
         <Sonner />
         <BrowserRouter basename={import.meta.env.BASE_URL}>

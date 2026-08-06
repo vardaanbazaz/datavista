@@ -12,6 +12,8 @@ interface UiState {
   isHydrated: boolean;
   llmApiKey: string;
   llmProvider: LlmProvider;
+  hasSeenTour: boolean;
+  runTour: boolean;
   setActiveView: (view: ViewType) => void;
   setShowWelcome: (show: boolean) => void;
   setIsLoading: (loading: boolean) => void;
@@ -19,6 +21,9 @@ interface UiState {
   setIsHydrated: (hydrated: boolean) => void;
   setLlmApiKey: (key: string) => void;
   setLlmProvider: (provider: LlmProvider) => void;
+  setHasSeenTour: (seen: boolean) => void;
+  setRunTour: (run: boolean) => void;
+  startTour: () => void;
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -29,6 +34,8 @@ export const useUiStore = create<UiState>((set) => ({
   isHydrated: false,
   llmApiKey: typeof window !== 'undefined' ? localStorage.getItem('datavista_llm_api_key') || '' : '',
   llmProvider: (typeof window !== 'undefined' ? (localStorage.getItem('datavista_llm_provider') as LlmProvider) || 'gemini' : 'gemini'),
+  hasSeenTour: typeof window !== 'undefined' ? localStorage.getItem('datavista_has_seen_tour') === 'true' : false,
+  runTour: typeof window !== 'undefined' ? localStorage.getItem('datavista_has_seen_tour') !== 'true' : false,
   setActiveView: (view) => set({ activeView: view }),
   setShowWelcome: (show) => set({ showWelcome: show }),
   setIsLoading: (loading) => set({ isLoading: loading }),
@@ -46,5 +53,13 @@ export const useUiStore = create<UiState>((set) => ({
     }
     set({ llmProvider: provider });
   },
+  setHasSeenTour: (seen) => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('datavista_has_seen_tour', seen ? 'true' : 'false');
+    }
+    set({ hasSeenTour: seen });
+  },
+  setRunTour: (run) => set({ runTour: run }),
+  startTour: () => set({ runTour: true }),
 }));
 
