@@ -53,10 +53,10 @@ export function weightedAverage(values: unknown[], weights: unknown[]): number |
 /**
  * Extracts the p-th percentile (0-100) using linear interpolation.
  */
-export const percentile = (values: any[], p: number): number | null => {
+export const percentile = (values: unknown[], p: number): number | null => {
   // 1. Filter out all non-numeric values and sort
-  const valid = values
-    .filter((v) => v !== null && v !== undefined && typeof v === 'number' && !isNaN(v))
+  const valid = (values
+    .filter((v): v is number => v !== null && v !== undefined && typeof v === 'number' && !isNaN(v)))
     .sort((a, b) => a - b);
 
   // 2. Guard clause: return null for empty arrays (Fixes Failure 1)
