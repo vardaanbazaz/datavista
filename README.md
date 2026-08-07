@@ -1,97 +1,72 @@
-# DataVista
+# DataVista 📊 
 
-> **Offline-first, browser-based Business Intelligence platform.**
+![Build Status](https://img.shields.io/github/actions/workflow/status/vardaanbazaz/datavista/deploy.yml?branch=main)
+![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white)
+![React](https://img.shields.io/badge/React_18-20232A?style=flat&logo=react&logoColor=61DAFB)
+![License](https://img.shields.io/badge/License-MIT-green.svg)
 
-DataVista is a modern, responsive, and entirely client-side Business Intelligence platform. It allows users to upload datasets (CSV, Excel), design analytical pipelines, write calculations, evaluate window partitions, structure pivot tables, and visualize results—all running securely in the browser without sending data to any external server.
+**DataVista** is an offline-first, browser-native Business Intelligence (BI) and analytics platform. 
 
----
+### 📖 What is DataVista? (The Layman's Explanation)
+Imagine taking the massive analytical power of enterprise tools like **Microsoft Power BI** or **Tableau** and cramming it entirely into your web browser. 
 
-## Key Features
+Normally, when you upload a spreadsheet to a data tool, your private data is sent to a remote server to be processed. **DataVista flips this model.** It uses your browser's internal storage and computing power to process, slice, and visualize multi-megabyte datasets locally. Your data never leaves your machine. 
 
-* **Zero-Server Processing**: Everything runs directly in the browser. Datasets remain private and secure.
-* **Offline-First Storage**: Powered by IndexedDB (via Dexie) to persist datasets, dashboards, and charts across browser reloads.
-* **Calculated Fields & Expression Library**: Full-featured custom formula language including Math, String, Date, and Logical functions.
-* **Multidimensional Pivot Table Engine**: Drag-and-drop row groups, column groups, and aggregations supporting distinct counts, weighted averages, and percentiles.
-* **Advanced Aggregations**: Supports `COUNT_DISTINCT`, `WEIGHTED_AVERAGE`, `PERCENTILE`, `SUM_IF`, and `COUNT_IF`.
-* **Window & Ranking Functions**: Compute moving averages, running totals, lag, lead, ranks, and dense ranks over custom partitions.
-* **Query Optimizer**: LRU caching and execution plans skip redundant pipeline evaluations to maximize rendering speed.
-* **High-Performance UI**: Fully virtualized tables and responsive charts (using TanStack Virtual and D3/recharts).
+Simply drag and drop a CSV or Excel file, and you instantly get access to interactive pivot tables, statistical analysis, complex formula parsing, and an AI Co-Pilot—all running at lightning speed directly on your device.
 
 ---
 
-## Architecture Overview
+## 📸 Platform Gallery
 
-DataVista relies on a multi-stage, client-side analytical pipeline:
+*(Note: Replace these placeholder paths with actual screenshots of your application)*
 
+| Overview Dashboard | Pivot Explorer |
+| :---: | :---: |
+| ![Dashboard](docs/dashboard-screenshot.png) <br> *Real-time metrics and executive summaries* | ![Pivot](docs/pivot-screenshot.png) <br> *Multidimensional data aggregation* |
+
+| AI Co-Pilot | Advanced Charting |
+| :---: | :---: |
+| ![AI Copilot](docs/ai-screenshot.png) <br> *Natural language queries via Gemini/GPT-4o* | ![Charts](docs/charts-screenshot.png) <br> *Over 8 interactive visualization types* |
+
+---
+
+## 🧠 System Architecture
+
+DataVista bypasses traditional backend servers by utilizing a modular, engine-driven architecture completely housed within the client layer. 
+
+```mermaid
+graph TD
+    subgraph UI Layer [React 18 User Interface]
+        A[Dashboard & Charts]
+        B[Command Palette ⌘K]
+        C[Joyride Onboarding]
+    end
+
+    subgraph State Management [Zustand + Persist]
+        D[UI & Theme Store]
+        E[Workspace & History Store]
+    end
+
+    subgraph Analytical Engines [Core Processing]
+        F[AST Formula Parser]
+        G[Pivot Aggregation Engine]
+        H[Statistical Math Engine]
+    end
+
+    subgraph Data Persistence [Browser Storage]
+        I[(IndexedDB / Dexie.js)]
+        J[Local Storage]
+    end
+
+    subgraph External AI APIs
+        K[Google Gemini API]
+        L[OpenAI GPT-4o API]
+    end
+
+    %% Flow connections
+    A & B & C <--> D & E
+    E <--> F & G & H
+    F & G & H <--> I
+    D <--> J
+    E <--> K & L
 ```
-[ Raw Dataset ]
-      │
-      ▼
-[ Metadata Layer ] ──> Infers column types & registers fields
-      │
-      ▼
-[ Formula Engine ] ──> Evaluates user-defined AST expressions
-      │
-      ▼
-[ Query Optimizer ] ──> Intercepts query, evaluates plan, looks up cache
-      │
-      ├─ Cache Hit ──> Slices & Paginated Output
-      └─ Cache Miss ─┐
-                     ▼
-             [ Query Engine ]
-                     ├─ applyFilters
-                     ├─ applySorting
-                     ├─ applyGroupingAndAggregations (Advanced Aggregations)
-                     ├─ applyWindowFunctions
-                     └─ paginate
-```
-
-All computationally heavy steps are designed to run in parallel Web Workers to prevent blocking the main rendering thread.
-
----
-
-## Tech Stack
-
-* **Core Framework**: React 18, TypeScript, Vite
-* **State Management**: Zustand
-* **Database & Persistence**: Dexie (IndexedDB wrapper)
-* **Styling & UI Components**: Tailwind CSS, shadcn/ui, Lucide Icons
-* **Data Visualization**: D3.js, Recharts
-* **Grid Virtualization**: TanStack Virtual
-
----
-
-## Getting Started
-
-### Prerequisites
-
-* Node.js (v18 or higher recommended)
-* npm
-
-### Installation
-
-1. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-2. Start the local development server:
-   ```bash
-   npm run dev
-   ```
-
-3. Open your browser and navigate to `http://localhost:5173`.
-
-### Production Build
-
-To build the static application assets:
-```bash
-npm run build
-```
-The output will be placed in the `dist/` directory.
-
----
-
-## License
-
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
