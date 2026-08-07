@@ -7,6 +7,8 @@
 
 **DataVista** is an offline-first, browser-native Business Intelligence (BI) and analytics platform. 
 
+---
+
 ### 📖 What is DataVista? (The Layman's Explanation)
 Imagine taking the massive analytical power of enterprise tools like **Microsoft Power BI** or **Tableau** and cramming it entirely into your web browser. 
 
@@ -16,17 +18,24 @@ Simply drag and drop a CSV or Excel file, and you instantly get access to intera
 
 ---
 
-## 📸 Platform Gallery
+## 🚀 Core Technical Features
 
-*(Note: Replace these placeholder paths with actual screenshots of your application)*
+* **Offline-First Storage**: Utilizes IndexedDB (via Dexie) to locally store, version, and manage massive datasets without requiring a backend database.
+* **Custom AST Formula Parser**: A recursive-descent parser that evaluates Excel-style calculated fields and window functions on the fly.
+* **Unified Query & Pivot Engine**: A multidimensional framework-agnostic engine allowing users to group data by Rows, Columns, and Values with complex aggregations.
+* **AI Co-Pilot Integration**: Connects directly to LLM APIs (Google Gemini, OpenAI GPT-4o) for natural language data querying and automated anomaly detection.
+* **Enterprise UX**: Features a robust 14-step guided product tour (`react-joyride`), global command palette (`⌘K`), and strict Tailwind dark-mode constraints.
 
-| Overview Dashboard | Pivot Explorer |
-| :---: | :---: |
-| ![Dashboard](docs/dashboard-screenshot.png) <br> *Real-time metrics and executive summaries* | ![Pivot](docs/pivot-screenshot.png) <br> *Multidimensional data aggregation* |
+---
 
-| AI Co-Pilot | Advanced Charting |
-| :---: | :---: |
-| ![AI Copilot](docs/ai-screenshot.png) <br> *Natural language queries via Gemini/GPT-4o* | ![Charts](docs/charts-screenshot.png) <br> *Over 8 interactive visualization types* |
+## 💻 Tech Stack
+
+* **Framework**: React 18, Vite
+* **Language**: Strict TypeScript
+* **State Management**: Zustand (with local storage persistence)
+* **Database / Local Persistence**: IndexedDB (Dexie.js)
+* **Styling & UI**: Tailwind CSS, shadcn/ui, Framer Motion, Lucide Icons
+* **DevOps & Quality**: GitHub Actions (CI/CD), Vitest (Unit Testing), Playwright (E2E), ESLint
 
 ---
 
@@ -70,3 +79,90 @@ graph TD
     D <--> J
     E <--> K & L
 ```
+
+---
+
+## 📸 Platform Gallery
+
+*(Note: Replace these placeholder paths with actual screenshots of your application)*
+
+| Overview Dashboard | Pivot Explorer |
+| :---: | :---: |
+| ![Dashboard](docs/dashboard-screenshot.png) <br> *Real-time metrics and executive summaries* | ![Pivot](docs/pivot-screenshot.png) <br> *Multidimensional data aggregation* |
+
+| AI Co-Pilot | Advanced Charting |
+| :---: | :---: |
+| ![AI Copilot](docs/ai-screenshot.png) <br> *Natural language queries via Gemini/GPT-4o* | ![Charts](docs/charts-screenshot.png) <br> *Over 8 interactive visualization types* |
+
+---
+
+## 📖 How to Use DataVista
+
+Follow these simple steps to explore and analyze your datasets with DataVista:
+
+1. **Importing Datasets**: 
+   - Click on **Upload Data** in the left sidebar or drag & drop CSV, TSV, or XLSX files (up to 100MB).
+   - Alternatively, click **Try with Sample Data ✨** on the Overview Dashboard for an instant demo.
+2. **Filtering & Narrowing Data**:
+   - Go to **Filters** to construct multi-layered conditions (equals, contains, numeric range) and watch dataset counts update dynamically.
+3. **Exploring Raw Data & Calculated Columns**:
+   - Open **Data Explorer** to inspect records, apply conditional formatting, and write AST formula expressions.
+4. **Building Visualizations & Charts**:
+   - Navigate to **Charts** to create over 8 interactive visualization types (Bar, Line, Scatter, Pie, Heatmap, Area) with customizable color schemes.
+5. **Multidimensional Pivot Analysis**:
+   - Select **Pivot Table** to aggregate fields across Rows, Columns, and Values with automated totals.
+6. **Statistical Summaries & Outliers**:
+   - Open **Statistics** to calculate mean, median, variance, standard deviation, correlation matrices, and IQR/Z-score outlier detection.
+7. **Window Functions & Rankings**:
+   - Use **Window Functions** to run rolling calculations, moving averages, cumulative sums, and row rankings (`ROW_NUMBER`, `RANK`, `DENSE_RANK`).
+8. **AI Co-Pilot Assistance**:
+   - Click the **AI Co-Pilot (Star icon)** in the top header to configure your Gemini or GPT-4o API keys for natural language query execution.
+9. **Exporting Data & Reports**:
+   - Visit **Export** to download processed datasets as CSVs or export visual reports directly to your local device.
+10. **Command Palette & Guided Tour**:
+    - Press `Cmd+K` (or `Ctrl+K`) anytime to open the Global Search / Command Palette.
+    - Click the `?` icon in the top header to restart the **14-step interactive guided tutorial**.
+
+---
+
+## 🛠️ Local Development
+
+### Prerequisites
+* **Node.js**: v18.x or higher
+* **npm**: v9.x or higher
+
+### Steps to Run Locally
+
+```bash
+# Clone the repository
+git clone https://github.com/vardaanbazaz/datavista.git
+
+# Navigate into the directory
+cd datavista
+
+# Install dependencies
+npm install
+
+# Start the Vite development server
+npm run dev
+```
+
+Open `http://localhost:5173` in your browser to start using DataVista locally.
+
+### Other Available Scripts
+```bash
+# Run unit test suite
+npm run test
+
+# Run TypeScript type check
+npx tsc --noEmit
+
+# Build production bundle
+npm run build
+```
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
