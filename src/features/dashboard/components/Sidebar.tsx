@@ -200,7 +200,7 @@ export function Sidebar({ onOpenSearch }: { onOpenSearch?: () => void }) {
                 className="h-9 w-9 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-zinc-900"
                 onClick={() => setIsAiSettingsModalOpen(true)}
                 aria-label="AI Co-Pilot Settings"
-                data-tour="nav-settings"
+                data-tour="header-copilot"
               >
                 <Sparkles className="h-5 w-5" />
               </Button>
@@ -218,6 +218,7 @@ export function Sidebar({ onOpenSearch }: { onOpenSearch?: () => void }) {
                 className="h-9 w-9 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-zinc-900"
                 onClick={resetTour}
                 aria-label="Restart Onboarding Tour"
+                data-tour="header-tutorial"
               >
                 <HelpCircle className="h-5 w-5" />
               </Button>
@@ -227,7 +228,7 @@ export function Sidebar({ onOpenSearch }: { onOpenSearch?: () => void }) {
             </TooltipContent>
           </Tooltip>
 
-          <ThemeToggle />
+          <ThemeToggle data-tour="header-theme" />
           <Button
             variant="ghost"
             size="icon"

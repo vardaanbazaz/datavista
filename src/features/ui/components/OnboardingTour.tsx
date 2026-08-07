@@ -6,58 +6,67 @@ export const OnboardingTour: React.FC = () => {
   const { runTour, setRunTour, setHasSeenTour } = useUiStore();
 
   const steps: Step[] = [
+    // --- MAIN FUNCTIONS ---
     {
       target: '[data-tour="nav-dashboard"]',
-      content: "Welcome to DataVista! The Overview Dashboard provides real-time executive summaries, anomaly detection alerts, and top-level KPIs for your active dataset.",
+      content: "Overview: The Dashboard provides real-time executive summaries and high-level metrics.",
       skipBeacon: true,
     },
     {
       target: '[data-tour="nav-upload"]',
-      content: "Upload Data: Drag and drop CSV, TSV, or XLSX datasets (up to 100MB). Features automatic type inference and instant data validation.",
-    },
-    {
-      target: '[data-tour="nav-datasets"]',
-      content: "Manage all your uploaded datasets, switch between active tables, and review schema version histories here.",
+      content: "Upload Data: Drag and drop your raw CSV or Excel datasets here to begin.",
     },
     {
       target: '[data-tour="tool-filters"]',
-      content: "Apply complex, multi-layered conditions to instantly narrow down your dataset.",
-    },
-    {
-      target: '[data-tour="dataset-grid"]',
-      content: "Data Explorer: Inspect raw data rows, apply conditional formatting, create custom calculated fields, and export cleaned CSVs.",
-    },
-    {
-      target: '[data-tour="nav-charts"]',
-      content: "Visualization & Charts: Build over 8 interactive chart types (Bar, Line, Scatter, Pie, Heatmap, Area) with customizable color palettes.",
-    },
-    {
-      target: '[data-tour="nav-pivot"]',
-      content: "Pivot Explorer: Slice, dice, and aggregate multidimensional data. Easily drag and drop fields into Rows, Columns, and Values.",
+      content: "Filters: Apply complex, multi-layered conditions to instantly narrow down your dataset.",
     },
     {
       target: '[data-tour="tool-statistics"]',
-      content: "View automated statistical summaries of your columns, including mean, median, variance, and standard deviation.",
+      content: "Statistics: View automated statistical summaries including mean, median, and variance.",
     },
     {
       target: '[data-tour="tool-window-functions"]',
-      content: "Perform advanced rolling calculations, moving averages, and cumulative sums directly in the browser.",
+      content: "Window Builder: Perform advanced rolling calculations and moving averages.",
     },
     {
       target: '[data-tour="tool-export"]',
-      content: "Done analyzing? Export your processed data and visual reports directly to your local machine.",
+      content: "Export: Download your processed data and visual reports directly to your local machine.",
     },
     {
-      target: '[data-tour="nav-dashboards"]',
-      content: "Access, organize, and manage your saved visual dashboard layouts and reports.",
+      target: '[data-tour="nav-charts"]',
+      content: "Charts: Build over 8 interactive chart types from your data.",
+    },
+    {
+      target: '[data-tour="nav-pivot"]',
+      content: "Pivot Table: Slice, dice, and aggregate multidimensional data into summary tables.",
     },
     {
       target: '[data-tour="global-search"]',
-      content: "Global Search / Command Palette: Press Cmd+K (or Ctrl+K) anywhere to execute commands, open templates, or search datasets.",
+      content: "Command Palette: Power user? Press Cmd+K (or Ctrl+K) anywhere to search and navigate instantly.",
+    },
+
+    // --- SUB-MENUS ---
+    {
+      target: '[data-tour="nav-datasets"]',
+      content: "Datasets: Manage all your uploaded files, switch between tables, and review history.",
     },
     {
-      target: '[data-tour="nav-settings"]',
-      content: "AI Co-Pilot & Settings: Configure Google Gemini or OpenAI GPT-4o keys for natural language query execution and automated insights.",
+      target: '[data-tour="nav-dashboards"]',
+      content: "Dashboards: Access, organize, and manage your saved visual layouts.",
+    },
+
+    // --- HEADER ACTIONS ---
+    {
+      target: '[data-tour="header-copilot"]',
+      content: "AI Co-Pilot: Click the star to configure your API keys and ask natural language queries.",
+    },
+    {
+      target: '[data-tour="header-tutorial"]',
+      content: "Tutorial: Need a refresher? Click this question mark to restart this tour anytime.",
+    },
+    {
+      target: '[data-tour="header-theme"]',
+      content: "Theme Toggle: Switch between Light and Dark mode to suit your workspace preference.",
     },
   ];
 

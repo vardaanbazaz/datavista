@@ -201,3 +201,5 @@ export function AiSettingsModal({ isOpen: externalIsOpen, onClose: externalOnClo
     </Dialog>
   );
 }
+
+export default AiSettingsModal;
