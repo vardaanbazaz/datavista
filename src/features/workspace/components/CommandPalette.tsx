@@ -345,7 +345,7 @@ export function CommandPalette({
           )}
 
           {!isAiExecuting && (
-            <ScrollArea className="max-h-[460px] p-3">
+            <ScrollArea className="max-h-[300px] overflow-y-auto overflow-x-hidden p-3">
               {flatUnifiedItems.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground space-y-2">
                   <Sparkles className="h-8 w-8 mx-auto text-muted-foreground/40" />
@@ -367,6 +367,7 @@ export function CommandPalette({
                         const isSelected = selectedIndex === currentIndex;
                         return (
                           <div
+                            ref={(el) => { if (isSelected && el) el.scrollIntoView({ block: "nearest" }); }}
                             onClick={() => handleRunAiQuery(aiPromptText)}
                             className={`p-3 rounded-lg flex items-center justify-between cursor-pointer transition-colors text-sm ${
                               isSelected
@@ -409,6 +410,7 @@ export function CommandPalette({
                         return (
                           <div
                             key={cmd.id}
+                            ref={(el) => { if (isSelected && el) el.scrollIntoView({ block: "nearest" }); }}
                             onClick={() => handleExecuteCommand(cmd)}
                             className={`p-2.5 rounded-lg flex items-center justify-between cursor-pointer transition-colors text-sm ${
                               isSelected
@@ -464,6 +466,7 @@ export function CommandPalette({
                         return (
                           <div
                             key={item.id}
+                            ref={(el) => { if (isSelected && el) el.scrollIntoView({ block: "nearest" }); }}
                             onClick={() => handleSelectSearchResult(item)}
                             className={`p-2.5 rounded-lg flex items-center justify-between cursor-pointer transition-colors text-sm ${
                               isSelected
@@ -497,6 +500,7 @@ export function CommandPalette({
                         return (
                           <div
                             key={item.id}
+                            ref={(el) => { if (isSelected && el) el.scrollIntoView({ block: "nearest" }); }}
                             onClick={() => handleSelectSearchResult(item)}
                             className={`p-2.5 rounded-lg flex items-center justify-between cursor-pointer transition-colors text-sm ${
                               isSelected
@@ -530,6 +534,7 @@ export function CommandPalette({
                         return (
                           <div
                             key={item.id}
+                            ref={(el) => { if (isSelected && el) el.scrollIntoView({ block: "nearest" }); }}
                             onClick={() => handleSelectSearchResult(item)}
                             className={`p-2.5 rounded-lg flex items-center justify-between cursor-pointer transition-colors text-sm ${
                               isSelected

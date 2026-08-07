@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 
 export type ViewType = 'overview' | 'upload' | 'charts' | 'data' | 'filters' | 'export' | 'pivot' | 'stats' | 'window-builder';
 
@@ -24,42 +25,53 @@ interface UiState {
   setHasSeenTour: (seen: boolean) => void;
   setRunTour: (run: boolean) => void;
   startTour: () => void;
+  resetTour: () => void;
 }
 
-export const useUiStore = create<UiState>((set) => ({
-  activeView: 'overview',
-  showWelcome: false,
-  isLoading: false,
-  theme: 'system',
-  isHydrated: false,
-  llmApiKey: typeof window !== 'undefined' ? localStorage.getItem('datavista_llm_api_key') || '' : '',
-  llmProvider: (typeof window !== 'undefined' ? (localStorage.getItem('datavista_llm_provider') as LlmProvider) || 'gemini' : 'gemini'),
-  hasSeenTour: typeof window !== 'undefined' ? localStorage.getItem('datavista_has_seen_tour') === 'true' : false,
-  runTour: typeof window !== 'undefined' ? localStorage.getItem('datavista_has_seen_tour') !== 'true' : false,
-  setActiveView: (view) => set({ activeView: view }),
-  setShowWelcome: (show) => set({ showWelcome: show }),
-  setIsLoading: (loading) => set({ isLoading: loading }),
-  setTheme: (theme) => set({ theme }),
-  setIsHydrated: (hydrated) => set({ isHydrated: hydrated }),
-  setLlmApiKey: (key) => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('datavista_llm_api_key', key);
+export const useUiStore = create<UiState>()(
+  persist(
+    (set) => ({
+      activeView: 'overview',
+      showWelcome: false,
+      isLoading: false,
+      theme: 'system',
+      isHydrated: false,
+      llmApiKey: '',
+      llmProvider: 'gemini',
+      hasSeenTour: false,
+      runTour: false,
+      setActiveView: (view) => set({ activeView: view }),
+      setShowWelcome: (show) => set({ showWelcome: show }),
+      setIsLoading: (loading) => set({ isLoading: loading }),
+      setTheme: (theme) => set({ theme }),
+      setIsHydrated: (hydrated) => set({ isHydrated: hydrated }),
+      setLlmApiKey: (key) => set({ llmApiKey: key }),
+      setLlmProvider: (provider) => set({ llmProvider: provider }),
+      setHasSeenTour: (seen) => set({ hasSeenTour: seen }),
+      setRunTour: (run) => set({ runTour: run }),
+      startTour: () => set({ runTour: true }),
+      resetTour: () => set({ hasSeenTour: false, runTour: true }),
+    }),
+    {
+      name: 'datavista-ui-storage',
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        hasSeenTour: state.hasSeenTour,
+        theme: state.theme,
+        llmApiKey: state.llmApiKey,
+        llmProvider: state.llmProvider,
+        activeView: state.activeView,
+      }),
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          // Trigger tour automatically ONLY on the very first visit
+          if (!state.hasSeenTour) {
+            state.runTour = true;
+          }
+          state.isHydrated = true;
+        }
+      },
     }
-    set({ llmApiKey: key });
-  },
-  setLlmProvider: (provider) => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('datavista_llm_provider', provider);
-    }
-    set({ llmProvider: provider });
-  },
-  setHasSeenTour: (seen) => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('datavista_has_seen_tour', seen ? 'true' : 'false');
-    }
-    set({ hasSeenTour: seen });
-  },
-  setRunTour: (run) => set({ runTour: run }),
-  startTour: () => set({ runTour: true }),
-}));
+  )
+);
 

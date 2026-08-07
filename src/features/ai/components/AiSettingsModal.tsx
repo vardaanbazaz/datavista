@@ -33,7 +33,7 @@ export function AiSettingsModal({ isOpen: externalIsOpen, onClose: externalOnClo
     setInternalIsOpen(open);
   };
 
-  const { llmApiKey, llmProvider, setLlmApiKey, setLlmProvider, startTour } = useUiStore();
+  const { llmApiKey, llmProvider, setLlmApiKey, setLlmProvider, resetTour } = useUiStore();
 
   const [apiKeyInput, setApiKeyInput] = useState(llmApiKey);
   const [providerInput, setProviderInput] = useState<LlmProvider>(llmProvider);
@@ -172,7 +172,7 @@ export function AiSettingsModal({ isOpen: externalIsOpen, onClose: externalOnClo
               className="gap-1.5 text-xs text-muted-foreground"
               onClick={() => {
                 setIsOpen(false);
-                startTour();
+                resetTour();
               }}
             >
               <HelpCircle className="h-3.5 w-3.5 text-primary" />

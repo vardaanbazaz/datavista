@@ -49,6 +49,7 @@ export function Sidebar({ onOpenSearch }: { onOpenSearch?: () => void }) {
   const activeView = useUiStore((state) => state.activeView);
   const onViewChange = useUiStore((state) => state.setActiveView);
   const startTour = useUiStore((state) => state.startTour);
+  const resetTour = useUiStore((state) => state.resetTour);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isInstantiateModalOpen, setIsInstantiateModalOpen] = useState(false);
   const [isAiSettingsModalOpen, setIsAiSettingsModalOpen] = useState(false);
@@ -199,7 +200,7 @@ export function Sidebar({ onOpenSearch }: { onOpenSearch?: () => void }) {
                 className="h-9 w-9 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-zinc-900"
                 onClick={() => setIsAiSettingsModalOpen(true)}
                 aria-label="AI Co-Pilot Settings"
-                data-tour="ai-copilot"
+                data-tour="nav-settings"
               >
                 <Sparkles className="h-5 w-5" />
               </Button>
@@ -215,7 +216,7 @@ export function Sidebar({ onOpenSearch }: { onOpenSearch?: () => void }) {
                 variant="ghost"
                 size="icon"
                 className="h-9 w-9 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-zinc-900"
-                onClick={startTour}
+                onClick={resetTour}
                 aria-label="Restart Onboarding Tour"
               >
                 <HelpCircle className="h-5 w-5" />
@@ -276,7 +277,17 @@ export function Sidebar({ onOpenSearch }: { onOpenSearch?: () => void }) {
           {navItems.map((item, index) => {
             const Icon = item.icon;
             const isActive = activeView === item.id;
-            const tourAttr = item.id === 'upload' ? 'sidebar-upload' : item.id === 'data' ? 'dataset-grid' : item.id === 'pivot' ? 'pivot-explorer' : undefined;
+            const tourAttr = 
+              item.id === 'overview' ? 'nav-dashboard' : 
+              item.id === 'upload' ? 'nav-upload' : 
+              item.id === 'filters' ? 'tool-filters' : 
+              item.id === 'charts' ? 'nav-charts' : 
+              item.id === 'data' ? 'dataset-grid' : 
+              item.id === 'pivot' ? 'nav-pivot' : 
+              item.id === 'stats' ? 'tool-statistics' : 
+              item.id === 'window-builder' ? 'tool-window-functions' : 
+              item.id === 'export' ? 'tool-export' : 
+              undefined;
             
             return (
               <motion.div
@@ -311,7 +322,7 @@ export function Sidebar({ onOpenSearch }: { onOpenSearch?: () => void }) {
 
       <Separator />
 
-      <div className="p-4 flex flex-col h-[200px] border-b">
+      <div className="p-4 flex flex-col h-[200px] border-b" data-tour="nav-datasets">
         <div className="flex items-center gap-2 mb-3">
           <Database className="w-4 h-4" />
           <span className="font-medium">Datasets</span>
@@ -390,7 +401,7 @@ export function Sidebar({ onOpenSearch }: { onOpenSearch?: () => void }) {
         </ScrollArea>
       </div>
 
-      <div className="p-4 flex flex-col h-[200px]">
+      <div className="p-4 flex flex-col h-[200px]" data-tour="nav-dashboards">
         <div className="flex items-center gap-2 mb-3">
           <LayoutDashboard className="w-4 h-4" />
           <span className="font-medium">Dashboards</span>
