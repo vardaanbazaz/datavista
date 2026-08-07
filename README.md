@@ -84,7 +84,6 @@ graph TD
 
 ## 📸 Platform Gallery
 
-*(Note: Replace these placeholder paths with actual screenshots of your application)*
 
 | Overview Dashboard | Pivot Explorer |
 | :---: | :---: |
