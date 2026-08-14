@@ -146,7 +146,7 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5173` in your browser to start using DataVista locally.
+Open `http://localhost:8080` in your browser to start using DataVista locally.
 
 ### Other Available Scripts
 ```bash
