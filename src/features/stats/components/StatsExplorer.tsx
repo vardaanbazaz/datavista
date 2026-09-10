@@ -3,6 +3,7 @@ import { useDatasetStore } from "@/store/datasetStore";
 import { useFilterStore } from "@/store/filterStore";
 import { usePivotStore } from "@/store/pivotStore";
 import { statsEngine } from "@/shared/services/stats";
+import { aggregationAdapter } from "@/shared/services/pivot";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/components/ui/button";
 import { ScrollArea } from "@/shared/components/ui/scroll-area";
@@ -100,7 +101,7 @@ export const StatsExplorer: React.FC = () => {
         setSelectedPivotColKey(activeCols[0].path.join(" > "));
       }
       if (valFields.length > 0 && !selectedPivotValField) {
-        setSelectedPivotValField(`${valFields[0].operator}_${valFields[0].column}`);
+        setSelectedPivotValField(aggregationAdapter.getValueFieldAlias(valFields[0]));
       }
     }
   }, [pivotResult, selectedPivotRowKey, selectedPivotColKey, selectedPivotValField]);
@@ -557,7 +558,7 @@ export const StatsExplorer: React.FC = () => {
               </SelectTrigger>
               <SelectContent>
                 {valFields.map(vf => {
-                  const alias = `${vf.operator}_${vf.column}`;
+                  const alias = aggregationAdapter.getValueFieldAlias(vf);
                   return <SelectItem key={alias} value={alias}>{vf.displayName}</SelectItem>;
                 })}
               </SelectContent>
@@ -571,7 +572,7 @@ export const StatsExplorer: React.FC = () => {
             <h3 className="font-semibold text-lg flex items-center gap-2">
               <Compass className="w-5 h-5 text-accent" />
               <span>
-                Pivot Summary: {pivotSliceType === 'row' ? selectedPivotRowKey : selectedPivotColKey} ({valFields.find(vf => `${vf.operator}_${vf.column}` === selectedPivotValField)?.displayName || selectedPivotValField})
+                Pivot Summary: {pivotSliceType === 'row' ? selectedPivotRowKey : selectedPivotColKey} ({valFields.find(vf => aggregationAdapter.getValueFieldAlias(vf) === selectedPivotValField)?.displayName || selectedPivotValField})
               </span>
             </h3>
           </div>

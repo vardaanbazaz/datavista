@@ -25,6 +25,29 @@ function createDebouncer(delay: number) {
   };
 }
 
+function isQuotaExceededError(e: unknown): boolean {
+  const name = (e as { name?: string } | undefined)?.name;
+  const innerName = (e as { inner?: { name?: string } } | undefined)?.inner?.name;
+  return name === "QuotaExceededError" || innerName === "QuotaExceededError";
+}
+
+function reportSyncFailure(table: string, e: unknown) {
+  console.error(`Failed to sync ${table} to DB:`, e);
+  if (isQuotaExceededError(e)) {
+    toast({
+      title: "Storage Full",
+      description: `Your browser's storage quota is full. ${table} could not be saved — the previous saved copy was kept. Free up space (delete unused datasets/charts) and try again.`,
+      variant: "destructive"
+    });
+  } else {
+    toast({
+      title: "Sync Failed",
+      description: `${table} could not be saved to local storage. The previous saved copy was kept; your latest changes may be lost on reload.`,
+      variant: "destructive"
+    });
+  }
+}
+
 export const persistenceService = {
   isHydrating: false,
   initialized: false,
@@ -40,11 +63,15 @@ export const persistenceService = {
     if (this.isHydrating) return;
     this.isHydrating = true;
 
-    // Timeout fallback (4s) to unlock UI and switch to in-memory mode
+    // Timeout fallback (4s): unlock the UI so it doesn't stay stuck on the
+    // loading screen. Deliberately does NOT clear `isHydrating` — that guard
+    // must only drop in the `finally` below, once hydrate()'s own reads/writes
+    // have actually finished. Clearing it here would let write-subscribers
+    // fire (and clear+rewrite tables) while hydrate() is still reading from
+    // them.
     const hydrationTimeout = setTimeout(() => {
       console.warn("Hydration timed out. Unlocking UI with defaults.");
       useUiStore.setState({ isHydrated: true });
-      this.isHydrating = false;
     }, 4000);
 
     try {
@@ -285,10 +312,12 @@ export const persistenceService = {
       if (state.datasets !== lastDatasets) {
         lastDatasets = state.datasets;
         try {
-          await db.datasets.clear();
-          await db.datasets.bulkAdd(state.datasets);
+          await db.transaction("rw", db.datasets, async () => {
+            await db.datasets.clear();
+            await db.datasets.bulkAdd(state.datasets);
+          });
         } catch (e) {
-          console.error("Failed to sync datasets to DB:", e);
+          reportSyncFailure("Datasets", e);
         }
       }
     });
@@ -355,10 +384,12 @@ export const persistenceService = {
 
         debounceCharts(async () => {
           try {
-            await db.charts.clear();
-            await db.charts.bulkAdd(state.charts);
+            await db.transaction("rw", db.charts, async () => {
+              await db.charts.clear();
+              await db.charts.bulkAdd(state.charts);
+            });
           } catch (e) {
-            console.error("Failed to sync charts to DB:", e);
+            reportSyncFailure("Charts", e);
           }
         });
       }
@@ -372,10 +403,12 @@ export const persistenceService = {
         lastDashboards = state.dashboards;
         debounceDashboards(async () => {
           try {
-            await db.dashboards.clear();
-            await db.dashboards.bulkAdd(state.dashboards);
+            await db.transaction("rw", db.dashboards, async () => {
+              await db.dashboards.clear();
+              await db.dashboards.bulkAdd(state.dashboards);
+            });
           } catch (e) {
-            console.error("Failed to sync dashboards to DB:", e);
+            reportSyncFailure("Dashboards", e);
           }
         });
       }

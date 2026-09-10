@@ -87,5 +87,41 @@ describe("Formula Engine", () => {
       const astDivZeroFields = compile("[Revenue] / [Units]");
       expect(evaluateAST(astDivZeroFields, { Revenue: 500, Units: 0 })).toBeNull();
     });
+
+    it("should bind NOT to the full comparison, not just its operand", () => {
+      // NOT [Status] == "Closed"  ->  NOT([Status] == "Closed")
+      const ast = compile('NOT [Status] == "Closed"');
+      expect(ast).toEqual({
+        type: "UnaryExpression",
+        operator: "NOT",
+        argument: {
+          type: "BinaryExpression",
+          left: { type: "FieldReference", name: "Status" },
+          operator: "==",
+          right: { type: "StringLiteral", value: "Closed" },
+        },
+      });
+
+      expect(evaluateAST(ast, { Status: "Closed" })).toBe(false);
+      expect(evaluateAST(ast, { Status: "Open" })).toBe(true);
+    });
+
+    it("should bind NOT tighter than AND/OR in a nested expression", () => {
+      // NOT [A] AND [B]  ->  (NOT [A]) AND [B]
+      const ast = compile("NOT [A] AND [B]");
+      expect(ast).toEqual({
+        type: "BinaryExpression",
+        left: {
+          type: "UnaryExpression",
+          operator: "NOT",
+          argument: { type: "FieldReference", name: "A" },
+        },
+        operator: "AND",
+        right: { type: "FieldReference", name: "B" },
+      });
+
+      expect(evaluateAST(ast, { A: false, B: true })).toBe(true);
+      expect(evaluateAST(ast, { A: true, B: true })).toBe(false);
+    });
   });
 });

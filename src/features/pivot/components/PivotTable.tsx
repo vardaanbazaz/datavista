@@ -1,5 +1,5 @@
 import React from "react";
-import { PivotResultModel, PivotColumnNode, PivotRowNode } from "@/shared/services/pivot";
+import { PivotResultModel, PivotColumnNode, PivotRowNode, aggregationAdapter } from "@/shared/services/pivot";
 import { cn } from "@/shared/lib/utils";
 
 interface PivotTableProps {
@@ -168,7 +168,7 @@ export const PivotTable: React.FC<PivotTableProps> = ({ result }) => {
         valueFields.forEach((vf) => {
           cells.push(
             <th
-              key={`vf-${colNode.path.join("-")}-${vf.column}-${vf.operator}`}
+              key={`vf-${colNode.path.join("-")}-${aggregationAdapter.getValueFieldAlias(vf)}`}
               className={cn(
                 "px-2 py-1.5 border border-gray-200 dark:border-white/10 text-center text-[10px] font-medium tracking-wider uppercase bg-gray-50 dark:bg-zinc-900/50 text-gray-500 dark:text-zinc-400",
                 colNode.isTotal && "bg-accent/20 text-accent-foreground font-bold"
@@ -212,7 +212,7 @@ export const PivotTable: React.FC<PivotTableProps> = ({ result }) => {
                 </th>
                 {valueFields.map((vf) => (
                   <th
-                    key={`header-vf-${vf.column}-${vf.operator}`}
+                    key={`header-vf-${aggregationAdapter.getValueFieldAlias(vf)}`}
                     className="px-4 py-3 border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-zinc-900/50 text-center text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-zinc-400"
                   >
                     {vf.displayName}
@@ -252,7 +252,7 @@ export const PivotTable: React.FC<PivotTableProps> = ({ result }) => {
                   {/* Values Cells */}
                   {visibleColumns.map((colNode) => {
                     return valueFields.map((vf) => {
-                      const alias = `${vf.operator}_${vf.column}`;
+                      const alias = aggregationAdapter.getValueFieldAlias(vf);
                       const val = showValues ? result.getCell(rowNode.path, colNode.path, alias) : null;
                       
                       return (
@@ -273,7 +273,7 @@ export const PivotTable: React.FC<PivotTableProps> = ({ result }) => {
                   {/* If there are no column dimensions, just render the values */}
                   {columnDimensions.length === 0 &&
                     valueFields.map((vf) => {
-                      const alias = `${vf.operator}_${vf.column}`;
+                      const alias = aggregationAdapter.getValueFieldAlias(vf);
                       const val = showValues ? result.getCell(rowNode.path, [], alias) : null;
                       return (
                         <td

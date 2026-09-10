@@ -225,13 +225,28 @@ class Parser {
   }
 
   private logicAnd(): ASTNode {
-    let expr = this.equality();
+    let expr = this.logicNot();
     while (this.match('OPERATOR', 'AND')) {
       const op = this.previous().value;
-      const right = this.equality();
+      const right = this.logicNot();
       expr = { type: 'BinaryExpression', left: expr, operator: op, right };
     }
     return expr;
+  }
+
+  /**
+   * NOT binds below comparison/equality (so `NOT [Status] == "Closed"` reads
+   * as `NOT([Status] == "Closed")`, not `(NOT [Status]) == "Closed"`), but
+   * above AND/OR (so `NOT [A] AND [B]` reads as `(NOT [A]) AND [B]`, matching
+   * standard short-circuit-boolean-language precedence).
+   */
+  private logicNot(): ASTNode {
+    if (this.match('OPERATOR', 'NOT')) {
+      const op = this.previous().value;
+      const arg = this.logicNot(); // recurse to allow chained NOT NOT ...
+      return { type: 'UnaryExpression', operator: op, argument: arg };
+    }
+    return this.equality();
   }
 
   private equality(): ASTNode {
@@ -280,7 +295,7 @@ class Parser {
   }
 
   private unary(): ASTNode {
-    if (this.match('OPERATOR', 'NOT') || this.match('OPERATOR', '-')) {
+    if (this.match('OPERATOR', '-')) {
       const op = this.previous().value;
       const arg = this.unary();
       return { type: 'UnaryExpression', operator: op, argument: arg };
