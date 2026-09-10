@@ -195,7 +195,11 @@ export function computeWindowMin(
 ): number | null {
   const values = getFrameNumericValues(partition, targetColumn, frameStart, frameEnd);
   if (values.length === 0) return null;
-  return Math.min(...values);
+  let min = values[0];
+  for (let i = 1; i < values.length; i++) {
+    if (values[i] < min) min = values[i];
+  }
+  return min;
 }
 
 /**
@@ -209,5 +213,168 @@ export function computeWindowMax(
 ): number | null {
   const values = getFrameNumericValues(partition, targetColumn, frameStart, frameEnd);
   if (values.length === 0) return null;
-  return Math.max(...values);
+  let max = values[0];
+  for (let i = 1; i < values.length; i++) {
+    if (values[i] > max) max = values[i];
+  }
+  return max;
+}
+
+/**
+ * Extracts a single numeric value (or null for missing/non-numeric) from a partition row.
+ */
+function getNumericValue(partition: PartitionItem[], targetColumn: string, i: number): number | null {
+  const val = partition[i].row[targetColumn];
+  if (val === null || val === undefined || val === "") return null;
+  const num = Number(val);
+  return isNaN(num) ? null : num;
+}
+
+/**
+ * Computes running sum + count for every row of a partition in a single O(n) sweep.
+ *
+ * `resolveFrameBounds` always produces `start`/`end` indices that are non-decreasing as
+ * the row index increases (true for every frame type this engine supports: UNBOUNDED,
+ * CURRENT ROW, and N PRECEDING/FOLLOWING all move forward-only as idx grows). That lets a
+ * two-pointer sweep add and remove each element at most once instead of rescanning the
+ * whole frame per row, turning the previous O(n) rescan x n rows into O(n) total.
+ */
+function computeFrameSumsAndCounts(
+  partition: PartitionItem[],
+  targetColumn: string,
+  bounds: { start: number; end: number }[]
+): { sums: number[]; counts: number[] } {
+  const n = partition.length;
+  const sums: number[] = new Array(n).fill(0);
+  const counts: number[] = new Array(n).fill(0);
+  let sum = 0;
+  let count = 0;
+  let left = 0;
+  let right = -1;
+
+  for (let j = 0; j < n; j++) {
+    const { start, end } = bounds[j];
+
+    while (right < end) {
+      right++;
+      const v = getNumericValue(partition, targetColumn, right);
+      if (v !== null) {
+        sum += v;
+        count++;
+      }
+    }
+    while (left < start) {
+      const v = getNumericValue(partition, targetColumn, left);
+      if (v !== null) {
+        sum -= v;
+        count--;
+      }
+      left++;
+    }
+
+    sums[j] = sum;
+    counts[j] = count;
+  }
+
+  return { sums, counts };
+}
+
+/**
+ * O(n) RUNNING_TOTAL for a whole partition (replaces per-row computeRunningTotal calls,
+ * which rescan the frame from scratch on every row — O(n^2) for the default cumulative frame).
+ */
+export function computeRunningTotals(
+  partition: PartitionItem[],
+  targetColumn: string,
+  bounds: { start: number; end: number }[]
+): (number | null)[] {
+  const { sums, counts } = computeFrameSumsAndCounts(partition, targetColumn, bounds);
+  return sums.map((s, i) => (counts[i] === 0 ? null : s));
+}
+
+/**
+ * O(n) MOVING_AVG for a whole partition (replaces per-row computeMovingAvg calls).
+ */
+export function computeMovingAvgs(
+  partition: PartitionItem[],
+  targetColumn: string,
+  bounds: { start: number; end: number }[]
+): (number | null)[] {
+  const { sums, counts } = computeFrameSumsAndCounts(partition, targetColumn, bounds);
+  return sums.map((s, i) => (counts[i] === 0 ? null : s / counts[i]));
+}
+
+/**
+ * Shared O(n) sweep for WINDOW_MIN/WINDOW_MAX using a monotonic deque of candidate row
+ * indices. Valid under the same forward-only bounds guarantee as computeFrameSumsAndCounts:
+ * each element enters and leaves the deque at most once across the whole partition. A plain
+ * array + head pointer stands in for the deque so front eviction stays O(1) (no Array.shift()).
+ *
+ * `keepFront(incoming, candidate)` decides whether `candidate` (at the back of the deque)
+ * is now useless and should be dropped in favor of `incoming`.
+ */
+function computeMonotonicFrameExtreme(
+  partition: PartitionItem[],
+  targetColumn: string,
+  bounds: { start: number; end: number }[],
+  keepFront: (incoming: number, candidate: number) => boolean
+): (number | null)[] {
+  const n = partition.length;
+  const results: (number | null)[] = new Array(n).fill(null);
+  const dequeIdx: number[] = [];
+  let head = 0;
+  let right = -1;
+
+  for (let j = 0; j < n; j++) {
+    const { start, end } = bounds[j];
+
+    while (right < end) {
+      right++;
+      const v = getNumericValue(partition, targetColumn, right);
+      if (v !== null) {
+        while (dequeIdx.length > head) {
+          const backIdx = dequeIdx[dequeIdx.length - 1];
+          const backVal = getNumericValue(partition, targetColumn, backIdx) as number;
+          if (keepFront(v, backVal)) {
+            dequeIdx.pop();
+          } else {
+            break;
+          }
+        }
+        dequeIdx.push(right);
+      }
+    }
+
+    while (head < dequeIdx.length && dequeIdx[head] < start) {
+      head++;
+    }
+
+    results[j] = head < dequeIdx.length
+      ? (getNumericValue(partition, targetColumn, dequeIdx[head]) as number)
+      : null;
+  }
+
+  return results;
+}
+
+/**
+ * O(n) WINDOW_MIN for a whole partition (replaces per-row computeWindowMin calls).
+ */
+export function computeWindowMins(
+  partition: PartitionItem[],
+  targetColumn: string,
+  bounds: { start: number; end: number }[]
+): (number | null)[] {
+  return computeMonotonicFrameExtreme(partition, targetColumn, bounds, (incoming, candidate) => incoming <= candidate);
+}
+
+/**
+ * O(n) WINDOW_MAX for a whole partition (replaces per-row computeWindowMax calls).
+ */
+export function computeWindowMaxs(
+  partition: PartitionItem[],
+  targetColumn: string,
+  bounds: { start: number; end: number }[]
+): (number | null)[] {
+  return computeMonotonicFrameExtreme(partition, targetColumn, bounds, (incoming, candidate) => incoming >= candidate);
 }

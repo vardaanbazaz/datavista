@@ -76,7 +76,14 @@ TASK: Generate a concise, professional 2 to 3 sentence executive summary describ
       if (clean.startsWith("{")) {
         try {
           const parsed = JSON.parse(clean);
-          clean = parsed.summary || parsed.explanation || parsed.title || clean;
+          const candidate = parsed.summary || parsed.explanation || parsed.title;
+          // The LLM response is untyped JSON - `summary` could be an object/array/number
+          // instead of a string (a nested object, say). Only accept it if it's actually
+          // a non-blank string; otherwise keep the raw text rather than handing a
+          // non-string value to the UI, which would throw when React tries to render it.
+          if (typeof candidate === "string" && candidate.trim() !== "") {
+            clean = candidate;
+          }
         } catch (e) {
           // preserve raw clean text
         }

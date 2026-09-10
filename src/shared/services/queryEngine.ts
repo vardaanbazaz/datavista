@@ -473,10 +473,14 @@ export const queryEngine = {
               : 0;
             break;
           case 'min':
-            value = numericValues.length > 0 ? Math.min(...numericValues) : 0;
+            value = numericValues.length > 0
+              ? numericValues.reduce((m, v) => (v < m ? v : m), numericValues[0])
+              : 0;
             break;
           case 'max':
-            value = numericValues.length > 0 ? Math.max(...numericValues) : 0;
+            value = numericValues.length > 0
+              ? numericValues.reduce((m, v) => (v > m ? v : m), numericValues[0])
+              : 0;
             break;
           case 'median':
             value = calculateMedian(numericValues);

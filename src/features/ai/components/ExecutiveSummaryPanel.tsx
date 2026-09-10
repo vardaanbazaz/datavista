@@ -7,8 +7,37 @@ import { Sparkles, RefreshCw, X, AlertTriangle, TrendingUp, TrendingDown } from 
 import { useDashboardStore } from "@/features/dashboards/store/dashboardStore";
 import { useDatasetStore } from "@/store/datasetStore";
 import { motion, AnimatePresence } from "framer-motion";
+import { ErrorBoundary } from "@/shared/components/ErrorBoundary";
 
+/**
+ * Public entry point: wrapped in its own local error boundary so a rendering failure
+ * inside the panel (e.g. an unvalidated LLM field) can't bubble up past it and blank the
+ * rest of the dashboard.
+ */
 export function ExecutiveSummaryPanel() {
+  return (
+    <ErrorBoundary fallback={<ExecutiveSummaryPanelError />}>
+      <ExecutiveSummaryPanelInner />
+    </ErrorBoundary>
+  );
+}
+
+function ExecutiveSummaryPanelError() {
+  return (
+    <div className="w-full my-4">
+      <Card className="bg-white dark:bg-zinc-900 border border-destructive/20 shadow-none">
+        <CardContent className="p-4 sm:p-5 flex items-center gap-3">
+          <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0" />
+          <p className="text-xs sm:text-sm text-muted-foreground">
+            Automated Analyst Insights couldn't be displayed. The rest of your dashboard is unaffected.
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function ExecutiveSummaryPanelInner() {
   const activeDataset = useDatasetStore((state) => state.activeDataset);
 
   const {

@@ -56,6 +56,28 @@ Strict Constraints:
 3. If the user prompt asks to query, filter, rank, group, or show top items (e.g. "top 5 regions by revenue", "show electronics sales"), set type="query" and populate query configuration.
 `;
 
+const LLM_REQUEST_TIMEOUT_MS = 30000;
+
+/**
+ * fetch() with an AbortController-based timeout. Without this, a stalled network condition
+ * (captive portal, dropped connection, provider hang) leaves the calling UI's "generating..."
+ * state stuck true forever, with no cancel path.
+ */
+export async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = LLM_REQUEST_TIMEOUT_MS): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'AbortError') {
+      throw new Error(`AI request timed out after ${timeoutMs / 1000}s. The service may be slow or unreachable - please try again.`);
+    }
+    throw e;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 export async function callLLM(
   apiKey: string,
   provider: LlmProvider,
@@ -77,7 +99,7 @@ Target Mode Preference: ${mode || 'auto'}
 
   if (provider === 'gemini') {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(apiKey.trim())}`;
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -112,7 +134,7 @@ Target Mode Preference: ${mode || 'auto'}
   } else {
     // OpenAI Provider
     const url = 'https://api.openai.com/v1/chat/completions';
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

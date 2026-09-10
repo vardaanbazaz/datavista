@@ -11,10 +11,10 @@ import {
   computeLead,
   computeFirstValue,
   computeLastValue,
-  computeRunningTotal,
-  computeMovingAvg,
-  computeWindowMin,
-  computeWindowMax
+  computeRunningTotals,
+  computeMovingAvgs,
+  computeWindowMins,
+  computeWindowMaxs
 } from "./functions";
 
 /**
@@ -107,11 +107,40 @@ function executeSingleQuery(data: DataRow[], query: WindowQuery): DataRow[] {
         break;
     }
 
+    const targetCol = query.targetColumn || "";
+
+    // 1b. Cumulative/rolling aggregates rescan their frame per row if computed one row at a
+    // time (O(n^2) over a partition). Resolve every row's frame bounds up front and run a
+    // single O(n) sweep instead — see computeRunningTotals/computeMovingAvgs/computeWindowMins/
+    // computeWindowMaxs in ./functions for why the forward-only bounds make that sweep valid.
+    let cumulativeResults: (number | null)[] | null = null;
+    if (
+      query.functionType === "RUNNING_TOTAL" ||
+      query.functionType === "MOVING_AVG" ||
+      query.functionType === "WINDOW_MIN" ||
+      query.functionType === "WINDOW_MAX"
+    ) {
+      const bounds = items.map((_, j) => resolveFrameBounds(j, len, query.frame, hasOrderBy));
+      switch (query.functionType) {
+        case "RUNNING_TOTAL":
+          cumulativeResults = computeRunningTotals(items, targetCol, bounds);
+          break;
+        case "MOVING_AVG":
+          cumulativeResults = computeMovingAvgs(items, targetCol, bounds);
+          break;
+        case "WINDOW_MIN":
+          cumulativeResults = computeWindowMins(items, targetCol, bounds);
+          break;
+        case "WINDOW_MAX":
+          cumulativeResults = computeWindowMaxs(items, targetCol, bounds);
+          break;
+      }
+    }
+
     // 2. Loop and apply values/aggregates row by row
     for (let j = 0; j < len; j++) {
       const item = items[j];
       let val: string | number | null = null;
-      const targetCol = query.targetColumn || "";
 
       switch (query.functionType) {
         case "ROW_NUMBER":
@@ -127,22 +156,20 @@ function executeSingleQuery(data: DataRow[], query: WindowQuery): DataRow[] {
         case "LEAD":
           val = computeLead(items, j, targetCol, query.offset, query.defaultValue);
           break;
+        case "RUNNING_TOTAL":
+        case "MOVING_AVG":
+        case "WINDOW_MIN":
+        case "WINDOW_MAX":
+          val = cumulativeResults![j];
+          break;
         default: {
-          // Resolve bounds for FIRST_VALUE, LAST_VALUE, and aggregates
+          // Resolve bounds for FIRST_VALUE / LAST_VALUE (single-index lookups, no rescan)
           const { start, end } = resolveFrameBounds(j, len, query.frame, hasOrderBy);
-          
+
           if (query.functionType === "FIRST_VALUE") {
             val = computeFirstValue(items, targetCol, start);
           } else if (query.functionType === "LAST_VALUE") {
             val = computeLastValue(items, targetCol, end);
-          } else if (query.functionType === "RUNNING_TOTAL") {
-            val = computeRunningTotal(items, targetCol, start, end);
-          } else if (query.functionType === "MOVING_AVG") {
-            val = computeMovingAvg(items, targetCol, start, end);
-          } else if (query.functionType === "WINDOW_MIN") {
-            val = computeWindowMin(items, targetCol, start, end);
-          } else if (query.functionType === "WINDOW_MAX") {
-            val = computeWindowMax(items, targetCol, start, end);
           }
           break;
         }

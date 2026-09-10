@@ -123,5 +123,89 @@ describe("Formula Engine", () => {
       expect(evaluateAST(ast, { A: false, B: true })).toBe(true);
       expect(evaluateAST(ast, { A: true, B: true })).toBe(false);
     });
+
+    it("should reject chained comparisons as a parse error instead of silently coercing", () => {
+      expect(() => compile("5 < 3 < 1")).toThrow(/[Cc]hained comparison/);
+      expect(() => compile('1 == 1 == 1')).toThrow(/[Cc]hained comparison/);
+      expect(() => compile("0 <= [X] < 100")).toThrow(/[Cc]hained comparison/);
+      // mixed comparison/equality chaining is the same nonsense, also rejected
+      expect(() => compile("[A] < [B] == [C]")).toThrow(/[Cc]hained comparison/);
+    });
+
+    it("should still allow a single comparison or equality", () => {
+      expect(compile("[Age] > 18")).toEqual({
+        type: "BinaryExpression",
+        left: { type: "FieldReference", name: "Age" },
+        operator: ">",
+        right: { type: "NumberLiteral", value: 18 },
+      });
+
+      const ast = compile('[Age] > 18');
+      expect(evaluateAST(ast, { Age: 25 })).toBe(true);
+      expect(evaluateAST(ast, { Age: 10 })).toBe(false);
+    });
+
+    it("should still allow multiple comparisons combined via explicit AND/OR", () => {
+      const ast = compile("[Age] > 18 AND [Age] < 65");
+      expect(ast).toEqual({
+        type: "BinaryExpression",
+        left: {
+          type: "BinaryExpression",
+          left: { type: "FieldReference", name: "Age" },
+          operator: ">",
+          right: { type: "NumberLiteral", value: 18 },
+        },
+        operator: "AND",
+        right: {
+          type: "BinaryExpression",
+          left: { type: "FieldReference", name: "Age" },
+          operator: "<",
+          right: { type: "NumberLiteral", value: 65 },
+        },
+      });
+
+      expect(evaluateAST(ast, { Age: 30 })).toBe(true);
+      expect(evaluateAST(ast, { Age: 70 })).toBe(false);
+      expect(evaluateAST(ast, { Age: 5 })).toBe(false);
+
+      const orAst = compile('[Status] == "Open" OR [Status] == "Pending"');
+      expect(evaluateAST(orAst, { Status: "Open" })).toBe(true);
+      expect(evaluateAST(orAst, { Status: "Closed" })).toBe(false);
+    });
+
+    it("should coerce numeric-looking strings for == and != (CSV-parsed values)", () => {
+      const eq = compile("[Age] == 25");
+      // CSV parsing often leaves numeric columns as strings
+      expect(evaluateAST(eq, { Age: "25" })).toBe(true);
+      expect(evaluateAST(eq, { Age: 25 })).toBe(true);
+      expect(evaluateAST(eq, { Age: "30" })).toBe(false);
+      // leading-zero numeric strings still compare numerically
+      expect(evaluateAST(eq, { Age: "025" })).toBe(true);
+
+      const neq = compile("[Age] != 25");
+      expect(evaluateAST(neq, { Age: "25" })).toBe(false);
+      expect(evaluateAST(neq, { Age: "30" })).toBe(true);
+
+      // non-numeric strings never get coerced into a NaN comparison
+      const strEq = compile('[Status] == "Closed"');
+      expect(evaluateAST(strEq, { Status: "Closed" })).toBe(true);
+      expect(evaluateAST(strEq, { Status: "Open" })).toBe(false);
+      expect(evaluateAST(compile("[Status] == 5"), { Status: "abc" })).toBe(false);
+    });
+
+    it("should not falsely coerce blank strings, null, or booleans in == comparisons", () => {
+      const eqZero = compile("[X] == 0");
+      // blank/whitespace-only strings are not "numeric-looking" - stay unequal to 0
+      expect(evaluateAST(eqZero, { X: "" })).toBe(false);
+      expect(evaluateAST(eqZero, { X: " " })).toBe(false);
+      // null short-circuits to null (propagates) before == ever runs, same as every
+      // other binary operator - it does not settle to false
+      expect(evaluateAST(eqZero, { X: null })).toBeNull();
+      expect(evaluateAST(eqZero, { X: 0 })).toBe(true);
+
+      // booleans are not numeric-like either, so true/false never coerce to 1/0
+      expect(evaluateAST(compile("[Y] == 1"), { Y: true })).toBe(false);
+      expect(evaluateAST(compile("[Y] == 0"), { Y: false })).toBe(false);
+    });
   });
 });

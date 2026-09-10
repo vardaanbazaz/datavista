@@ -249,19 +249,46 @@ class Parser {
     return this.equality();
   }
 
+  /**
+   * Comparison/equality operators are non-associative: `a < b < c` and `1 == 1 == 1`
+   * are parse errors, not silently-coerced booleans. Combine multiple comparisons with
+   * explicit AND, e.g. `a < b AND b < c`.
+   */
+  private isComparisonOrEqualityOperator(): boolean {
+    return (
+      this.check('OPERATOR', '<') ||
+      this.check('OPERATOR', '<=') ||
+      this.check('OPERATOR', '>') ||
+      this.check('OPERATOR', '>=') ||
+      this.check('OPERATOR', '==') ||
+      this.check('OPERATOR', '!=')
+    );
+  }
+
+  private rejectChainedComparison(): void {
+    if (this.isComparisonOrEqualityOperator()) {
+      throw new Error(
+        `Chained comparisons like 'a < b < c' are not supported at position ${this.peek().position}. ` +
+        `Use AND instead, e.g. 'a < b AND b < c'.`
+      );
+    }
+  }
+
   private equality(): ASTNode {
-    let expr = this.comparison();
-    while (this.match('OPERATOR', '==') || this.match('OPERATOR', '!=')) {
+    const expr = this.comparison();
+    if (this.match('OPERATOR', '==') || this.match('OPERATOR', '!=')) {
       const op = this.previous().value;
       const right = this.comparison();
-      expr = { type: 'BinaryExpression', left: expr, operator: op, right };
+      const combined: ASTNode = { type: 'BinaryExpression', left: expr, operator: op, right };
+      this.rejectChainedComparison();
+      return combined;
     }
     return expr;
   }
 
   private comparison(): ASTNode {
-    let expr = this.addition();
-    while (
+    const expr = this.addition();
+    if (
       this.match('OPERATOR', '<') ||
       this.match('OPERATOR', '<=') ||
       this.match('OPERATOR', '>') ||
@@ -269,7 +296,9 @@ class Parser {
     ) {
       const op = this.previous().value;
       const right = this.addition();
-      expr = { type: 'BinaryExpression', left: expr, operator: op, right };
+      const combined: ASTNode = { type: 'BinaryExpression', left: expr, operator: op, right };
+      this.rejectChainedComparison();
+      return combined;
     }
     return expr;
   }
@@ -353,6 +382,32 @@ export function compile(expr: string): ASTNode {
 }
 
 /**
+ * Whether a value looks numeric (a finite number, or a non-blank string that parses
+ * cleanly to one) — used by looseEquals to decide when numeric-string coercion applies.
+ */
+function isNumericLike(v: unknown): boolean {
+  if (typeof v === 'number') return !isNaN(v);
+  if (typeof v === 'string' && v.trim() !== '') return !isNaN(Number(v));
+  return false;
+}
+
+/**
+ * Equality used by `==`/`!=`. Every other operator (-, *, /, %, <, <=, >, >=) already
+ * coerces numeric-looking strings before comparing, so strict `===` here was the odd one
+ * out: a CSV-parsed string column ("25") would never equal the number 25. This keeps
+ * strict identity as the first check, then falls back to numeric comparison only when
+ * both sides look numeric — so "abc" == 5 still cleanly stays false rather than coercing
+ * into NaN comparisons.
+ */
+function looseEquals(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (isNumericLike(a) && isNumericLike(b)) {
+    return Number(a) === Number(b);
+  }
+  return false;
+}
+
+/**
  * AST Evaluator
  */
 export function evaluateAST(node: ASTNode, row: DataRow): unknown {
@@ -412,9 +467,9 @@ export function evaluateAST(node: ASTNode, row: DataRow): unknown {
         case '%':
           return Number(rightVal) === 0 ? null : Number(leftVal) % Number(rightVal);
         case '==':
-          return leftVal === rightVal;
+          return looseEquals(leftVal, rightVal);
         case '!=':
-          return leftVal !== rightVal;
+          return !looseEquals(leftVal, rightVal);
         case '<':
           return leftVal < rightVal;
         case '<=':

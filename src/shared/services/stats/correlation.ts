@@ -23,7 +23,10 @@ export function calculatePearson(x: number[], y: number[]): number | null {
     denY += diffY * diffY;
   }
 
-  if (denX === 0 || denY === 0) return 0;
+  // Zero variance in either column makes r = 0/0, mathematically undefined - not "no
+  // linear relationship" (r=0). Matches the n<=1 branch above, which returns null for
+  // its own undefined case.
+  if (denX === 0 || denY === 0) return null;
   return num / Math.sqrt(denX * denY);
 }
 

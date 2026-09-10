@@ -71,7 +71,7 @@ export const persistenceService = {
     // them.
     const hydrationTimeout = setTimeout(() => {
       console.warn("Hydration timed out. Unlocking UI with defaults.");
-      useUiStore.setState({ isHydrated: true });
+      useUiStore.setState({ isDataHydrated: true });
     }, 4000);
 
     try {
@@ -201,8 +201,8 @@ export const persistenceService = {
         useUiStore.setState({ showWelcome: prefs["showWelcome"] });
       }
 
-      // Trigger hydration readiness
-      useUiStore.setState({ isHydrated: true });
+      // Trigger hydration readiness (real IndexedDB load complete)
+      useUiStore.setState({ isDataHydrated: true });
     } catch (error) {
       console.error("Hydration failed, falling back to clean memory state:", error);
       toast({
@@ -210,7 +210,7 @@ export const persistenceService = {
         description: "IndexedDB is blocked or unavailable. Running in memory-only mode.",
         variant: "destructive"
       });
-      useUiStore.setState({ isHydrated: true });
+      useUiStore.setState({ isDataHydrated: true });
     } finally {
       clearTimeout(hydrationTimeout);
       this.isHydrating = false;

@@ -11,6 +11,13 @@ interface UiState {
   isLoading: boolean;
   theme: 'light' | 'dark' | 'system';
   isHydrated: boolean;
+  /**
+   * True once persistenceService.hydrate() has actually finished reading IndexedDB (or
+   * given up via its timeout/error fallback) — distinct from `isHydrated`, which the
+   * zustand `persist` middleware flips synchronously from localStorage before that real
+   * load even starts. UI loading gates should wait on this one, not `isHydrated`.
+   */
+  isDataHydrated: boolean;
   llmApiKey: string;
   llmProvider: LlmProvider;
   hasSeenTour: boolean;
@@ -20,6 +27,7 @@ interface UiState {
   setIsLoading: (loading: boolean) => void;
   setTheme: (theme: 'light' | 'dark' | 'system') => void;
   setIsHydrated: (hydrated: boolean) => void;
+  setIsDataHydrated: (hydrated: boolean) => void;
   setLlmApiKey: (key: string) => void;
   setLlmProvider: (provider: LlmProvider) => void;
   setHasSeenTour: (seen: boolean) => void;
@@ -36,6 +44,7 @@ export const useUiStore = create<UiState>()(
       isLoading: false,
       theme: 'system',
       isHydrated: false,
+      isDataHydrated: false,
       llmApiKey: '',
       llmProvider: 'gemini',
       hasSeenTour: false,
@@ -45,6 +54,7 @@ export const useUiStore = create<UiState>()(
       setIsLoading: (loading) => set({ isLoading: loading }),
       setTheme: (theme) => set({ theme }),
       setIsHydrated: (hydrated) => set({ isHydrated: hydrated }),
+      setIsDataHydrated: (hydrated) => set({ isDataHydrated: hydrated }),
       setLlmApiKey: (key) => set({ llmApiKey: key }),
       setLlmProvider: (provider) => set({ llmProvider: provider }),
       setHasSeenTour: (seen) => set({ hasSeenTour: seen }),

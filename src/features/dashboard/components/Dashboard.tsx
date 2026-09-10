@@ -42,7 +42,10 @@ export function Dashboard() {
   const showWelcome = useUiStore((state) => state.showWelcome);
   const setShowWelcome = useUiStore((state) => state.setShowWelcome);
   const isLoading = useUiStore((state) => state.isLoading);
-  const isHydrated = useUiStore((state) => state.isHydrated);
+  // The real IndexedDB load, not the synchronous localStorage-only `isHydrated` flag
+  // (see uiStore.ts) - gating on that one let the dashboard render before actual data
+  // had loaded.
+  const isDataHydrated = useUiStore((state) => state.isDataHydrated);
 
   const activeDataset = useDatasetStore((state) => state.activeDataset);
   const uploadDataset = useDatasetStore((state) => state.uploadDataset);
@@ -82,15 +85,15 @@ export function Dashboard() {
 
   // Show welcome overlay on first visit
   useEffect(() => {
-    if (!isHydrated) return;
+    if (!isDataHydrated) return;
     const hasVisited = localStorage.getItem('datavista-visited');
     if (!hasVisited) {
       setShowWelcome(true);
       localStorage.setItem('datavista-visited', 'true');
     }
-  }, [isHydrated, setShowWelcome]);
+  }, [isDataHydrated, setShowWelcome]);
 
-  if (!isHydrated) {
+  if (!isDataHydrated) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center w-full">
         <LoadingState 
