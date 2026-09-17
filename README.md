@@ -16,6 +16,12 @@ Normally, when you upload a spreadsheet to a data tool, your private data is sen
 
 Simply drag and drop a CSV or Excel file, and you instantly get access to interactive pivot tables, statistical analysis, complex formula parsing, and an AI Co-Pilot—all running at lightning speed directly on your device.
 
+> **Privacy note:** everything above runs fully offline — except the AI
+> Co-Pilot. If you add a Gemini/OpenAI API key and use natural-language
+> queries or AI formula generation, sample values from your dataset's
+> columns are sent to that provider to generate a response. Skip AI
+> features and nothing ever leaves your device.
+
 ---
 
 ## 🚀 Core Technical Features

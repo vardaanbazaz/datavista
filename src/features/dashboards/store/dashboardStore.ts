@@ -1,11 +1,11 @@
 import { create } from "zustand";
-import { Dashboard, Query, GlobalFilter } from "@/shared/types";
+import { Dashboard, Query, GlobalFilter, FilterState } from "@/shared/types";
 import { KPICardConfig } from "@/features/kpi/types";
 import { toast } from "@/shared/hooks/use-toast";
 import { useDatasetStore } from "@/store/datasetStore";
 import { useFilterStore } from "@/store/filterStore";
 import { useChartStore } from "@/store/chartStore";
-import { useUiStore } from "@/store/uiStore";
+import { useUiStore, ViewType } from "@/store/uiStore";
 import { queryEngine } from "@/shared/services/queryEngine";
 import { summaryEngine } from "@/features/ai/summaryEngine";
 import { DetectedAnomaly } from "@/features/ai/anomalyDetector";
@@ -15,6 +15,14 @@ export interface DashboardSnapshotState {
   dashboards: Dashboard[];
   activeDashboardId: string | null;
   activeGlobalFilters: GlobalFilter[];
+  // Optional: only present on snapshots taken around an action (e.g. loadDashboard)
+  // that also mutates the dataset/filter/view stores. Absent on snapshots that don't
+  // touch those stores (most mutations), and on older/external snapshots (named
+  // workspace snapshots, pre-existing history entries) — undo/redo/restore must skip
+  // the external-store restore in that case rather than clobber unrelated state.
+  activeDatasetId?: string | null;
+  datasetFilterState?: FilterState;
+  activeView?: ViewType;
 }
 
 const MAX_HISTORY = 25;
@@ -31,6 +39,10 @@ interface DashboardState {
   isGeneratingSummary: boolean;
   executiveSummaryDismissed: boolean;
   detectedAnomalies: DetectedAnomaly[];
+  // Which path produced the current executiveSummary — 'ai' (sent to the configured LLM
+  // provider) or 'offline' (local heuristic, no data left the browser). Lets the panel show
+  // an "AI Generated" indicator only when data actually left the browser.
+  executiveSummarySource: 'ai' | 'offline' | null;
   generateExecutiveSummary: () => Promise<void>;
   dismissExecutiveSummary: () => void;
 
@@ -49,7 +61,7 @@ interface DashboardState {
   setDashboards: (dashboards: Dashboard[]) => void;
   setActiveDashboardId: (id: string | null) => void;
   createDashboard: (name: string, datasetId: string, chartIds?: string[]) => void;
-  saveDashboard: (id: string, updates: Partial<Dashboard>) => void;
+  saveDashboard: (id: string, updates: Partial<Dashboard>, debounceHistory?: boolean) => void;
   renameDashboard: (id: string, name: string) => void;
   deleteDashboard: (id: string) => void;
   loadDashboard: (id: string) => void;
@@ -62,15 +74,95 @@ interface DashboardState {
   toggleCrossFilter: (filterInput: Omit<GlobalFilter, "id">) => void;
 }
 
+// Builds the same Query shape loadDashboard (and the undo/redo dataset-context
+// restore) need from a persisted/snapshotted FilterState, so the two can't drift.
+function buildFilterQuery(filterState: FilterState): Query {
+  return {
+    filters: {
+      categoricalFilters: filterState.categoricalFilters,
+      dateRangeFilters: filterState.dateRangeFilters,
+    },
+    groupBy: filterState.groupByColumn ? {
+      column: filterState.groupByColumn,
+      period: filterState.groupByPeriod,
+    } : undefined,
+    pagination: {
+      pageSize: 'all',
+    }
+  };
+}
+
+// Plain JSON.parse(JSON.stringify(...)) would turn dateRangeFilters' Date values
+// into ISO strings — consumers like FilterPanel call date-fns' format() on them
+// directly, which throws on a string. Clone structurally instead, keeping Dates.
+function cloneFilterState(filterState: FilterState): FilterState {
+  const dateRangeFilters: FilterState["dateRangeFilters"] = {};
+  for (const [column, range] of Object.entries(filterState.dateRangeFilters || {})) {
+    dateRangeFilters[column] = {
+      start: range.start ? new Date(range.start) : undefined,
+      end: range.end ? new Date(range.end) : undefined,
+    };
+  }
+  return {
+    categoricalFilters: JSON.parse(JSON.stringify(filterState.categoricalFilters || {})),
+    dateRangeFilters,
+    groupByColumn: filterState.groupByColumn,
+    groupByPeriod: filterState.groupByPeriod,
+  };
+}
+
+// Captures the dataset/filter/view state that loadDashboard (and similar actions)
+// mutate outside of dashboardStore, so a snapshot taken around such an action can
+// undo/redo those side effects too — see restoreExternalContext.
+function captureExternalContext(): Pick<DashboardSnapshotState, "activeDatasetId" | "datasetFilterState" | "activeView"> {
+  return {
+    activeDatasetId: useDatasetStore.getState().activeDataset?.id ?? null,
+    datasetFilterState: cloneFilterState(useFilterStore.getState().activeFilters),
+    activeView: useUiStore.getState().activeView,
+  };
+}
+
+// Reapplies a captured external context (dataset selection, filters, active view).
+// No-op when the snapshot doesn't carry one (older history entries, or named
+// workspace snapshots / manual restoreSnapshotState calls that never set it) —
+// those must not clobber whatever the dataset/filter/view stores currently hold.
+function restoreExternalContext(snapshot: DashboardSnapshotState) {
+  if (snapshot.activeDatasetId === undefined) return;
+
+  const currentActiveDataset = useDatasetStore.getState().activeDataset;
+  if (snapshot.activeDatasetId !== (currentActiveDataset?.id ?? null)) {
+    const dataset = snapshot.activeDatasetId
+      ? useDatasetStore.getState().datasets.find(d => d.id === snapshot.activeDatasetId) ?? null
+      : null;
+    // Raw setState (not setActiveDataset): mirrors what loadDashboard did, without
+    // re-running formulaEngine/windowEngine augmentation on the restored object.
+    useDatasetStore.setState({ activeDataset: dataset });
+  }
+
+  const filterState: FilterState = snapshot.datasetFilterState ?? {
+    categoricalFilters: {},
+    dateRangeFilters: {},
+  };
+  const dataset = useDatasetStore.getState().activeDataset;
+  const filteredData = dataset ? queryEngine.execute(dataset, buildFilterQuery(filterState)).rows : [];
+  useFilterStore.setState({ activeFilters: filterState, filteredData });
+
+  if (snapshot.activeView) {
+    useUiStore.getState().setActiveView(snapshot.activeView);
+  }
+}
+
 function pushPast(
   get: () => DashboardState,
   set: (partial: Partial<DashboardState> | ((state: DashboardState) => Partial<DashboardState>)) => void,
-  isDebounced = false
+  isDebounced = false,
+  captureContext = false
 ) {
   const currentSnapshot: DashboardSnapshotState = {
     dashboards: JSON.parse(JSON.stringify(get().dashboards)),
     activeDashboardId: get().activeDashboardId,
     activeGlobalFilters: JSON.parse(JSON.stringify(get().activeGlobalFilters)),
+    ...(captureContext ? captureExternalContext() : {}),
   };
 
   const now = Date.now();
@@ -104,12 +196,14 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   isGeneratingSummary: false,
   executiveSummaryDismissed: false,
   detectedAnomalies: [],
+  executiveSummarySource: null,
   past: [],
   future: [],
 
   dismissExecutiveSummary: () => set({ executiveSummaryDismissed: true }),
 
   generateExecutiveSummary: async () => {
+    const requestDatasetId = useDatasetStore.getState().activeDataset?.id ?? null;
     set({ isGeneratingSummary: true, executiveSummaryDismissed: false });
     const dataset = useDatasetStore.getState().activeDataset;
     const allCharts = useChartStore.getState().charts;
@@ -119,15 +213,25 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       ? allCharts.filter((c) => c.datasetId === dataset?.id && activeDashboard.chartIds.includes(c.id))
       : allCharts.filter((c) => c.datasetId === dataset?.id);
 
-    const { summary, anomalies } = await summaryEngine.generateExecutiveSummary(
+    const { summary, anomalies, source } = await summaryEngine.generateExecutiveSummary(
       dataset,
       charts,
       get().activeGlobalFilters
     );
 
+    // The active dataset may have changed while the request was in flight
+    // (e.g. the user switched datasets). Discard stale results rather than
+    // painting the new dataset's panel with the old dataset's summary.
+    const currentDatasetId = useDatasetStore.getState().activeDataset?.id ?? null;
+    if (currentDatasetId !== requestDatasetId) {
+      set({ isGeneratingSummary: false });
+      return;
+    }
+
     set({
       executiveSummary: summary,
       detectedAnomalies: anomalies,
+      executiveSummarySource: source,
       isGeneratingSummary: false,
       executiveSummaryDismissed: false,
     });
@@ -143,10 +247,15 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
 
     const previousState = past[past.length - 1];
     const newPast = past.slice(0, past.length - 1);
+    // Only capture context on the redo-side entry when the state we're restoring
+    // also carries one — otherwise a plain mutation's undo would start clobbering
+    // live filter/view state on its redo too.
+    const captureContext = previousState.activeDatasetId !== undefined;
     const currentState: DashboardSnapshotState = {
       dashboards: JSON.parse(JSON.stringify(dashboards)),
       activeDashboardId,
       activeGlobalFilters: JSON.parse(JSON.stringify(activeGlobalFilters)),
+      ...(captureContext ? captureExternalContext() : {}),
     };
 
     set({
@@ -156,6 +265,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       past: newPast,
       future: [currentState, ...future],
     });
+    restoreExternalContext(previousState);
 
     toast({
       title: "Undo",
@@ -169,10 +279,12 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
 
     const nextState = future[0];
     const newFuture = future.slice(1);
+    const captureContext = nextState.activeDatasetId !== undefined;
     const currentState: DashboardSnapshotState = {
       dashboards: JSON.parse(JSON.stringify(dashboards)),
       activeDashboardId,
       activeGlobalFilters: JSON.parse(JSON.stringify(activeGlobalFilters)),
+      ...(captureContext ? captureExternalContext() : {}),
     };
 
     set({
@@ -182,6 +294,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       past: [...past, currentState].slice(-MAX_HISTORY),
       future: newFuture,
     });
+    restoreExternalContext(nextState);
 
     toast({
       title: "Redo",
@@ -197,6 +310,9 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       activeGlobalFilters: JSON.parse(JSON.stringify(snapshotState.activeGlobalFilters || [])),
       future: [],
     });
+    // No-op unless snapshotState carries a captured context (e.g. a history entry
+    // from loadDashboard) — see restoreExternalContext.
+    restoreExternalContext(snapshotState);
   },
   
   setDashboards: (dashboards) => {
@@ -259,9 +375,9 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     });
   },
 
-  saveDashboard: (id, updates) => {
-    const isLayoutUpdate = Boolean(updates.layout);
-    pushPast(get, set, isLayoutUpdate);
+  saveDashboard: (id, updates, debounceHistory = false) => {
+    const isDebounced = Boolean(updates.layout) || debounceHistory;
+    pushPast(get, set, isDebounced);
 
     const { dashboards } = get();
     const updated = dashboards.map(d => 
@@ -344,7 +460,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       return;
     }
 
-    pushPast(get, set);
+    pushPast(get, set, false, true);
 
     // Restore associated dataset context
     const dataset = useDatasetStore.getState().datasets.find(d => d.id === dashboard.datasetId);
@@ -371,21 +487,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       dateRangeFilters: {},
     };
 
-    const query: Query = {
-      filters: {
-        categoricalFilters: filterState.categoricalFilters,
-        dateRangeFilters: filterState.dateRangeFilters,
-      },
-      groupBy: filterState.groupByColumn ? {
-        column: filterState.groupByColumn,
-        period: filterState.groupByPeriod,
-      } : undefined,
-      pagination: {
-        pageSize: 'all',
-      }
-    };
-
-    const filteredData = queryEngine.execute(dataset, query).rows;
+    const filteredData = queryEngine.execute(dataset, buildFilterQuery(filterState)).rows;
 
     useFilterStore.setState({
       activeFilters: filterState,
@@ -513,3 +615,20 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     });
   }
 }));
+
+// Reset the executive summary panel whenever the active dataset changes
+// (by id, not just content) so a stale summary/anomaly list from the
+// previous dataset never lingers after a switch (audit #19).
+let lastSummaryDatasetId = useDatasetStore.getState().activeDataset?.id ?? null;
+useDatasetStore.subscribe((state) => {
+  const nextId = state.activeDataset?.id ?? null;
+  if (nextId !== lastSummaryDatasetId) {
+    lastSummaryDatasetId = nextId;
+    useDashboardStore.setState({
+      executiveSummary: null,
+      detectedAnomalies: [],
+      executiveSummaryDismissed: false,
+      executiveSummarySource: null,
+    });
+  }
+});

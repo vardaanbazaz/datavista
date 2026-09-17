@@ -14,7 +14,7 @@ export interface ColumnMetadata {
   latestDate?: string;
   detectedFormat?: string;
   categoryCardinality?: Record<string, number>;
-  role: 'dimension' | 'measure' | 'date' | 'identifier' | 'calculated' | 'hidden';
+  role: 'dimension' | 'measure' | 'date' | 'identifier' | 'calculated' | 'hidden' | 'window';
 }
 
 export interface DatasetMetadata {

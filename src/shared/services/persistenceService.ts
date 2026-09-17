@@ -15,6 +15,7 @@ import {
 import { FilterState, Query } from "@/shared/types";
 import { queryEngine } from "@/shared/services/queryEngine";
 import { formulaEngine } from "@/shared/services/formulaEngine";
+import { windowEngine } from "@/shared/services/window";
 import { toast } from "@/shared/hooks/use-toast";
 
 function createDebouncer(delay: number) {
@@ -106,7 +107,14 @@ export const persistenceService = {
       const validDashboards = allDashboards.filter(isValidDashboard);
 
       // 5. Hydrate datasetStore
-      const evaluatedDatasets = validDatasets.map(d => formulaEngine.evaluateCalculatedFields(d));
+      // Re-run BOTH formulaEngine and windowEngine here, not just formulaEngine — this is
+      // the sole bridge from persisted (IndexedDB) data into a live session, so it's the
+      // one place a defensive re-evaluation is worth its cost: it self-heals any dataset
+      // that was persisted with calculatedFields/windowQueries defined but without their
+      // materialized columns (e.g. from before this fix, or from any future bypass that
+      // writes datasets[] directly). windowEngine.evaluate no-ops for datasets with no
+      // window queries, so this is free for the common case.
+      const evaluatedDatasets = validDatasets.map(d => windowEngine.evaluate(formulaEngine.evaluateCalculatedFields(d)));
       useDatasetStore.setState({
         datasets: evaluatedDatasets
       });
@@ -339,7 +347,10 @@ export const persistenceService = {
               ...activeDashboard.settings,
               filterState: state.activeFilters
             };
-            useDashboardStore.getState().saveDashboard(activeDashboardId, { settings: updatedSettings });
+            // Filter changes fire rapidly (e.g. dragging a date-range slider); debounce
+            // the undo/redo history push the same way layout drags are, so filter noise
+            // doesn't evict genuinely undo-worthy actions from MAX_HISTORY.
+            useDashboardStore.getState().saveDashboard(activeDashboardId, { settings: updatedSettings }, true);
           }
         }
 

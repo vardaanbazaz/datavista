@@ -22,6 +22,14 @@ interface UiState {
   llmProvider: LlmProvider;
   hasSeenTour: boolean;
   runTour: boolean;
+  /**
+   * One-time, persistent acknowledgement that the Executive Summary panel auto-generates
+   * insights by sending dataset content to the configured AI provider. Set only when the
+   * user explicitly clicks "Generate AI Insights" — independent of dashboardStore's
+   * per-dataset executiveSummary/executiveSummaryDismissed reset (audit #19), so switching
+   * datasets or reloading doesn't re-prompt once the user has consented once.
+   */
+  hasAcknowledgedAiInsights: boolean;
   setActiveView: (view: ViewType) => void;
   setShowWelcome: (show: boolean) => void;
   setIsLoading: (loading: boolean) => void;
@@ -34,6 +42,7 @@ interface UiState {
   setRunTour: (run: boolean) => void;
   startTour: () => void;
   resetTour: () => void;
+  setHasAcknowledgedAiInsights: (acknowledged: boolean) => void;
 }
 
 export const useUiStore = create<UiState>()(
@@ -49,6 +58,7 @@ export const useUiStore = create<UiState>()(
       llmProvider: 'gemini',
       hasSeenTour: false,
       runTour: false,
+      hasAcknowledgedAiInsights: false,
       setActiveView: (view) => set({ activeView: view }),
       setShowWelcome: (show) => set({ showWelcome: show }),
       setIsLoading: (loading) => set({ isLoading: loading }),
@@ -61,6 +71,7 @@ export const useUiStore = create<UiState>()(
       setRunTour: (run) => set({ runTour: run }),
       startTour: () => set({ runTour: true }),
       resetTour: () => set({ hasSeenTour: false, runTour: true }),
+      setHasAcknowledgedAiInsights: (acknowledged) => set({ hasAcknowledgedAiInsights: acknowledged }),
     }),
     {
       name: 'datavista-ui-storage',
@@ -71,6 +82,7 @@ export const useUiStore = create<UiState>()(
         llmApiKey: state.llmApiKey,
         llmProvider: state.llmProvider,
         activeView: state.activeView,
+        hasAcknowledgedAiInsights: state.hasAcknowledgedAiInsights,
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {

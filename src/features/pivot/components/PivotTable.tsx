@@ -269,24 +269,6 @@ export const PivotTable: React.FC<PivotTableProps> = ({ result }) => {
                       );
                     });
                   })}
-
-                  {/* If there are no column dimensions, just render the values */}
-                  {columnDimensions.length === 0 &&
-                    valueFields.map((vf) => {
-                      const alias = aggregationAdapter.getValueFieldAlias(vf);
-                      const val = showValues ? result.getCell(rowNode.path, [], alias) : null;
-                      return (
-                        <td
-                          key={`cell-${rowNode.path.join("-")}-none-${alias}`}
-                          className={cn(
-                            "px-4 py-2 border border-border text-right tabular-nums transition-all duration-200",
-                            isGrandTotalRow && "bg-accent/10 font-bold"
-                          )}
-                        >
-                          {formatCellValue(val as number)}
-                        </td>
-                      );
-                    })}
                 </tr>
               );
             })}

@@ -11,16 +11,43 @@ import { ScrollArea } from "@/shared/components/ui/scroll-area";
 import { Separator } from "@/shared/components/ui/separator";
 import { Checkbox } from "@/shared/components/ui/checkbox";
 import { DataTable } from "@/features/datasets/components/DataTable";
-import { 
-  Plus, 
-  Trash2, 
-  Settings, 
-  Columns, 
-  ChevronRight, 
-  ArrowUpDown, 
+import {
+  Plus,
+  Trash2,
+  Settings,
+  Columns,
+  ChevronRight,
+  ArrowUpDown,
   Layers,
-  HelpCircle
+  HelpCircle,
+  AlertTriangle
 } from "lucide-react";
+
+// Function types whose result is undefined/meaningless without an explicit row
+// sequence: RANK/DENSE_RANK/PERCENT_RANK collapse to a single tied rank (arePeers
+// treats every row as a peer with no orderBy — see functions.ts), and
+// FIRST_VALUE/LAST_VALUE/RUNNING_TOTAL/MOVING_AVG/WINDOW_MIN/WINDOW_MAX all collapse
+// to one dataset-wide constant repeated on every row (resolveFrameBounds's
+// no-orderBy fallback spans the whole partition for every row — see engine.ts).
+// Confirmed empirically in window/__tests__. ROW_NUMBER/NTILE/LAG/LEAD are excluded:
+// they stay well-defined (positional on the dataset's existing row order) without
+// an explicit order, so ordering is optional for them.
+export const ORDER_BY_REQUIRED_REASONS: Partial<Record<WindowFunctionType, string>> = {
+  RANK: "RANK requires Order By to define row sequence — without it every row ties for rank 1.",
+  DENSE_RANK: "DENSE_RANK requires Order By to define row sequence — without it every row ties for rank 1.",
+  PERCENT_RANK: "PERCENT_RANK requires Order By to define row sequence — without it every row collapses to 0.",
+  FIRST_VALUE: "FIRST_VALUE requires Order By to define row sequence — without it every row returns the same arbitrary row's value.",
+  LAST_VALUE: "LAST_VALUE requires Order By to define row sequence — without it every row returns the same arbitrary row's value.",
+  RUNNING_TOTAL: "RUNNING_TOTAL requires Order By to define row sequence — without it every row shows the same dataset-wide total.",
+  MOVING_AVG: "MOVING_AVG requires Order By to define row sequence — without it every row shows the same dataset-wide average.",
+  WINDOW_MIN: "WINDOW_MIN requires Order By to define row sequence — without it every row shows the same dataset-wide minimum.",
+  WINDOW_MAX: "WINDOW_MAX requires Order By to define row sequence — without it every row shows the same dataset-wide maximum.",
+};
+
+/** Whether Add Column must stay disabled: functionType requires ordering and none is set. */
+export function isOrderByMissing(functionType: WindowFunctionType, orderBy: WindowOrderBy[]): boolean {
+  return !!ORDER_BY_REQUIRED_REASONS[functionType] && orderBy.length === 0;
+}
 
 export const WindowExplorer: React.FC = () => {
   const activeDataset = useDatasetStore((state) => state.activeDataset);
@@ -108,11 +135,16 @@ export const WindowExplorer: React.FC = () => {
     }
   };
 
+  // Order By requirement for the currently selected function type
+  const orderByRequiredReason = ORDER_BY_REQUIRED_REASONS[functionType];
+  const orderByMissing = isOrderByMissing(functionType, orderBy);
+
   // Form Submission
   const handleCreateColumn = (e: React.FormEvent) => {
     e.preventDefault();
     const cleanAlias = alias.trim();
     if (!cleanAlias) return;
+    if (orderByMissing) return;
 
     // Build frame
     let frame: WindowFrame | undefined = undefined;
@@ -346,6 +378,13 @@ export const WindowExplorer: React.FC = () => {
                     Add
                   </Button>
                 </div>
+
+                {orderByMissing && (
+                  <div className="flex items-start gap-1.5 text-[11px] text-destructive bg-destructive/10 border border-destructive/30 rounded-md p-2">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                    <span>{orderByRequiredReason}</span>
+                  </div>
+                )}
               </div>
 
               <Separator className="bg-border/60" />
@@ -424,7 +463,11 @@ export const WindowExplorer: React.FC = () => {
                 </div>
               )}
 
-              <Button type="submit" className="w-full text-xs h-9 bg-primary hover:bg-primary/95 text-primary-foreground font-bold rounded-lg shadow-md">
+              <Button
+                type="submit"
+                disabled={orderByMissing}
+                className="w-full text-xs h-9 bg-primary hover:bg-primary/95 text-primary-foreground font-bold rounded-lg shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 Add Column
               </Button>
             </form>

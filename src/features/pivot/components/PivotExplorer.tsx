@@ -62,9 +62,9 @@ export const PivotExplorer: React.FC = () => {
   }, [resolvedConfig, pivotConfig, setPivotConfig]);
 
   // Compute Pivot Result
-  const pivotResult = useMemo(() => {
+  const { pivotResult, pivotError } = useMemo(() => {
     if (!activeDataset || !resolvedConfig || resolvedConfig.valueFields.length === 0) {
-      return null;
+      return { pivotResult: null, pivotError: null };
     }
 
     try {
@@ -73,10 +73,13 @@ export const PivotExplorer: React.FC = () => {
         ...activeDataset,
         data: filteredData
       };
-      return pivotEngine.execute(syntheticDataset, resolvedConfig);
+      return { pivotResult: pivotEngine.execute(syntheticDataset, resolvedConfig), pivotError: null };
     } catch (e) {
       console.error("Pivot execution failed:", e);
-      return null;
+      return {
+        pivotResult: null,
+        pivotError: e instanceof Error ? e.message : String(e)
+      };
     }
   }, [activeDataset, filteredData, resolvedConfig]);
 
@@ -127,6 +130,22 @@ export const PivotExplorer: React.FC = () => {
             </div>
             
             <PivotTable result={pivotResult} />
+          </div>
+        ) : pivotError ? (
+          <div
+            role="alert"
+            className="flex flex-col items-center justify-center h-[50vh] border border-destructive/40 rounded-xl bg-destructive/5 text-center select-none"
+          >
+            <div className="w-12 h-12 rounded-xl bg-destructive/10 flex items-center justify-center mb-3">
+              <AlertCircle className="w-6 h-6 text-destructive" />
+            </div>
+            <h4 className="text-sm font-semibold mb-1 text-destructive">Pivot Table Failed to Render</h4>
+            <p className="text-xs text-muted-foreground max-w-xs px-4">
+              This pivot configuration hit an error while computing results. Try adjusting the value fields or dimensions.
+            </p>
+            <p className="text-[11px] text-destructive/70 max-w-sm px-4 mt-2 font-mono break-words">
+              {pivotError}
+            </p>
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center h-[50vh] border border-dashed border-border rounded-xl bg-muted/5 text-center select-none">

@@ -208,26 +208,63 @@ export const windowEngine = {
   },
 
   /**
-   * Registers custom window function output columns within the dataset metadata layer.
+   * Materializes window function output columns into dataset.data (mirrors
+   * formulaEngine.evaluateCalculatedFields' pattern) and keeps columns/columnTypes/
+   * metadata.columns in sync — including pruning aliases for window queries that
+   * were since removed or renamed, so no phantom column definitions survive.
    */
-  augmentMetadata(dataset: Dataset): Dataset {
-    if (!dataset.windowQueries || dataset.windowQueries.length === 0) {
+  evaluate(dataset: Dataset): Dataset {
+    const currentQueries = dataset.windowQueries || [];
+    const currentAliases = new Set(currentQueries.map((q) => q.alias));
+
+    // Prior window-derived column names, identified via the dedicated 'window'
+    // metadata role (exclusive to this function — unlike 'measure', which raw
+    // numeric columns also carry, so it can't be used to tell them apart).
+    const priorAliasNames = new Set(
+      (dataset.metadata?.columns || []).filter((c) => c.role === "window").map((c) => c.name)
+    );
+
+    if (currentAliases.size === 0 && priorAliasNames.size === 0) {
       return dataset;
     }
 
-    const columns = [...dataset.columns];
-    const columnTypes = { ...dataset.columnTypes };
-    const metadataColumns = dataset.metadata ? [...dataset.metadata.columns] : [];
+    // 1. Strip any alias no longer present in the current windowQueries list
+    // (removed or renamed) — same reconciliation formulaEngine does for
+    // calculated fields, but keyed off a role that's actually unambiguous.
+    const cleanData: DataRow[] = dataset.data.map((row) => {
+      const cleanRow: DataRow = {};
+      Object.keys(row).forEach((key) => {
+        if (priorAliasNames.has(key) && !currentAliases.has(key)) return;
+        cleanRow[key] = row[key];
+      });
+      return cleanRow;
+    });
 
-    for (const q of dataset.windowQueries) {
-      if (!columns.includes(q.alias)) {
-        columns.push(q.alias);
-      }
-      columnTypes[q.alias] = "numeric";
+    // 2. Recompute every current window query's values, real per-row values.
+    const materialized = currentAliases.size > 0 ? this.execute(cleanData, currentQueries) : cleanData;
 
-      if (dataset.metadata) {
-        const exists = metadataColumns.some((c) => c.name === q.alias);
-        if (!exists) {
+    // 3. Rebuild columns/columnTypes/metadata.columns: drop stale window-derived
+    // entries not in currentAliases, keep everything else, re-add current aliases.
+    const columns = dataset.columns.filter((c) => !priorAliasNames.has(c) || currentAliases.has(c));
+    for (const alias of currentAliases) {
+      if (!columns.includes(alias)) columns.push(alias);
+    }
+
+    const columnTypes: Record<string, "numeric" | "categorical" | "date"> = {};
+    for (const [k, v] of Object.entries(dataset.columnTypes)) {
+      if (!priorAliasNames.has(k) || currentAliases.has(k)) columnTypes[k] = v;
+    }
+    for (const alias of currentAliases) {
+      columnTypes[alias] = "numeric";
+    }
+
+    let metadata = dataset.metadata;
+    if (metadata) {
+      const metadataColumns = metadata.columns.filter(
+        (c) => c.role !== "window" || currentAliases.has(c.name)
+      );
+      for (const q of currentQueries) {
+        if (!metadataColumns.some((c) => c.name === q.alias)) {
           const colMeta: ColumnMetadata = {
             id: `${dataset.id}_${q.alias}`,
             name: q.alias,
@@ -237,24 +274,24 @@ export const windowEngine = {
             nullableStatus: true,
             uniqueValueCount: 0,
             missingValueCount: 0,
-            role: "measure"
+            role: "window"
           };
           metadataColumns.push(colMeta);
         }
       }
+      metadata = {
+        ...metadata,
+        columns: metadataColumns,
+        columnCount: columns.length
+      };
     }
 
     return {
       ...dataset,
+      data: materialized,
       columns,
       columnTypes,
-      metadata: dataset.metadata
-        ? {
-            ...dataset.metadata,
-            columns: metadataColumns,
-            columnCount: columns.length
-          }
-        : undefined
+      metadata
     };
   }
 };

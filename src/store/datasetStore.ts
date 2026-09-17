@@ -30,15 +30,52 @@ interface DatasetState {
   deleteWindowQuery: (alias: string) => void;
 }
 
-export const useDatasetStore = create<DatasetState>((set, get) => ({
+export const useDatasetStore = create<DatasetState>((set, get) => {
+  /**
+   * Shared commit path for actions that mutate the active dataset's calculatedFields or
+   * windowQueries (addCalculatedField, deleteCalculatedField, addWindowQuery,
+   * deleteWindowQuery). Runs the updater, re-evaluates (formulaEngine then windowEngine),
+   * and writes the SAME evaluated result to both `datasets[]` and `activeDataset`.
+   *
+   * This exists because all four call sites independently had the identical bug: they
+   * computed `evaluated` correctly for `activeDataset` but wrote the pre-evaluation
+   * `updatedDataset` into `datasets[]` instead (a one-word copy-paste mistake, repeated
+   * four times). Any code that later re-selects activeDataset from the raw `datasets[]`
+   * array (persistenceService.hydrate, dashboardStore.loadDashboard/restoreExternalContext,
+   * snapshotStore — see docs/INVESTIGATION-item3-window-pivot-zeroing-2026-09-14.md and the
+   * 2026-09-14 comprehensive audit) inherited that staleness — window/calculated columns
+   * silently zeroed out. Funneling all four through one function means there's only one
+   * place left to get this right, instead of four.
+   */
+  function applyActiveDatasetUpdate(updater: (dataset: Dataset) => Dataset): Dataset | null {
+    const { activeDataset, datasets } = get();
+    if (!activeDataset) return null;
+
+    const updatedDataset = updater(activeDataset);
+
+    queryCache.invalidate(activeDataset.id);
+    const evaluated = windowEngine.evaluate(formulaEngine.evaluateCalculatedFields(updatedDataset));
+    const updatedDatasets = datasets.map(d => (d.id === activeDataset.id ? evaluated : d));
+
+    set({
+      datasets: updatedDatasets,
+      activeDataset: evaluated,
+    });
+
+    useFilterStore.getState().setFilteredData(evaluated.data);
+
+    return evaluated;
+  }
+
+  return {
   datasets: [],
   activeDataset: null,
   setDatasets: (datasets) => {
-    const evaluated = datasets.map(d => windowEngine.augmentMetadata(formulaEngine.evaluateCalculatedFields(d)));
+    const evaluated = datasets.map(d => windowEngine.evaluate(formulaEngine.evaluateCalculatedFields(d)));
     set({ datasets: evaluated });
   },
   setActiveDataset: (activeDataset) => {
-    const evaluated = activeDataset ? windowEngine.augmentMetadata(formulaEngine.evaluateCalculatedFields(activeDataset)) : null;
+    const evaluated = activeDataset ? windowEngine.evaluate(formulaEngine.evaluateCalculatedFields(activeDataset)) : null;
     set({ activeDataset: evaluated });
   },
   
@@ -53,7 +90,7 @@ export const useDatasetStore = create<DatasetState>((set, get) => ({
       lastUpdated: dataset.lastUpdated || Date.now(),
     };
 
-    const evaluated = windowEngine.augmentMetadata(formulaEngine.evaluateCalculatedFields(initialDataset));
+    const evaluated = windowEngine.evaluate(formulaEngine.evaluateCalculatedFields(initialDataset));
     
     set((state) => ({
       datasets: [...state.datasets, evaluated],
@@ -96,7 +133,7 @@ export const useDatasetStore = create<DatasetState>((set, get) => ({
       windowQueries: targetDataset.windowQueries || [],
     };
 
-    const evaluated = windowEngine.augmentMetadata(formulaEngine.evaluateCalculatedFields(updatedDataset));
+    const evaluated = windowEngine.evaluate(formulaEngine.evaluateCalculatedFields(updatedDataset));
 
     const updatedDatasets = datasets.map((d) => (d.id === datasetId ? evaluated : d));
 
@@ -119,7 +156,7 @@ export const useDatasetStore = create<DatasetState>((set, get) => ({
   },
   
   selectDataset: (dataset) => {
-    const evaluated = windowEngine.augmentMetadata(formulaEngine.evaluateCalculatedFields(dataset));
+    const evaluated = windowEngine.evaluate(formulaEngine.evaluateCalculatedFields(dataset));
     set({ activeDataset: evaluated });
     useFilterStore.getState().setFilteredData(evaluated.data);
     useFilterStore.getState().resetFilters();
@@ -191,34 +228,19 @@ export const useDatasetStore = create<DatasetState>((set, get) => ({
   },
 
   addCalculatedField: (fieldName, expression) => {
-    const { activeDataset, datasets } = get();
-    if (!activeDataset) return;
-
     const calculatedField: CalculatedField = {
       name: fieldName,
       expression,
     };
 
-    const updatedCalculatedFields = [
-      ...(activeDataset.calculatedFields || []).filter(f => f.name !== fieldName),
-      calculatedField,
-    ];
-
-    const updatedDataset: Dataset = {
-      ...activeDataset,
-      calculatedFields: updatedCalculatedFields,
-    };
-
-    queryCache.invalidate(activeDataset.id);
-    const evaluated = windowEngine.augmentMetadata(formulaEngine.evaluateCalculatedFields(updatedDataset));
-    const updatedDatasets = datasets.map(d => d.id === activeDataset.id ? updatedDataset : d);
-
-    set({
-      datasets: updatedDatasets,
-      activeDataset: evaluated,
-    });
-
-    useFilterStore.getState().setFilteredData(evaluated.data);
+    const evaluated = applyActiveDatasetUpdate((dataset) => ({
+      ...dataset,
+      calculatedFields: [
+        ...(dataset.calculatedFields || []).filter(f => f.name !== fieldName),
+        calculatedField,
+      ],
+    }));
+    if (!evaluated) return;
 
     toast({
       title: "Calculated field added",
@@ -227,26 +249,11 @@ export const useDatasetStore = create<DatasetState>((set, get) => ({
   },
 
   deleteCalculatedField: (fieldName) => {
-    const { activeDataset, datasets } = get();
-    if (!activeDataset) return;
-
-    const updatedCalculatedFields = (activeDataset.calculatedFields || []).filter(f => f.name !== fieldName);
-
-    const updatedDataset: Dataset = {
-      ...activeDataset,
-      calculatedFields: updatedCalculatedFields,
-    };
-
-    queryCache.invalidate(activeDataset.id);
-    const evaluated = windowEngine.augmentMetadata(formulaEngine.evaluateCalculatedFields(updatedDataset));
-    const updatedDatasets = datasets.map(d => d.id === activeDataset.id ? updatedDataset : d);
-
-    set({
-      datasets: updatedDatasets,
-      activeDataset: evaluated,
-    });
-
-    useFilterStore.getState().setFilteredData(evaluated.data);
+    const evaluated = applyActiveDatasetUpdate((dataset) => ({
+      ...dataset,
+      calculatedFields: (dataset.calculatedFields || []).filter(f => f.name !== fieldName),
+    }));
+    if (!evaluated) return;
 
     toast({
       title: "Calculated field deleted",
@@ -255,29 +262,14 @@ export const useDatasetStore = create<DatasetState>((set, get) => ({
   },
 
   addWindowQuery: (query) => {
-    const { activeDataset, datasets } = get();
-    if (!activeDataset) return;
-
-    const updatedWindowQueries = [
-      ...(activeDataset.windowQueries || []).filter(q => q.alias !== query.alias),
-      query,
-    ];
-
-    const updatedDataset: Dataset = {
-      ...activeDataset,
-      windowQueries: updatedWindowQueries,
-    };
-
-    queryCache.invalidate(activeDataset.id);
-    const evaluated = windowEngine.augmentMetadata(formulaEngine.evaluateCalculatedFields(updatedDataset));
-    const updatedDatasets = datasets.map(d => d.id === activeDataset.id ? updatedDataset : d);
-
-    set({
-      datasets: updatedDatasets,
-      activeDataset: evaluated,
-    });
-
-    useFilterStore.getState().setFilteredData(evaluated.data);
+    const evaluated = applyActiveDatasetUpdate((dataset) => ({
+      ...dataset,
+      windowQueries: [
+        ...(dataset.windowQueries || []).filter(q => q.alias !== query.alias),
+        query,
+      ],
+    }));
+    if (!evaluated) return;
 
     toast({
       title: "Window function added",
@@ -286,30 +278,16 @@ export const useDatasetStore = create<DatasetState>((set, get) => ({
   },
 
   deleteWindowQuery: (alias) => {
-    const { activeDataset, datasets } = get();
-    if (!activeDataset) return;
-
-    const updatedWindowQueries = (activeDataset.windowQueries || []).filter(q => q.alias !== alias);
-
-    const updatedDataset: Dataset = {
-      ...activeDataset,
-      windowQueries: updatedWindowQueries,
-    };
-
-    queryCache.invalidate(activeDataset.id);
-    const evaluated = windowEngine.augmentMetadata(formulaEngine.evaluateCalculatedFields(updatedDataset));
-    const updatedDatasets = datasets.map(d => d.id === activeDataset.id ? updatedDataset : d);
-
-    set({
-      datasets: updatedDatasets,
-      activeDataset: evaluated,
-    });
-
-    useFilterStore.getState().setFilteredData(evaluated.data);
+    const evaluated = applyActiveDatasetUpdate((dataset) => ({
+      ...dataset,
+      windowQueries: (dataset.windowQueries || []).filter(q => q.alias !== alias),
+    }));
+    if (!evaluated) return;
 
     toast({
       title: "Window function deleted",
       description: `Window column '${alias}' has been deleted.`,
     });
   }
-}));
+  };
+});

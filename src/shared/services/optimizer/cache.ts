@@ -7,7 +7,9 @@ class LruCache<T> {
 
   constructor(
     private maxEntries: number = 5,
-    private maxTotalRows: number = 100000
+    // ADR-003: "strict limit of 100,000 rows per cache entry" — this is a
+    // per-entry cap, not a cumulative budget across all cached entries.
+    private maxRowsPerEntry: number = 100000
   ) {}
 
   /**
@@ -29,15 +31,20 @@ class LruCache<T> {
    * Caches an item, evicting oldest accessed items if thresholds are exceeded.
    */
   set(key: string, datasetId: string, data: T, rowCount: number): void {
+    // Reject entries that alone exceed the per-entry row cap. Without this,
+    // an oversized entry gets admitted whole (the eviction loop below never
+    // runs against an empty cache), then every subsequent set() finds the
+    // budget already blown and evicts everything down to that one entry.
+    if (rowCount > this.maxRowsPerEntry) {
+      return;
+    }
+
     if (this.cache.has(key)) {
       this.delete(key);
     }
 
-    // Evict oldest entries if capacity or row bounds are breached
-    while (
-      (this.cache.size >= this.maxEntries || this.totalRowsCount + rowCount > this.maxTotalRows) &&
-      this.cache.size > 0
-    ) {
+    // Evict oldest entries once entry-count capacity is breached.
+    while (this.cache.size >= this.maxEntries && this.cache.size > 0) {
       const oldestKey = this.cache.keys().next().value;
       if (oldestKey !== undefined) {
         this.delete(oldestKey);

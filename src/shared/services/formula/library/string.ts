@@ -8,6 +8,7 @@ export const stringFunctions: FunctionDefinition[] = [
       { name: "text1", type: "string" },
       { name: "text2", type: "string", optional: true }
     ],
+    variadic: true,
     returnType: "string",
     apply: (args) => {
       return args

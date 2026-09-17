@@ -4,12 +4,17 @@ import { buildRowHierarchy, buildColumnHierarchy, computeHierarchyValues, sortHi
 import { PivotResultModel } from "./resultModel";
 import { aggregationAdapter } from "./aggregationAdapter";
 import { flattenRowHierarchy, flattenColumnHierarchy } from "./utilities";
+import { getCachedPivotResult, setCachedPivotResult } from "./cache";
 
 export const pivotEngine = {
   /**
    * Executes the pivot aggregation process on the dataset data, building rows, columns, and cell values.
+   * Results are cached per (filtered-rows array identity, config) — see cache.ts.
    */
   execute(dataset: Dataset, config: PivotConfig): PivotResultModel {
+    const cached = getCachedPivotResult(dataset.data, config);
+    if (cached) return cached;
+
     const startTime = performance.now();
 
     // 1. Map pivot value fields to unified query aggregations
@@ -41,7 +46,7 @@ export const pivotEngine = {
 
     const executionTimeMs = performance.now() - startTime;
 
-    return new PivotResultModel(
+    const result = new PivotResultModel(
       config,
       rowHierarchy,
       columnHierarchy,
@@ -53,6 +58,9 @@ export const pivotEngine = {
         processingTimeMs: executionTimeMs
       }
     );
+
+    setCachedPivotResult(dataset.data, config, result);
+    return result;
   }
 };
 export default pivotEngine;

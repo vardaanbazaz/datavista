@@ -35,6 +35,31 @@ function calculateStdDev(values: number[]): number {
 }
 
 /**
+ * Resolves a filter operand (cell value or filter target) to a comparable number for
+ * greaterThan/lessThan/between. Plain numbers and numeric strings use Number() as before;
+ * date strings/Date objects (which Number() turns into NaN) fall back to date parsing so
+ * date-range filters don't silently match zero rows.
+ */
+function toComparableNumber(v: unknown): number | null {
+  if (v instanceof Date) {
+    const t = v.getTime();
+    return isNaN(t) ? null : t;
+  }
+  const n = Number(v);
+  if (!isNaN(n)) return n;
+  // Only fall back to date parsing for strings that plausibly encode a date (contain a
+  // 4-digit year). JS's Date parser is permissive enough that ambiguous, non-date strings
+  // like "5/3" or "10-20" (a categorical code, a ratio, ...) silently resolve to a real but
+  // wrong date instead of failing, which would make greaterThan/lessThan/between misbehave
+  // on non-date columns that share this code path.
+  if (typeof v === 'string' && /\d{4}/.test(v)) {
+    const d = parseDate(v);
+    return d ? d.getTime() : null;
+  }
+  return null;
+}
+
+/**
  * Helper to compute median
  */
 function calculateMedian(values: number[]): number {
@@ -273,10 +298,16 @@ export const queryEngine = {
             return value.map(String).includes(String(cellVal));
           }
           return false;
-        case 'greaterThan':
-          return Number(cellVal) > Number(value);
-        case 'lessThan':
-          return Number(cellVal) < Number(value);
+        case 'greaterThan': {
+          const a = toComparableNumber(cellVal);
+          const b = toComparableNumber(value);
+          return a !== null && b !== null && a > b;
+        }
+        case 'lessThan': {
+          const a = toComparableNumber(cellVal);
+          const b = toComparableNumber(value);
+          return a !== null && b !== null && a < b;
+        }
         case 'startsWith':
           return String(cellVal).startsWith(String(value));
         case 'endsWith':
@@ -284,8 +315,16 @@ export const queryEngine = {
         case 'between':
           if (typeof value === 'object' && value !== null) {
             const range = value as { start?: string | Date | number; end?: string | Date | number };
-            if (range.start !== undefined && Number(cellVal) < Number(range.start)) return false;
-            if (range.end !== undefined && Number(cellVal) > Number(range.end)) return false;
+            const cellNum = toComparableNumber(cellVal);
+            if (cellNum === null) return false;
+            if (range.start !== undefined) {
+              const startNum = toComparableNumber(range.start);
+              if (startNum !== null && cellNum < startNum) return false;
+            }
+            if (range.end !== undefined) {
+              const endNum = toComparableNumber(range.end);
+              if (endNum !== null && cellNum > endNum) return false;
+            }
             return true;
           }
           return false;
@@ -421,10 +460,14 @@ export const queryEngine = {
                 : 0;
               break;
             case 'min':
-              value = numericValues.length > 0 ? Math.min(...numericValues) : 0;
+              value = numericValues.length > 0
+                ? numericValues.reduce((m, v) => (v < m ? v : m), numericValues[0])
+                : 0;
               break;
             case 'max':
-              value = numericValues.length > 0 ? Math.max(...numericValues) : 0;
+              value = numericValues.length > 0
+                ? numericValues.reduce((m, v) => (v > m ? v : m), numericValues[0])
+                : 0;
               break;
             case 'median':
               value = calculateMedian(numericValues);

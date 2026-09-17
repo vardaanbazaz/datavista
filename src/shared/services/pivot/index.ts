@@ -1,4 +1,5 @@
 export * from "./types";
+export * from "./cache";
 export * from "./hierarchyBuilder";
 export * from "./aggregationAdapter";
 export * from "./resultModel";

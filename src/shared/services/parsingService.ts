@@ -37,12 +37,28 @@ const isDateString = (val: string): boolean => {
 };
 
 /**
+ * Matches a leading zero followed by more digits (e.g. "01234", "00501") — values shaped
+ * like zip codes where coercing to a JS number would silently destroy the leading zero.
+ * Deliberately does not match a leading zero on a negative number (e.g. "-0123") — that
+ * shape is rare enough in practice to leave out of this narrow fix.
+ */
+const hasLeadingZero = (val: string): boolean => /^0\d+/.test(val);
+
+/**
  * Detects the type of a column based on its non-null values.
  */
 export const detectColumnType = (values: (string | number | null)[]): 'numeric' | 'categorical' | 'date' => {
   const nonNullValues = values.filter((v): v is string | number => v !== null && v !== undefined && v !== '');
 
   if (nonNullValues.length === 0) return 'categorical';
+
+  // A column containing any leading-zero numeric-looking string (e.g. zip codes) must not
+  // be classified 'numeric' — those values are intentionally kept as strings at ingest
+  // (see processRawData) to avoid losing the leading zero, so labeling the column 'numeric'
+  // here would contradict the actual cell types and break strict typeof-based consumers.
+  if (nonNullValues.some(val => hasLeadingZero(String(val)))) {
+    return 'categorical';
+  }
 
   // Count matches
   let numericCount = 0;
@@ -121,6 +137,11 @@ export const processRawData = (rawData: Record<string, unknown>[], fileName: str
       const cleanValResult = cleanValue(row[originalCol]);
       if (cleanValResult === null) {
         processedRow[col] = null;
+      } else if (typeof cleanValResult === 'string' && hasLeadingZero(cleanValResult)) {
+        // Preserve the original string so the leading zero isn't silently destroyed
+        // (e.g. "01234" -> 1234). See detectColumnType, which forces such columns
+        // to 'categorical' so the column type stays consistent with these string cells.
+        processedRow[col] = cleanValResult;
       } else {
         const numVal = Number(cleanValResult);
         if (!isNaN(numVal) && cleanValResult !== "") {

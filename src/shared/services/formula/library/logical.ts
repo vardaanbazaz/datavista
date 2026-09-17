@@ -22,6 +22,7 @@ export const logicalFunctions: FunctionDefinition[] = [
       { name: "value1", type: "any" },
       { name: "value2", type: "any", optional: true }
     ],
+    variadic: true,
     returnType: "any",
     apply: (args) => {
       for (const arg of args) {

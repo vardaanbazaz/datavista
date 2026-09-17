@@ -163,6 +163,18 @@ export function AiSettingsModal({ isOpen: externalIsOpen, onClose: externalOnClo
             </p>
           </div>
 
+          {/* Data Disclosure */}
+          <div className="rounded-md border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-3">
+            <p className="text-[11px] leading-relaxed text-amber-900 dark:text-amber-200">
+              <span className="font-semibold">Data sent to your provider:</span> when you run a
+              natural-language query or generate an AI formula, DataVista sends sample values from
+              your dataset&apos;s columns to the selected provider (Google or OpenAI) so it can
+              respond — including from any column, so avoid AI features on datasets containing
+              names, emails, or other sensitive personal data you don&apos;t want to share with
+              that provider. This is separate from your API key, which stays in this browser.
+            </p>
+          </div>
+
           {/* Action Buttons */}
           <div className="flex items-center gap-2 justify-between pt-2">
             <Button

@@ -11,11 +11,12 @@ export const summaryEngine = {
     dataset: Dataset | null,
     charts: ChartConfig[],
     filters?: FilterState | GlobalFilter[]
-  ): Promise<{ summary: string; anomalies: DetectedAnomaly[] }> {
+  ): Promise<{ summary: string; anomalies: DetectedAnomaly[]; source: 'ai' | 'offline' }> {
     if (!dataset) {
       return {
         summary: "No active dataset loaded. Upload or select a dataset to generate automated insights.",
-        anomalies: []
+        anomalies: [],
+        source: 'offline'
       };
     }
 
@@ -56,7 +57,8 @@ TASK: Generate a concise, professional 2 to 3 sentence executive summary describ
     if (!llmApiKey || llmApiKey.trim() === "") {
       return {
         summary: this.generateOfflineSummary(datasetName, rowCount, chartCount, anomalies, filterText),
-        anomalies
+        anomalies,
+        source: 'offline'
       };
     }
 
@@ -91,13 +93,15 @@ TASK: Generate a concise, professional 2 to 3 sentence executive summary describ
 
       return {
         summary: clean,
-        anomalies
+        anomalies,
+        source: 'ai'
       };
     } catch (e) {
       console.warn("LLM summary generation failed, falling back to heuristic summary:", e);
       return {
         summary: this.generateOfflineSummary(datasetName, rowCount, chartCount, anomalies, filterText),
-        anomalies
+        anomalies,
+        source: 'offline'
       };
     }
   },

@@ -454,6 +454,12 @@ export function evaluateAST(node: ASTNode, row: DataRow): unknown {
 
       switch (node.operator) {
         case '+':
+          // Numeric-looking strings (e.g. CSV-parsed "5") add rather than concatenate,
+          // consistent with looseEquals below and every other arithmetic operator here.
+          // Genuine string concatenation still applies when either side isn't numeric-like.
+          if (isNumericLike(leftVal) && isNumericLike(rightVal)) {
+            return Number(leftVal) + Number(rightVal);
+          }
           if (typeof leftVal === 'string' || typeof rightVal === 'string') {
             return String(leftVal) + String(rightVal);
           }
@@ -569,12 +575,29 @@ export const formulaEngine = {
     // Validate function calls
     const validateFunctions = (node: ASTNode) => {
       if (node.type === 'FunctionCall') {
-        if (!formulaRegistry.has(node.name.toUpperCase())) {
+        const handlerDef = formulaRegistry.get(node.name.toUpperCase());
+        if (!handlerDef) {
           errors.push({
             field: fieldName,
             message: `Unknown function '${node.name}'.`,
             type: 'syntax'
           });
+        } else {
+          const requiredCount = handlerDef.args.filter(a => !a.optional).length;
+          const maxCount = handlerDef.args.length;
+          if (node.args.length < requiredCount) {
+            errors.push({
+              field: fieldName,
+              message: `Function '${node.name}' expects at least ${requiredCount} argument${requiredCount === 1 ? '' : 's'} but got ${node.args.length}.`,
+              type: 'syntax'
+            });
+          } else if (!handlerDef.variadic && node.args.length > maxCount) {
+            errors.push({
+              field: fieldName,
+              message: `Function '${node.name}' expects at most ${maxCount} argument${maxCount === 1 ? '' : 's'} but got ${node.args.length}.`,
+              type: 'syntax'
+            });
+          }
         }
         node.args.forEach(validateFunctions);
       } else if (node.type === 'UnaryExpression') {
@@ -745,7 +768,7 @@ export const formulaEngine = {
         let val = evaluateAST(ast, row);
 
         // Normalize value type
-        if (val === undefined || val === '') {
+        if (val === undefined || val === '' || (typeof val === 'number' && Number.isNaN(val))) {
           val = null;
         }
 
