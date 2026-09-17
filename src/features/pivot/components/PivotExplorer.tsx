@@ -7,6 +7,7 @@ import { PivotBuilder } from "./PivotBuilder";
 import { PivotTable } from "./PivotTable";
 import { AlertCircle, Grid3X3, RefreshCw } from "lucide-react";
 import { Dataset } from "@/shared/types";
+import { getEffectiveColumnType } from "@/shared/utils/columnType";
 
 export const PivotExplorer: React.FC = () => {
   const activeDataset = useDatasetStore((state) => state.activeDataset);
@@ -20,17 +21,18 @@ export const PivotExplorer: React.FC = () => {
     if (pivotConfig) return pivotConfig;
     if (!activeDataset) return null;
 
-    // Pick first categorical column as default row, numeric as default value
-    const columns = activeDataset.metadata
-      ? activeDataset.metadata.columns
-      : activeDataset.columns.map(name => ({
-          name,
-          inferredDataType: activeDataset.columnTypes[name] || 'categorical',
-          role: activeDataset.columnTypes[name] === 'numeric' ? 'measure' : 'dimension'
-        }));
+    const columnNames = activeDataset.metadata
+      ? activeDataset.metadata.columns.map(c => c.name)
+      : activeDataset.columns;
 
-    const defaultRow = columns.find(c => c.inferredDataType === 'categorical' || c.inferredDataType === 'date')?.name;
-    const defaultVal = columns.find(c => c.inferredDataType === 'numeric')?.name;
+    const effectiveTypeOf = (name: string) => getEffectiveColumnType(activeDataset, name);
+
+    // Pick first categorical column as default row, numeric as default value
+    const defaultRow = columnNames.find(name => {
+      const t = effectiveTypeOf(name);
+      return t === 'categorical' || t === 'date';
+    });
+    const defaultVal = columnNames.find(name => effectiveTypeOf(name) === 'numeric');
 
     if (defaultRow && defaultVal) {
       return {

@@ -224,6 +224,7 @@ export const generateDatasetMetadata = (
     validNumCount: number;
     minDate: Date | null;
     maxDate: Date | null;
+    allIntegers: boolean;
   }
 
   // Pre-initialize stats objects for each column
@@ -237,6 +238,7 @@ export const generateDatasetMetadata = (
       validNumCount: 0,
       minDate: null,
       maxDate: null,
+      allIntegers: true,
     };
     return acc;
   }, {} as Record<string, ColStatAccumulator>);
@@ -266,6 +268,7 @@ export const generateDatasetMetadata = (
             stats.sum += num;
             if (num < stats.min) stats.min = num;
             if (num > stats.max) stats.max = num;
+            if (!Number.isInteger(num)) stats.allIntegers = false;
           }
         } else if (type === 'date') {
           const date = new Date(strVal);
@@ -321,7 +324,9 @@ export const generateDatasetMetadata = (
       latestDate: type === 'date' && stats.maxDate ? stats.maxDate.toISOString().split('T')[0] : undefined,
       detectedFormat: type === 'date' ? 'YYYY-MM-DD' : undefined,
       categoryCardinality,
-      role
+      role,
+      allIntegerValues: type === 'numeric' ? (stats.validNumCount > 0 && stats.allIntegers) : false,
+      userOverrideType: undefined
     };
   });
 

@@ -22,6 +22,7 @@ import { CreateTemplateModal } from "@/features/dashboards/components/CreateTemp
 import { SnapshotManager } from "@/features/dashboards/components/SnapshotManager";
 import { useTemplateStore } from "@/features/dashboards/store/templateStore";
 import { templateEngine } from "@/features/dashboards/services/templateEngine";
+import { getEffectiveColumnType, getEffectiveColumnTypes } from "@/shared/utils/columnType";
 
 export function DashboardSummary() {
   const dataset = useDatasetStore((state) => state.activeDataset);
@@ -80,13 +81,9 @@ export function DashboardSummary() {
     const filteredRows = filteredData.length;
     const filterProgress = (filteredRows / totalRows) * 100;
     
-    const numericColumns = dataset.metadata
-      ? dataset.metadata.columns.filter(c => c.inferredDataType === 'numeric').map(c => c.name)
-      : dataset.columns.filter(col => dataset.columnTypes[col] === 'numeric');
-      
-    const categoricalColumns = dataset.metadata
-      ? dataset.metadata.columns.filter(c => c.inferredDataType === 'categorical').map(c => c.name)
-      : dataset.columns.filter(col => dataset.columnTypes[col] === 'categorical');
+    const effectiveTypes = getEffectiveColumnTypes(dataset);
+    const numericColumns = dataset.columns.filter(col => effectiveTypes[col] === 'numeric');
+    const categoricalColumns = dataset.columns.filter(col => effectiveTypes[col] === 'categorical');
 
     const activeFilterCount = Object.keys(activeFilters.categoricalFilters || {}).length + 
                              Object.keys(activeFilters.dateRangeFilters || {}).length;
@@ -97,7 +94,7 @@ export function DashboardSummary() {
     
     if (!isFiltered && dataset.metadata) {
       numericStats = dataset.metadata.columns
-        .filter(c => c.inferredDataType === 'numeric' && c.minimumValue !== undefined && c.maximumValue !== undefined && c.average !== undefined)
+        .filter(c => getEffectiveColumnType(dataset, c.name) === 'numeric' && c.minimumValue !== undefined && c.maximumValue !== undefined && c.average !== undefined)
         .map(col => {
           const count = dataset.metadata!.rowCount - col.missingValueCount;
           const sum = (col.average || 0) * count;

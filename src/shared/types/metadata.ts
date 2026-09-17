@@ -15,6 +15,8 @@ export interface ColumnMetadata {
   detectedFormat?: string;
   categoryCardinality?: Record<string, number>;
   role: 'dimension' | 'measure' | 'date' | 'identifier' | 'calculated' | 'hidden' | 'window';
+  allIntegerValues: boolean;
+  userOverrideType?: 'numeric' | 'categorical' | 'date' | null;
 }
 
 export interface DatasetMetadata {

@@ -13,6 +13,7 @@ import { Button } from "@/shared/components/ui/button";
 import { Badge } from "@/shared/components/ui/badge";
 import { toast } from "@/shared/hooks/use-toast";
 import { ErrorBoundary, WidgetError } from "@/shared/components/ErrorBoundary";
+import { getEffectiveColumnType } from "@/shared/utils/columnType";
 
 import { pluginRegistry } from "@/shared/services/pluginRegistry";
 import { anomalyDetector } from "@/features/ai/anomalyDetector";
@@ -223,7 +224,7 @@ function ChartVisualizationContent({ chart }: ChartVisualizationProps) {
       const activeDataset = useDatasetStore.getState().activeDataset;
       if (activeDataset && activeDataset.id === chart.datasetId && activeDataset.metadata) {
         const colMeta = activeDataset.metadata.columns.find(c => c.name === col);
-        if (colMeta) return colMeta.inferredDataType;
+        if (colMeta) return getEffectiveColumnType(activeDataset, col);
       }
 
       const nonNull = chartData.map(d => d[col]).filter(v => v !== null && v !== undefined && v !== "");

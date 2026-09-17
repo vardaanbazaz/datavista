@@ -28,6 +28,7 @@ interface DatasetState {
   deleteCalculatedField: (fieldName: string) => void;
   addWindowQuery: (query: WindowQuery) => void;
   deleteWindowQuery: (alias: string) => void;
+  setColumnTypeOverride: (columnName: string, overrideType: 'numeric' | 'categorical' | 'date' | null) => void;
 }
 
 export const useDatasetStore = create<DatasetState>((set, get) => {
@@ -121,12 +122,33 @@ export const useDatasetStore = create<DatasetState>((set, get) => {
     const computedColumns = newColumns || (newMetadata ? newMetadata.columns.map((c) => c.name) : targetDataset.columns);
     const computedTypes = newColumnTypes || targetDataset.columnTypes;
 
+    // Carry a column's manual override forward only if its auto-detected type
+    // didn't change across this update; a changed inferred type means the
+    // underlying data shape changed enough that a prior override (based on the
+    // old shape) shouldn't silently persist — matches schemaDiff's existing
+    // treatment of a cross-version type change as breaking.
+    const mergedMetadata = newMetadata && targetDataset.metadata
+      ? {
+          ...newMetadata,
+          columns: newMetadata.columns.map((newCol) => {
+            const oldCol = targetDataset.metadata!.columns.find((c) => c.name === newCol.name);
+            if (oldCol && oldCol.userOverrideType && oldCol.inferredDataType === newCol.inferredDataType) {
+              return { ...newCol, userOverrideType: oldCol.userOverrideType };
+            }
+            // Inferred type changed (or there was no prior override): don't let a stale
+            // override survive even if newMetadata's column object happened to carry one
+            // (e.g. a caller building newMetadata by spreading the old column list).
+            return { ...newCol, userOverrideType: undefined };
+          }),
+        }
+      : newMetadata;
+
     const updatedDataset: Dataset = {
       ...targetDataset,
       data: newRawData,
       columns: computedColumns,
       columnTypes: computedTypes,
-      metadata: newMetadata || targetDataset.metadata,
+      metadata: mergedMetadata || targetDataset.metadata,
       version: nextVersion,
       lastUpdated: Date.now(),
       calculatedFields: targetDataset.calculatedFields || [],
@@ -287,6 +309,21 @@ export const useDatasetStore = create<DatasetState>((set, get) => {
     toast({
       title: "Window function deleted",
       description: `Window column '${alias}' has been deleted.`,
+    });
+  },
+
+  setColumnTypeOverride: (columnName, overrideType) => {
+    applyActiveDatasetUpdate((dataset) => {
+      if (!dataset.metadata) return dataset;
+      return {
+        ...dataset,
+        metadata: {
+          ...dataset.metadata,
+          columns: dataset.metadata.columns.map((c) =>
+            c.name === columnName ? { ...c, userOverrideType: overrideType } : c
+          ),
+        },
+      };
     });
   }
   };

@@ -22,6 +22,8 @@ import { CalculatedFieldsManager } from "./CalculatedFieldsManager";
 import { QueryPerformanceBadge } from "@/features/dashboard/components/QueryPerformanceBadge";
 import { ConditionalFormattingBuilder } from "@/features/dashboards/components/ConditionalFormattingBuilder";
 import { DatasetUpdateModal } from "./DatasetUpdateModal";
+import { getEffectiveColumnType, mightBeCategorical } from "@/shared/utils/columnType";
+import { Popover, PopoverContent, PopoverTrigger } from "@/shared/components/ui/popover";
 
 interface DataTableProps {
   customDataset?: Dataset | null;
@@ -44,6 +46,7 @@ export function DataTable({
   const activeDatasetStore = useDatasetStore((state) => state.activeDataset);
   const storeFilteredData = useFilterStore((state) => state.filteredData);
   const updateDatasetData = useDatasetStore((state) => state.updateDatasetData);
+  const setColumnTypeOverride = useDatasetStore((state) => state.setColumnTypeOverride);
 
   const activeDataset = customDataset !== undefined ? customDataset : activeDatasetStore;
   const storeData = customData !== undefined ? customData : storeFilteredData;
@@ -258,9 +261,9 @@ export function DataTable({
     if (!isFiltered && dataset.metadata) {
       dataset.metadata.columns.forEach(col => {
         if (
-          col.inferredDataType === 'numeric' && 
-          col.minimumValue !== undefined && 
-          col.maximumValue !== undefined && 
+          getEffectiveColumnType(dataset, col.name) === 'numeric' &&
+          col.minimumValue !== undefined &&
+          col.maximumValue !== undefined &&
           col.average !== undefined
         ) {
           stats[col.name] = {
@@ -275,7 +278,7 @@ export function DataTable({
     }
     
     dataset.columns.forEach(col => {
-      if (dataset.columnTypes[col] === 'numeric') {
+      if (getEffectiveColumnType(dataset, col) === 'numeric') {
         const values = filteredData
           .map(row => row[col])
           .filter(val => val !== null && val !== undefined && typeof val === 'number') as number[];
@@ -512,26 +515,88 @@ export function DataTable({
             <Table className="relative">
               <TableHeader className="sticky top-0 bg-gray-50 dark:bg-zinc-900/95 backdrop-blur-sm z-10 border-b border-gray-200 dark:border-white/10">
                 <TableRow>
-                  {dataset.columns.map((column) => (
-                    <TableHead 
-                      key={column} 
-                      className="bg-gray-50 dark:bg-zinc-900/95 backdrop-blur-sm text-xs uppercase tracking-wider text-gray-500 dark:text-zinc-400 font-semibold py-2"
-                      aria-sort={sortColumn === column ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
-                    >
-                      <Button
-                        variant="ghost"
-                        className="h-auto p-2 justify-start font-semibold text-xs uppercase tracking-wider text-gray-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white"
-                        onClick={() => handleSort(column)}
-                        aria-label={`Sort by ${column}, currently ${sortColumn === column ? (sortDirection === 'asc' ? 'sorted ascending' : 'sorted descending') : 'unsorted'}`}
+                  {dataset.columns.map((column) => {
+                    const colMeta = dataset.metadata?.columns.find(c => c.name === column);
+                    const effectiveType = getEffectiveColumnType(dataset, column);
+                    const flagged = colMeta
+                      ? mightBeCategorical(colMeta) && colMeta.userOverrideType == null
+                      : false;
+                    const overridden = colMeta?.userOverrideType != null;
+
+                    const badge = (
+                      <Badge
+                        variant="outline"
+                        className={
+                          "ml-2 text-[10px] uppercase font-normal cursor-pointer " +
+                          (flagged
+                            ? "border-amber-400 text-amber-600 dark:text-amber-400"
+                            : overridden
+                              ? "border-primary text-primary"
+                              : "border-gray-300 dark:border-zinc-700 text-gray-500 dark:text-zinc-400")
+                        }
                       >
-                        <span className="truncate max-w-32">{column}</span>
-                        <Badge variant="outline" className="ml-2 text-[10px] uppercase font-normal border-gray-300 dark:border-zinc-700 text-gray-500 dark:text-zinc-400">
-                          {dataset.columnTypes[column]}
-                        </Badge>
-                        <ArrowUpDown className="ml-2 h-3 w-3" />
-                      </Button>
-                    </TableHead>
-                  ))}
+                        {effectiveType}
+                        {overridden && " (override)"}
+                      </Badge>
+                    );
+
+                    return (
+                      <TableHead
+                        key={column}
+                        className="bg-gray-50 dark:bg-zinc-900/95 backdrop-blur-sm text-xs uppercase tracking-wider text-gray-500 dark:text-zinc-400 font-semibold py-2"
+                        aria-sort={sortColumn === column ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
+                      >
+                        <div className="flex items-center">
+                          <Button
+                            variant="ghost"
+                            className="h-auto p-2 justify-start font-semibold text-xs uppercase tracking-wider text-gray-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white"
+                            onClick={() => handleSort(column)}
+                            aria-label={`Sort by ${column}, currently ${sortColumn === column ? (sortDirection === 'asc' ? 'sorted ascending' : 'sorted descending') : 'unsorted'}`}
+                          >
+                            <span className="truncate max-w-32">{column}</span>
+                            <ArrowUpDown className="ml-2 h-3 w-3" />
+                          </Button>
+                          {(flagged || overridden) && colMeta ? (
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                {badge}
+                              </PopoverTrigger>
+                              <PopoverContent className="w-64 text-xs normal-case tracking-normal">
+                                {flagged ? (
+                                  <>
+                                    <p className="font-semibold mb-1">Might be categorical</p>
+                                    <p className="text-muted-foreground mb-3">
+                                      {colMeta.uniqueValueCount} distinct values, range {colMeta.minimumValue}–{colMeta.maximumValue}. Could be an ordinal or category code rather than a real measure.
+                                    </p>
+                                    <div className="flex flex-col gap-2">
+                                      <Button size="sm" variant="default" className="w-full" onClick={() => setColumnTypeOverride(column, 'categorical')}>
+                                        Treat as Categorical
+                                      </Button>
+                                      <Button size="sm" variant="outline" className="w-full" onClick={() => setColumnTypeOverride(column, 'numeric')}>
+                                        Keep as Numeric
+                                      </Button>
+                                    </div>
+                                  </>
+                                ) : (
+                                  <>
+                                    <p className="font-semibold mb-1">Type overridden</p>
+                                    <p className="text-muted-foreground mb-3">
+                                      Treated as {colMeta.userOverrideType} instead of the auto-detected {colMeta.inferredDataType}.
+                                    </p>
+                                    <Button size="sm" variant="outline" onClick={() => setColumnTypeOverride(column, null)}>
+                                      Reset to auto-detected
+                                    </Button>
+                                  </>
+                                )}
+                              </PopoverContent>
+                            </Popover>
+                          ) : (
+                            badge
+                          )}
+                        </div>
+                      </TableHead>
+                    );
+                  })}
                 </TableRow>
               </TableHeader>
               <TableBody>

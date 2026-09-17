@@ -22,6 +22,7 @@ import { useDatasetStore } from "@/store/datasetStore";
 import { KPICardConfig } from "../types";
 import { AggregationOperator, ConditionalFormatRule } from "@/shared/types";
 import { ConditionalFormattingBuilder } from "@/features/dashboards/components/ConditionalFormattingBuilder";
+import { getEffectiveColumnTypes } from "@/shared/utils/columnType";
 import { Palette } from "lucide-react";
 
 interface KPIBuilderProps {
@@ -56,14 +57,8 @@ export function KPIBuilder({ isOpen, onClose, onSave, editKpi = null }: KPIBuild
 
   const dateColumns = useMemo(() => {
     if (!dataset) return [];
-    if (dataset.metadata) {
-      return dataset.metadata.columns
-        .filter((c) => c.inferredDataType === "date")
-        .map((c) => c.name);
-    }
-    return Object.entries(dataset.columnTypes)
-      .filter(([_, type]) => type === "date")
-      .map(([col]) => col);
+    const effectiveTypes = getEffectiveColumnTypes(dataset);
+    return dataset.columns.filter((col) => effectiveTypes[col] === "date");
   }, [dataset]);
 
   // Load configuration if editing

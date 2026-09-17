@@ -8,6 +8,7 @@ import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/components/ui/button";
 import { ScrollArea } from "@/shared/components/ui/scroll-area";
 import { Dataset } from "@/shared/types";
+import { getEffectiveColumnTypes } from "@/shared/utils/columnType";
 import { Badge } from "@/shared/components/ui/badge";
 import { Separator } from "@/shared/components/ui/separator";
 import {
@@ -49,14 +50,8 @@ export const StatsExplorer: React.FC = () => {
   // Resolve numeric columns
   const numericColumns = useMemo(() => {
     if (!activeDataset) return [];
-    if (activeDataset.metadata) {
-      return activeDataset.metadata.columns
-        .filter(c => c.inferredDataType === 'numeric')
-        .map(c => c.name);
-    }
-    return activeDataset.columns.filter(
-      col => activeDataset.columnTypes[col] === 'numeric'
-    );
+    const effectiveTypes = getEffectiveColumnTypes(activeDataset);
+    return activeDataset.columns.filter(col => effectiveTypes[col] === 'numeric');
   }, [activeDataset]);
 
   // Set default column
@@ -251,7 +246,7 @@ export const StatsExplorer: React.FC = () => {
   const renderCorrelationTab = () => {
     if (!statsResult) return null;
     const { correlationMatrix } = statsResult;
-    const cols = correlationMatrix.columns;
+    const cols = correlationMatrix.columns.filter(col => numericColumns.includes(col));
 
     // Helper to get color coding based on coefficient
     const getCorrBgColor = (r: number | null): string => {

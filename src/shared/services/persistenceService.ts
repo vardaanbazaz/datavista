@@ -12,7 +12,7 @@ import {
   isValidUIState,
   isValidDashboard
 } from "@/shared/utils/validators";
-import { FilterState, Query } from "@/shared/types";
+import { Dataset, FilterState, Query } from "@/shared/types";
 import { queryEngine } from "@/shared/services/queryEngine";
 import { formulaEngine } from "@/shared/services/formulaEngine";
 import { windowEngine } from "@/shared/services/window";
@@ -47,6 +47,35 @@ function reportSyncFailure(table: string, e: unknown) {
       variant: "destructive"
     });
   }
+}
+
+/**
+ * Datasets persisted before ColumnMetadata.allIntegerValues existed load without it.
+ * Recompute it from the dataset's own rows so the "might be categorical" heuristic
+ * (src/shared/utils/columnType.ts) doesn't have to special-case a missing field beyond
+ * its existing fail-closed default. No-ops (returns the dataset unchanged) if metadata
+ * is absent or every column already has the field.
+ */
+function backfillAllIntegerValues(dataset: Dataset): Dataset {
+  if (!dataset.metadata) return dataset;
+  const needsBackfill = dataset.metadata.columns.some((c) => c.allIntegerValues === undefined);
+  if (!needsBackfill) return dataset;
+
+  return {
+    ...dataset,
+    metadata: {
+      ...dataset.metadata,
+      columns: dataset.metadata.columns.map((col) => {
+        if (col.allIntegerValues !== undefined) return col;
+        if (col.inferredDataType !== 'numeric') return { ...col, allIntegerValues: false };
+        const allIntegers = dataset.data.every((row) => {
+          const val = row[col.name];
+          return val === null || val === undefined || (typeof val === 'number' && Number.isInteger(val));
+        });
+        return { ...col, allIntegerValues: allIntegers };
+      }),
+    },
+  };
 }
 
 export const persistenceService = {
@@ -114,7 +143,9 @@ export const persistenceService = {
       // materialized columns (e.g. from before this fix, or from any future bypass that
       // writes datasets[] directly). windowEngine.evaluate no-ops for datasets with no
       // window queries, so this is free for the common case.
-      const evaluatedDatasets = validDatasets.map(d => windowEngine.evaluate(formulaEngine.evaluateCalculatedFields(d)));
+      const evaluatedDatasets = validDatasets
+        .map(backfillAllIntegerValues)
+        .map(d => windowEngine.evaluate(formulaEngine.evaluateCalculatedFields(d)));
       useDatasetStore.setState({
         datasets: evaluatedDatasets
       });

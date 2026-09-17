@@ -1,6 +1,7 @@
 import React from "react";
 import { cn } from "@/shared/lib/utils";
 import { Dataset, ColumnMetadata, AggregationOperator } from "@/shared/types";
+import { getEffectiveColumnType } from "@/shared/utils/columnType";
 import { PivotConfig, PivotValueField } from "@/shared/services/pivot";
 import { usePivotStore } from "@/store/pivotStore";
 import { Button } from "@/shared/components/ui/button";
@@ -86,7 +87,7 @@ export const PivotBuilder: React.FC<PivotBuilderProps> = ({ dataset }) => {
     if (dataset.metadata) {
       return dataset.metadata.columns.map(c => ({
         name: c.name,
-        type: c.inferredDataType,
+        type: getEffectiveColumnType(dataset, c.name),
         role: c.role,
       }));
     }
