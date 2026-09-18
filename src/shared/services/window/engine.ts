@@ -2,6 +2,7 @@ import { DataRow, Dataset, ColumnMetadata } from "@/shared/types";
 import { WindowQuery, WindowFrame } from "./types";
 import { partitionAndSort, PartitionItem } from "./partitioner";
 import {
+  arePeers,
   computeRowNumber,
   computeRank,
   computeDenseRank,
@@ -19,17 +20,25 @@ import {
 
 /**
  * Resolves the start and end row indices of the window frame for the row at `idx` in a partition of size `length`.
+ *
+ * `peerGroupEnd`, when supplied, is the last index of `idx`'s tied-on-ORDER-BY peer group
+ * (see `computePeerGroupEnds` in this file). It's used only for the no-explicit-frame default
+ * case below, where SQL's actual default is RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+ * — which includes every row tied with the current one, not just rows up to its array position.
+ * Omitting it keeps the old purely-positional behavior (used by direct/unit-test callers that
+ * don't have peer information available).
  */
 export function resolveFrameBounds(
   idx: number,
   length: number,
   frame?: WindowFrame,
-  hasOrderBy = false
+  hasOrderBy = false,
+  peerGroupEnd?: number
 ): { start: number; end: number } {
   if (!frame) {
     if (hasOrderBy) {
-      // Default: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-      return { start: 0, end: idx };
+      // Default: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW (peer-aware)
+      return { start: 0, end: peerGroupEnd !== undefined ? peerGroupEnd : idx };
     } else {
       // Default: ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
       return { start: 0, end: length - 1 };
@@ -76,6 +85,23 @@ export function resolveFrameBounds(
 }
 
 /**
+ * For a partition already sorted by ORDER BY, computes each row's peer-group end index: the
+ * last index of the contiguous run of rows tied with it on every ORDER BY column (via the same
+ * `arePeers` helper RANK/DENSE_RANK/PERCENT_RANK already use). One O(n) backward pass — the
+ * result is non-decreasing as the row index increases (constant within a tied group, only ever
+ * jumps up at a group boundary), which is what keeps the O(n) frame-bounds sweeps in
+ * ./functions valid when this is fed into resolveFrameBounds.
+ */
+function computePeerGroupEnds(items: PartitionItem[], orderBy?: WindowQuery["orderBy"]): number[] {
+  const n = items.length;
+  const ends = new Array<number>(n);
+  for (let i = n - 1; i >= 0; i--) {
+    ends[i] = (i === n - 1 || !arePeers(items[i].row, items[i + 1].row, orderBy)) ? i : ends[i + 1];
+  }
+  return ends;
+}
+
+/**
  * Executes a single window query over the cloned dataset rows.
  */
 function executeSingleQuery(data: DataRow[], query: WindowQuery): DataRow[] {
@@ -84,11 +110,15 @@ function executeSingleQuery(data: DataRow[], query: WindowQuery): DataRow[] {
 
   partitions.forEach((items) => {
     const len = items.length;
-    
+
     // 1. Precompute ranking outputs if applicable
     let ranks: number[] = [];
     const hasOrderBy = !!query.orderBy && query.orderBy.length > 0;
-    
+
+    // Peer-group ends for the no-explicit-frame default (SQL's implicit RANGE UNBOUNDED
+    // PRECEDING .. CURRENT ROW). Only needed there — an explicit ROWS frame stays positional.
+    const peerGroupEnds = hasOrderBy && !query.frame ? computePeerGroupEnds(items, query.orderBy) : null;
+
     switch (query.functionType) {
       case "ROW_NUMBER":
         ranks = computeRowNumber(items);
@@ -120,7 +150,7 @@ function executeSingleQuery(data: DataRow[], query: WindowQuery): DataRow[] {
       query.functionType === "WINDOW_MIN" ||
       query.functionType === "WINDOW_MAX"
     ) {
-      const bounds = items.map((_, j) => resolveFrameBounds(j, len, query.frame, hasOrderBy));
+      const bounds = items.map((_, j) => resolveFrameBounds(j, len, query.frame, hasOrderBy, peerGroupEnds?.[j]));
       switch (query.functionType) {
         case "RUNNING_TOTAL":
           cumulativeResults = computeRunningTotals(items, targetCol, bounds);
@@ -164,7 +194,7 @@ function executeSingleQuery(data: DataRow[], query: WindowQuery): DataRow[] {
           break;
         default: {
           // Resolve bounds for FIRST_VALUE / LAST_VALUE (single-index lookups, no rescan)
-          const { start, end } = resolveFrameBounds(j, len, query.frame, hasOrderBy);
+          const { start, end } = resolveFrameBounds(j, len, query.frame, hasOrderBy, peerGroupEnds?.[j]);
 
           if (query.functionType === "FIRST_VALUE") {
             val = computeFirstValue(items, targetCol, start);

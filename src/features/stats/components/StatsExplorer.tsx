@@ -78,7 +78,8 @@ export const StatsExplorer: React.FC = () => {
 
     return statsEngine.calculateDatasetStats(syntheticDataset, {
       outlierMethod,
-      outlierThreshold
+      outlierThreshold,
+      isFullDataset: filteredData.length === activeDataset.data.length
     });
   }, [activeDataset, filteredData, outlierMethod, outlierThreshold]);
 

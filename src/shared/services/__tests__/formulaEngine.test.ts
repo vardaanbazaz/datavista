@@ -2,6 +2,113 @@ import { describe, it, expect } from "vitest";
 import { formulaEngine } from "../formulaEngine";
 import { Dataset } from "../../types";
 
+describe("formulaEngine.evaluateCalculatedFields - stale column reconciliation (backlog item 3)", () => {
+  it("strips the materialized column when the LAST calculated field is deleted", () => {
+    // Simulates the post-deletion state: calculatedFields is now empty, but dataset.data
+    // and metadata still carry the previously materialized 'Diff' column (role: 'calculated')
+    // from before the field was removed.
+    const dataset: Dataset = {
+      id: "ds1",
+      name: "test",
+      data: [
+        { A: 10, B: 4, Diff: 6 },
+        { A: 20, B: 5, Diff: 15 },
+      ],
+      columns: ["A", "B", "Diff"],
+      columnTypes: { A: "numeric", B: "numeric", Diff: "numeric" },
+      calculatedFields: [], // field deleted from config
+      metadata: {
+        datasetId: "ds1",
+        name: "test",
+        createdAt: 0,
+        updatedAt: 0,
+        rowCount: 2,
+        columnCount: 3,
+        originalFileName: "test.csv",
+        originalFileType: "text/csv",
+        parsingStatistics: { processingTimeMs: 0 },
+        version: 1,
+        columns: [
+          {
+            id: "ds1_A", name: "A", displayName: "A", originalHeader: "A",
+            inferredDataType: "numeric", nullableStatus: false,
+            uniqueValueCount: 2, missingValueCount: 0, role: "measure", allIntegerValues: true,
+          },
+          {
+            id: "ds1_B", name: "B", displayName: "B", originalHeader: "B",
+            inferredDataType: "numeric", nullableStatus: false,
+            uniqueValueCount: 2, missingValueCount: 0, role: "measure", allIntegerValues: true,
+          },
+          {
+            id: "ds1_Diff", name: "Diff", displayName: "Diff", originalHeader: "Diff",
+            inferredDataType: "numeric", nullableStatus: false,
+            uniqueValueCount: 2, missingValueCount: 0, role: "calculated", allIntegerValues: true,
+          },
+        ],
+      },
+    };
+
+    const result = formulaEngine.evaluateCalculatedFields(dataset);
+
+    expect(result.columns).not.toContain("Diff");
+    expect(result.columnTypes.Diff).toBeUndefined();
+    expect(result.data.every((row) => !("Diff" in row))).toBe(true);
+    expect(result.metadata!.columns.some((c) => c.name === "Diff")).toBe(false);
+  });
+
+  it("still recomputes a renamed/kept field correctly while dropping an unrelated removed one", () => {
+    const dataset: Dataset = {
+      id: "ds1",
+      name: "test",
+      data: [{ A: 10, B: 4, Diff: 999, Kept: 999 }], // both stale from a prior evaluation
+      columns: ["A", "B", "Diff", "Kept"],
+      columnTypes: { A: "numeric", B: "numeric", Diff: "numeric", Kept: "numeric" },
+      calculatedFields: [{ name: "Kept", expression: "[A] + [B]" }], // 'Diff' was removed
+      metadata: {
+        datasetId: "ds1",
+        name: "test",
+        createdAt: 0,
+        updatedAt: 0,
+        rowCount: 1,
+        columnCount: 4,
+        originalFileName: "test.csv",
+        originalFileType: "text/csv",
+        parsingStatistics: { processingTimeMs: 0 },
+        version: 1,
+        columns: [
+          {
+            id: "ds1_A", name: "A", displayName: "A", originalHeader: "A",
+            inferredDataType: "numeric", nullableStatus: false,
+            uniqueValueCount: 1, missingValueCount: 0, role: "measure", allIntegerValues: true,
+          },
+          {
+            id: "ds1_B", name: "B", displayName: "B", originalHeader: "B",
+            inferredDataType: "numeric", nullableStatus: false,
+            uniqueValueCount: 1, missingValueCount: 0, role: "measure", allIntegerValues: true,
+          },
+          {
+            id: "ds1_Diff", name: "Diff", displayName: "Diff", originalHeader: "Diff",
+            inferredDataType: "numeric", nullableStatus: false,
+            uniqueValueCount: 1, missingValueCount: 0, role: "calculated", allIntegerValues: true,
+          },
+          {
+            id: "ds1_Kept", name: "Kept", displayName: "Kept", originalHeader: "Kept",
+            inferredDataType: "numeric", nullableStatus: false,
+            uniqueValueCount: 1, missingValueCount: 0, role: "calculated", allIntegerValues: true,
+          },
+        ],
+      },
+    };
+
+    const result = formulaEngine.evaluateCalculatedFields(dataset);
+
+    expect(result.columns).not.toContain("Diff");
+    expect(result.columns).toContain("Kept");
+    expect(result.data[0].Diff).toBeUndefined();
+    expect(result.data[0].Kept).toBe(14); // freshly recomputed, not the stale 999
+  });
+});
+
 describe("formulaEngine.evaluateCalculatedFields - NaN normalization (audit #16)", () => {
   it("writes null, not NaN, when a calculated field produces a non-numeric result", () => {
     const dataset: Dataset = {

@@ -65,10 +65,10 @@ export function calculateMode(values: number[]): number[] {
 export function computeDescriptive(
   allRawValues: unknown[],
   metadata?: ColumnMetadata,
-  totalRowCount?: number
+  isFullDataset?: boolean
 ): DescriptiveStats {
   const totalCount = allRawValues.length;
-  const isFullDataset = metadata && totalRowCount !== undefined && totalCount === totalRowCount;
+  const useCachedMetadata = Boolean(metadata) && isFullDataset === true;
 
   const numericValues: number[] = [];
   let rawMissingCount = 0;
@@ -87,9 +87,9 @@ export function computeDescriptive(
   }
 
   const validCount = numericValues.length;
-  const missingCount = isFullDataset && metadata.missingValueCount !== undefined ? metadata.missingValueCount : rawMissingCount;
+  const missingCount = useCachedMetadata && metadata!.missingValueCount !== undefined ? metadata!.missingValueCount : rawMissingCount;
   const nullPercentage = totalCount > 0 ? (missingCount / totalCount) * 100 : 0;
-  const uniqueCount = isFullDataset && metadata.uniqueValueCount !== undefined ? metadata.uniqueValueCount : uniqueSet.size;
+  const uniqueCount = useCachedMetadata && metadata!.uniqueValueCount !== undefined ? metadata!.uniqueValueCount : uniqueSet.size;
 
   if (validCount === 0) {
     return {
@@ -115,8 +115,8 @@ export function computeDescriptive(
     };
   }
 
-  const min = isFullDataset && metadata.minimumValue !== undefined ? metadata.minimumValue : Math.min(...numericValues);
-  const max = isFullDataset && metadata.maximumValue !== undefined ? metadata.maximumValue : Math.max(...numericValues);
+  const min = useCachedMetadata && metadata!.minimumValue !== undefined ? metadata!.minimumValue : Math.min(...numericValues);
+  const max = useCachedMetadata && metadata!.maximumValue !== undefined ? metadata!.maximumValue : Math.max(...numericValues);
   const range = max - min;
 
   const sum = numericValues.reduce((s, v) => s + v, 0);

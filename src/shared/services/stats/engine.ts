@@ -12,7 +12,7 @@ export const statsEngine = {
    */
   calculateDatasetStats(
     dataset: Dataset,
-    options?: { outlierMethod?: 'iqr' | 'zscore'; outlierThreshold?: number }
+    options?: { outlierMethod?: 'iqr' | 'zscore'; outlierThreshold?: number; isFullDataset?: boolean }
   ): StatsResultModel {
     const descriptive: Record<string, DescriptiveStats> = {};
     const outliers: Record<string, OutlierInfo> = {};
@@ -27,7 +27,7 @@ export const statsEngine = {
       const rawValues = dataset.data.map(row => row[col]);
       const colMeta = dataset.metadata?.columns.find(c => c.name === col);
 
-      descriptive[col] = computeDescriptive(rawValues, colMeta, dataset.data.length);
+      descriptive[col] = computeDescriptive(rawValues, colMeta, options?.isFullDataset);
       outliers[col] = computeOutliers(rawValues, options?.outlierMethod ?? 'iqr', {
         threshold: options?.outlierThreshold
       });

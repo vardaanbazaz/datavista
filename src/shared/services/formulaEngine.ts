@@ -703,36 +703,54 @@ export const formulaEngine = {
    * Evaluates all calculated fields row-by-row and appends them to dataset properties + metadata.
    */
   evaluateCalculatedFields(dataset: Dataset): Dataset {
-    if (!dataset.calculatedFields || dataset.calculatedFields.length === 0) {
+    const currentFields = dataset.calculatedFields || [];
+    const currentNames = new Set(currentFields.map(f => f.name));
+
+    // Prior calculated-field column names, identified via the dedicated 'calculated'
+    // metadata role (mirrors windowEngine.evaluate's reconciliation). Using this instead
+    // of the current field list is what lets a removed field's stale materialized column
+    // get stripped even when currentFields is now empty (deleting the last calculated
+    // field used to early-return here before ever reconciling columns).
+    const priorCalculatedNames = new Set(
+      (dataset.metadata?.columns || []).filter(c => c.role === 'calculated').map(c => c.name)
+    );
+
+    if (currentFields.length === 0 && priorCalculatedNames.size === 0) {
       return dataset;
     }
 
     // 1. Resolve sorting order
     let sortedFields: CalculatedField[];
     try {
-      sortedFields = this.resolveEvaluationOrder(dataset.columns, dataset.calculatedFields);
+      sortedFields = this.resolveEvaluationOrder(dataset.columns, currentFields);
     } catch (e) {
       console.error("Failed to resolve calculations order due to cycle:", e);
       return dataset; // Abort calculations on cycle to avoid infinite loops
     }
 
     // 2. Setup baseline columns to reset recalculations (clean state)
-    // We filter out any previous calculated columns from the data row keys
+    // Strip both stale (removed) and current (about-to-be-recomputed) calculated
+    // columns from the data row keys.
     const rawColumnsSet = new Set(dataset.columns);
-    const calculatedFieldNames = dataset.calculatedFields.map(f => f.name);
+    const reconciledCalculatedNames = new Set([...priorCalculatedNames, ...currentNames]);
 
     const cleanData = dataset.data.map(row => {
       const cleanRow: DataRow = {};
       Object.keys(row).forEach(key => {
-        if (rawColumnsSet.has(key) && !calculatedFieldNames.includes(key)) {
+        if (rawColumnsSet.has(key) && !reconciledCalculatedNames.has(key)) {
           cleanRow[key] = row[key];
         }
       });
       return cleanRow;
     });
 
-    const evaluatedColumns = [...dataset.columns];
-    const evaluatedColumnTypes = { ...dataset.columnTypes };
+    const evaluatedColumns = dataset.columns.filter(c => !priorCalculatedNames.has(c) || currentNames.has(c));
+    const evaluatedColumnTypes: Record<string, 'numeric' | 'categorical' | 'date'> = {};
+    for (const [k, v] of Object.entries(dataset.columnTypes)) {
+      if (!priorCalculatedNames.has(k) || currentNames.has(k)) {
+        evaluatedColumnTypes[k] = v;
+      }
+    }
 
     // Initialize/reset metadata columns mapping
     const metadataColumnsMap = new Map<string, ColumnMetadata>();

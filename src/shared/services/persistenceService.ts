@@ -26,6 +26,20 @@ function createDebouncer(delay: number) {
   };
 }
 
+async function restorePivotConfig(datasetId: string | null | undefined) {
+  if (!datasetId) {
+    usePivotStore.setState({ pivotConfig: null });
+    return;
+  }
+  try {
+    const pref = await db.uiState.get(`pivotConfig::${datasetId}`);
+    usePivotStore.setState({ pivotConfig: (pref && pref.value) || null });
+  } catch (e) {
+    console.error("Failed to load pivot config:", e);
+    usePivotStore.setState({ pivotConfig: null });
+  }
+}
+
 function isQuotaExceededError(e: unknown): boolean {
   const name = (e as { name?: string } | undefined)?.name;
   const innerName = (e as { inner?: { name?: string } } | undefined)?.inner?.name;
@@ -169,6 +183,7 @@ export const persistenceService = {
         const activeDataset = evaluatedDatasets.find((d) => d.id === activeDashboard.datasetId);
         if (activeDataset) {
           useDatasetStore.setState({ activeDataset });
+          await restorePivotConfig(activeDataset.id);
           const filterState = activeDashboard.settings?.filterState || {
             categoricalFilters: {},
             dateRangeFilters: {},
@@ -199,6 +214,7 @@ export const persistenceService = {
         const activeDataset = evaluatedDatasets.find((d) => d.id === activeDatasetId);
         if (activeDataset) {
           useDatasetStore.setState({ activeDataset });
+          await restorePivotConfig(activeDataset.id);
           // Hydrate active filters
           const activeFilters = validFiltersMap[activeDataset.id];
           if (activeFilters) {
@@ -294,21 +310,7 @@ export const persistenceService = {
         }
 
         // Restore pivot configuration for the new active dataset
-        if (currentActiveDatasetId) {
-          try {
-            const pref = await db.uiState.get(`pivotConfig::${currentActiveDatasetId}`);
-            if (pref && pref.value) {
-              usePivotStore.setState({ pivotConfig: pref.value });
-            } else {
-              usePivotStore.setState({ pivotConfig: null });
-            }
-          } catch (e) {
-            console.error("Failed to load pivot config:", e);
-            usePivotStore.setState({ pivotConfig: null });
-          }
-        } else {
-          usePivotStore.setState({ pivotConfig: null });
-        }
+        await restorePivotConfig(currentActiveDatasetId);
 
         if (state.activeDataset) {
           try {
