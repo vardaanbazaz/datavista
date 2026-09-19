@@ -10,6 +10,7 @@ import { useFilterStore } from "@/store/filterStore";
 import { useChartStore } from "@/store/chartStore";
 import { exportChartAsPNG, exportChartAsSVG, exportDataAsCSV, generatePDFReport } from "@/shared/utils/exportUtils";
 import { useToast } from "@/shared/hooks/use-toast";
+import { ChartVisualization } from "@/features/charts/components/ChartVisualization";
 
 export function ExportPanel() {
   const dataset = useDatasetStore((state) => state.activeDataset);
@@ -97,6 +98,29 @@ export function ExportPanel() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Off-screen chart staging: exportChartAsPNG/SVG and generatePDFReport (exportUtils.ts)
+          locate charts via document.querySelector('[data-chart-id]'), which only exists while
+          a ChartVisualization for that chart is mounted somewhere. The Overview tab mounts one
+          per dashboard chart, but Export can be reached independently of Overview and covers ALL
+          of the dataset's charts (see `charts` above), not just the active dashboard's — so those
+          nodes aren't guaranteed to exist. Render every exportable chart off-screen here instead,
+          scoped to this panel's own mount lifetime (i.e. only while the Export tab is open, not
+          for the whole session). `position: fixed` keeps it out of normal layout/scroll flow, and
+          each chart gets an explicit pixel size so ChartVisualization's mount-time width read
+          (see ChartVisualization.tsx's ResizeObserver effect) has a real value to draw against
+          immediately — no waiting on async layout before it's capturable. */}
+      <div
+        aria-hidden="true"
+        className="fixed top-0 left-0 pointer-events-none"
+        style={{ transform: "translateX(-10000px)" }}
+      >
+        {charts.map((chart) => (
+          <div key={chart.id} className="w-[640px] h-[360px]">
+            <ChartVisualization chart={chart} />
+          </div>
+        ))}
+      </div>
+
       <div className="flex items-center gap-2">
         <Download className="h-6 w-6" />
         <h2 className="text-3xl font-bold">Export Dashboard</h2>

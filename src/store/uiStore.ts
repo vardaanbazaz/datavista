@@ -30,6 +30,7 @@ interface UiState {
    * datasets or reloading doesn't re-prompt once the user has consented once.
    */
   hasAcknowledgedAiInsights: boolean;
+  isSnapshotManagerOpen: boolean;
   setActiveView: (view: ViewType) => void;
   setShowWelcome: (show: boolean) => void;
   setIsLoading: (loading: boolean) => void;
@@ -43,6 +44,7 @@ interface UiState {
   startTour: () => void;
   resetTour: () => void;
   setHasAcknowledgedAiInsights: (acknowledged: boolean) => void;
+  setIsSnapshotManagerOpen: (open: boolean) => void;
 }
 
 export const useUiStore = create<UiState>()(
@@ -59,6 +61,7 @@ export const useUiStore = create<UiState>()(
       hasSeenTour: false,
       runTour: false,
       hasAcknowledgedAiInsights: false,
+      isSnapshotManagerOpen: false,
       setActiveView: (view) => set({ activeView: view }),
       setShowWelcome: (show) => set({ showWelcome: show }),
       setIsLoading: (loading) => set({ isLoading: loading }),
@@ -72,6 +75,7 @@ export const useUiStore = create<UiState>()(
       startTour: () => set({ runTour: true }),
       resetTour: () => set({ hasSeenTour: false, runTour: true }),
       setHasAcknowledgedAiInsights: (acknowledged) => set({ hasAcknowledgedAiInsights: acknowledged }),
+      setIsSnapshotManagerOpen: (open) => set({ isSnapshotManagerOpen: open }),
     }),
     {
       name: 'datavista-ui-storage',

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { Dashboard, Query, GlobalFilter, FilterState } from "@/shared/types";
+import { Dashboard, Query, GlobalFilter, FilterState, FilterCondition } from "@/shared/types";
 import { KPICardConfig } from "@/features/kpi/types";
 import { toast } from "@/shared/hooks/use-toast";
 import { useDatasetStore } from "@/store/datasetStore";
@@ -76,11 +76,27 @@ interface DashboardState {
 
 // Builds the same Query shape loadDashboard (and the undo/redo dataset-context
 // restore) need from a persisted/snapshotted FilterState, so the two can't drift.
-function buildFilterQuery(filterState: FilterState): Query {
+// FilterPanel.tsx uses this same function to apply its filters, for the same reason.
+export function buildFilterQuery(filterState: FilterState): Query {
+  const conditions: FilterCondition[] = [];
+
+  Object.entries(filterState.numericRangeFilters || {}).forEach(([column, range]) => {
+    if (range.min !== undefined || range.max !== undefined) {
+      conditions.push({ column, operator: 'between', value: { start: range.min, end: range.max } });
+    }
+  });
+
+  Object.entries(filterState.textSearchFilters || {}).forEach(([column, text]) => {
+    if (text && text.trim()) {
+      conditions.push({ column, operator: 'contains', value: text.trim() });
+    }
+  });
+
   return {
     filters: {
       categoricalFilters: filterState.categoricalFilters,
       dateRangeFilters: filterState.dateRangeFilters,
+      conditions: conditions.length > 0 ? conditions : undefined,
     },
     groupBy: filterState.groupByColumn ? {
       column: filterState.groupByColumn,
@@ -106,6 +122,15 @@ function cloneFilterState(filterState: FilterState): FilterState {
   return {
     categoricalFilters: JSON.parse(JSON.stringify(filterState.categoricalFilters || {})),
     dateRangeFilters,
+    // Optional (unlike categoricalFilters/dateRangeFilters above), so only clone them if the
+    // source actually had them — forcing them to `{}` here would make every cloned FilterState
+    // structurally different from ones that never set them, breaking exact-equality comparisons.
+    numericRangeFilters: filterState.numericRangeFilters
+      ? JSON.parse(JSON.stringify(filterState.numericRangeFilters))
+      : undefined,
+    textSearchFilters: filterState.textSearchFilters
+      ? JSON.parse(JSON.stringify(filterState.textSearchFilters))
+      : undefined,
     groupByColumn: filterState.groupByColumn,
     groupByPeriod: filterState.groupByPeriod,
   };

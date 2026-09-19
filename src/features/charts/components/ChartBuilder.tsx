@@ -182,7 +182,13 @@ export function ChartBuilder() {
       case 'bubble':
         return xAxis && yAxis && sizeBy;
       default:
-        return false;
+        // Plugin-registered chart types (see chartTypes above) carry no required-fields/
+        // validation metadata of their own — CustomChartTypeDefinition (shared/types/plugins.ts)
+        // is just { type, label, description?, iconName?, component }. The plugin's own
+        // component is the only thing that knows how to interpret a ChartConfig for its
+        // rendering, so there's nothing more to validate here beyond the title (checked above)
+        // and that this actually is a registered plugin type, not a typo/unknown value.
+        return pluginRegistry.getCustomChart(chartType) !== undefined;
     }
   };
 

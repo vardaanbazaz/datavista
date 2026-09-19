@@ -183,6 +183,9 @@ export const WindowExplorer: React.FC = () => {
   };
 
   const needsTargetCol = functionType !== "ROW_NUMBER" && functionType !== "RANK" && functionType !== "DENSE_RANK" && functionType !== "PERCENT_RANK" && functionType !== "NTILE";
+  // LAG/LEAD are offset-based (see engine.ts's LAG/LEAD case, which reads only offset/defaultValue),
+  // so a window frame doesn't apply to them structurally — the control is hidden, not just disabled.
+  const supportsCustomFrame = needsTargetCol && functionType !== "LAG" && functionType !== "LEAD";
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start w-full animate-fade-in">
@@ -390,7 +393,7 @@ export const WindowExplorer: React.FC = () => {
               <Separator className="bg-border/60" />
 
               {/* Window Frame */}
-              {needsTargetCol && (
+              {supportsCustomFrame && (
                 <div className="space-y-3.5 select-none">
                   <div className="flex items-center space-x-2">
                     <Checkbox

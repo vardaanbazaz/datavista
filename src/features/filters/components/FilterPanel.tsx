@@ -9,13 +9,15 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/shared/components/ui/
 import { Checkbox } from "@/shared/components/ui/checkbox";
 import { ScrollArea } from "@/shared/components/ui/scroll-area";
 import { Separator } from "@/shared/components/ui/separator";
-import { Filter, CalendarIcon, X, RotateCcw } from "lucide-react";
+import { Input } from "@/shared/components/ui/input";
+import { Filter, CalendarIcon, X, RotateCcw, Search } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/shared/lib/utils";
-import { Dataset, DataRow, FilterState, Query } from "@/shared/types";
+import { Dataset, DataRow, FilterState } from "@/shared/types";
 import { queryEngine } from "@/shared/services/queryEngine";
 import { useFilterStore } from "@/store/filterStore";
 import { useDatasetStore } from "@/store/datasetStore";
+import { buildFilterQuery } from "@/features/dashboards/store/dashboardStore";
 
 export function FilterPanel() {
   const dataset = useDatasetStore((state) => state.activeDataset);
@@ -71,22 +73,8 @@ export function FilterPanel() {
   // Apply filters and grouping
   useEffect(() => {
     if (!dataset) return;
-    
-    const query: Query = {
-      filters: {
-        categoricalFilters: filters.categoricalFilters,
-        dateRangeFilters: filters.dateRangeFilters,
-      },
-      groupBy: filters.groupByColumn ? {
-        column: filters.groupByColumn,
-        period: filters.groupByPeriod,
-      } : undefined,
-      pagination: {
-        pageSize: 'all',
-      }
-    };
 
-    const queryResult = queryEngine.execute(dataset, query);
+    const queryResult = queryEngine.execute(dataset, buildFilterQuery(filters));
     setFiltersChange(queryResult.rows, filters);
   }, [filters, dataset, setFiltersChange]);
 
@@ -125,14 +113,39 @@ export function FilterPanel() {
     }));
   };
 
+  const updateNumericRangeFilter = (column: string, bound: 'min' | 'max', value: number | undefined) => {
+    setFilters(prev => ({
+      ...prev,
+      numericRangeFilters: {
+        ...prev.numericRangeFilters,
+        [column]: {
+          ...prev.numericRangeFilters?.[column],
+          [bound]: value
+        }
+      }
+    }));
+  };
+
+  const updateTextSearchFilter = (column: string, text: string) => {
+    setFilters(prev => ({
+      ...prev,
+      textSearchFilters: {
+        ...prev.textSearchFilters,
+        [column]: text
+      }
+    }));
+  };
+
   const clearAllFilters = () => {
     setFilters({
       categoricalFilters: {},
       dateRangeFilters: {},
+      numericRangeFilters: {},
+      textSearchFilters: {},
     });
   };
 
-  const removeFilter = (type: 'categorical' | 'dateRange', column: string, value?: string) => {
+  const removeFilter = (type: 'categorical' | 'dateRange' | 'numericRange' | 'textSearch', column: string, value?: string) => {
     setFilters(prev => {
       if (type === 'categorical' && value) {
         return {
@@ -148,6 +161,18 @@ export function FilterPanel() {
           ...prev,
           dateRangeFilters: rest
         };
+      } else if (type === 'numericRange') {
+        const { [column]: removed, ...rest } = prev.numericRangeFilters || {};
+        return {
+          ...prev,
+          numericRangeFilters: rest
+        };
+      } else if (type === 'textSearch') {
+        const { [column]: removed, ...rest } = prev.textSearchFilters || {};
+        return {
+          ...prev,
+          textSearchFilters: rest
+        };
       }
       return prev;
     });
@@ -160,8 +185,15 @@ export function FilterPanel() {
     return values;
   };
 
-  const activeFiltersCount = Object.values(filters.categoricalFilters).flat().length + 
-    Object.keys(filters.dateRangeFilters).length;
+  const activeNumericRangeFilters = Object.entries(filters.numericRangeFilters || {})
+    .filter(([, range]) => range.min !== undefined || range.max !== undefined);
+  const activeTextSearchFilters = Object.entries(filters.textSearchFilters || {})
+    .filter(([, text]) => text && text.trim().length > 0);
+
+  const activeFiltersCount = Object.values(filters.categoricalFilters).flat().length +
+    Object.keys(filters.dateRangeFilters).length +
+    activeNumericRangeFilters.length +
+    activeTextSearchFilters.length;
 
   return (
     <Card className="glass">
@@ -207,9 +239,27 @@ export function FilterPanel() {
               {Object.entries(filters.dateRangeFilters).map(([column, range]) => (
                 <Badge key={column} variant="outline" className="flex items-center gap-1">
                   {column}: {range.start ? format(range.start, 'MMM dd') : '...'} - {range.end ? format(range.end, 'MMM dd') : '...'}
-                  <X 
-                    className="w-3 h-3 cursor-pointer" 
+                  <X
+                    className="w-3 h-3 cursor-pointer"
                     onClick={() => removeFilter('dateRange', column)}
+                  />
+                </Badge>
+              ))}
+              {activeNumericRangeFilters.map(([column, range]) => (
+                <Badge key={column} variant="outline" className="flex items-center gap-1">
+                  {column}: {range.min ?? '-∞'} to {range.max ?? '∞'}
+                  <X
+                    className="w-3 h-3 cursor-pointer"
+                    onClick={() => removeFilter('numericRange', column)}
+                  />
+                </Badge>
+              ))}
+              {activeTextSearchFilters.map(([column, text]) => (
+                <Badge key={column} variant="outline" className="flex items-center gap-1">
+                  {column} contains "{text}"
+                  <X
+                    className="w-3 h-3 cursor-pointer"
+                    onClick={() => removeFilter('textSearch', column)}
                   />
                 </Badge>
               ))}
@@ -223,10 +273,20 @@ export function FilterPanel() {
           {categoricalColumns.map(column => {
             const uniqueValues = getUniqueValues(column);
             const selectedValues = filters.categoricalFilters[column] || [];
+            const searchText = filters.textSearchFilters?.[column] || '';
 
             return (
               <div key={column} className="space-y-3">
                 <Label className="font-medium">{column}</Label>
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input
+                    placeholder={`Search ${column}...`}
+                    value={searchText}
+                    onChange={(e) => updateTextSearchFilter(column, e.target.value)}
+                    className="h-8 pl-7 text-xs"
+                  />
+                </div>
                 <ScrollArea className="h-32 border rounded-md p-2">
                   <div className="space-y-2">
                     {uniqueValues.map(value => (
@@ -312,6 +372,42 @@ export function FilterPanel() {
                       </PopoverContent>
                     </Popover>
                   </div>
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Numeric Range Filters */}
+          {numericColumns.map(column => {
+            const range = filters.numericRangeFilters?.[column] || {};
+
+            return (
+              <div key={column} className="space-y-3">
+                <Label className="font-medium">{column} Range</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    placeholder="Min"
+                    value={range.min ?? ''}
+                    onChange={(e) => updateNumericRangeFilter(
+                      column,
+                      'min',
+                      e.target.value === '' ? undefined : Number(e.target.value)
+                    )}
+                    className="h-9 text-sm"
+                  />
+                  <span className="text-xs text-muted-foreground shrink-0">to</span>
+                  <Input
+                    type="number"
+                    placeholder="Max"
+                    value={range.max ?? ''}
+                    onChange={(e) => updateNumericRangeFilter(
+                      column,
+                      'max',
+                      e.target.value === '' ? undefined : Number(e.target.value)
+                    )}
+                    className="h-9 text-sm"
+                  />
                 </div>
               </div>
             );

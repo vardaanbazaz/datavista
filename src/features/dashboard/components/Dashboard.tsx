@@ -46,6 +46,7 @@ export function Dashboard() {
   // (see uiStore.ts) - gating on that one let the dashboard render before actual data
   // had loaded.
   const isDataHydrated = useUiStore((state) => state.isDataHydrated);
+  const setIsSnapshotManagerOpen = useUiStore((state) => state.setIsSnapshotManagerOpen);
 
   const activeDataset = useDatasetStore((state) => state.activeDataset);
   const uploadDataset = useDatasetStore((state) => state.uploadDataset);
@@ -61,7 +62,7 @@ export function Dashboard() {
 
     const handleOpenSnapshots = () => {
       setActiveView("overview");
-      // Trigger snapshot manager open via custom event or state
+      setIsSnapshotManagerOpen(true);
     };
 
     const handleExportPdf = () => {
@@ -76,7 +77,7 @@ export function Dashboard() {
       window.removeEventListener("datavista:open-snapshots", handleOpenSnapshots);
       window.removeEventListener("datavista:export-pdf", handleExportPdf);
     };
-  }, [setActiveView]);
+  }, [setActiveView, setIsSnapshotManagerOpen]);
 
   // Initialize persistence on mount
   useEffect(() => {

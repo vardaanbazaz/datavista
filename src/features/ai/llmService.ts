@@ -1,5 +1,22 @@
 import { AIPromptContext } from "./types";
 import { LlmProvider } from "@/store/uiStore";
+import { functionsByCategory } from "@/shared/services/formula/library/registry";
+import { FunctionDefinition } from "@/shared/services/formula/library/types";
+
+/** Renders a function's registry entry as an LLM-facing call signature, e.g. `ROUND(number, decimals?)`. */
+function formatFunctionSignature(fn: FunctionDefinition): string {
+  const argNames = fn.args.map((arg) => (arg.optional ? `${arg.name}?` : arg.name));
+  if (fn.variadic) argNames.push("...");
+  return `${fn.name}(${argNames.join(", ")})`;
+}
+
+/**
+ * Generated FROM formula/library's registry (not hand-written) so this can't drift out
+ * of sync with the actual available functions as they're added/removed/renamed.
+ */
+const FORMULA_FUNCTIONS_BLOCK = Object.entries(functionsByCategory)
+  .map(([category, fns]) => `${category}: ${fns.map(formatFunctionSignature).join(", ")}`)
+  .join("\n");
 
 export const SYSTEM_PROMPT = `
 You are the AI Data Translation Layer for DataVista analytics engine.
@@ -44,10 +61,8 @@ Response JSON Schema:
 }
 
 Formula Functions available:
-Math: SUM, AVG, MIN, MAX, ROUND, ABS, SQRT, CEIL, FLOOR, POWER, LOG
-String: CONCAT, UPPER, LOWER, LEN, SUBSTRING, TRIM
-Date: YEAR, MONTH, DAY, DATEDIFF, TODAY, DATEADD
-Logical: IF(condition, trueVal, falseVal), AND, OR, NOT
+${FORMULA_FUNCTIONS_BLOCK}
+Logical Operators (not functions, used infix/prefix): AND, OR, NOT — e.g. [A] > 5 AND NOT [B] == "Closed"
 Column syntax: Always wrap column names in square brackets like [Sales] or [Region].
 
 Strict Constraints:

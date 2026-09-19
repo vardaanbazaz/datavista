@@ -40,6 +40,10 @@ export interface ChartConfig {
 export interface FilterState {
   categoricalFilters: Record<string, string[]>;
   dateRangeFilters: Record<string, { start?: Date; end?: Date }>;
+  /** Optional so existing FilterState literals across the codebase don't need updating. */
+  numericRangeFilters?: Record<string, { min?: number; max?: number }>;
+  /** Per-column substring ("contains") search on categorical columns. */
+  textSearchFilters?: Record<string, string>;
   groupByColumn?: string;
   groupByPeriod?: 'day' | 'month' | 'year';
 }

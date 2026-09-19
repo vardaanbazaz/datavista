@@ -555,6 +555,74 @@ export function CommandPalette({
                       })}
                     </div>
                   )}
+
+                  {/* Templates Search Results */}
+                  {searchResults.templates.length > 0 && (
+                    <div className="space-y-1">
+                      <div className="px-2 py-1 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                        <LayoutTemplate className="h-3.5 w-3.5 text-primary" /> Templates ({searchResults.templates.length})
+                      </div>
+                      {searchResults.templates.map((item) => {
+                        const currentIndex = globalItemCounter++;
+                        const isSelected = selectedIndex === currentIndex;
+                        return (
+                          <div
+                            key={item.id}
+                            ref={(el) => { if (isSelected && el) el.scrollIntoView({ block: "nearest" }); }}
+                            onClick={() => handleSelectSearchResult(item)}
+                            className={`p-2.5 rounded-lg flex items-center justify-between cursor-pointer transition-colors text-sm ${
+                              isSelected
+                                ? "bg-primary/15 border border-primary/40 font-medium"
+                                : "hover:bg-accent/10 border border-transparent"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <LayoutTemplate className="h-4 w-4 text-purple-500 shrink-0" />
+                              <div className="min-w-0">
+                                <p className="truncate font-medium">{item.title}</p>
+                                <p className="text-xs text-muted-foreground truncate">{item.subtitle}</p>
+                              </div>
+                            </div>
+                            <ChevronRight className="h-4 w-4 text-muted-foreground/50 shrink-0" />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Saved Views Search Results */}
+                  {searchResults.views.length > 0 && (
+                    <div className="space-y-1">
+                      <div className="px-2 py-1 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                        <Bookmark className="h-3.5 w-3.5 text-primary" /> Saved Views ({searchResults.views.length})
+                      </div>
+                      {searchResults.views.map((item) => {
+                        const currentIndex = globalItemCounter++;
+                        const isSelected = selectedIndex === currentIndex;
+                        return (
+                          <div
+                            key={item.id}
+                            ref={(el) => { if (isSelected && el) el.scrollIntoView({ block: "nearest" }); }}
+                            onClick={() => handleSelectSearchResult(item)}
+                            className={`p-2.5 rounded-lg flex items-center justify-between cursor-pointer transition-colors text-sm ${
+                              isSelected
+                                ? "bg-primary/15 border border-primary/40 font-medium"
+                                : "hover:bg-accent/10 border border-transparent"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <Bookmark className="h-4 w-4 text-amber-500 shrink-0" />
+                              <div className="min-w-0">
+                                <p className="truncate font-medium">{item.title}</p>
+                                <p className="text-xs text-muted-foreground truncate">{item.subtitle}</p>
+                              </div>
+                            </div>
+                            <ChevronRight className="h-4 w-4 text-muted-foreground/50 shrink-0" />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
             </ScrollArea>

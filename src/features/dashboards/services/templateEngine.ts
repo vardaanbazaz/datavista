@@ -1,5 +1,12 @@
 import { Dataset, ChartConfig, Dashboard, DashboardTemplate, RequiredColumnSchema } from "@/shared/types";
 import { KPICardConfig } from "@/features/kpi/types";
+import { getEffectiveColumnType } from "@/shared/utils/columnType";
+
+export interface SchemaTypeMismatch {
+  name: string;
+  expectedType: RequiredColumnSchema["dataType"];
+  actualType: RequiredColumnSchema["dataType"];
+}
 
 export class TemplateEngine {
   /**
@@ -70,24 +77,33 @@ export class TemplateEngine {
   }
 
   /**
-   * Validate whether a target dataset possesses all required columns for a template
+   * Validate whether a target dataset possesses all required columns for a template,
+   * with the correct data type for each (through getEffectiveColumnType, so a user's
+   * manual numeric/categorical override on the target dataset is respected).
    */
   validateSchema(
     templateSchema: RequiredColumnSchema[],
     targetDataset: Dataset
-  ): { valid: boolean; missingColumns: string[] } {
+  ): { valid: boolean; missingColumns: string[]; typeMismatches: SchemaTypeMismatch[] } {
     const datasetColumns = new Set(targetDataset.columns || []);
     const missingColumns: string[] = [];
+    const typeMismatches: SchemaTypeMismatch[] = [];
 
     templateSchema.forEach((req) => {
       if (!datasetColumns.has(req.name)) {
         missingColumns.push(req.name);
+        return;
+      }
+      const actualType = getEffectiveColumnType(targetDataset, req.name);
+      if (actualType !== req.dataType) {
+        typeMismatches.push({ name: req.name, expectedType: req.dataType, actualType });
       }
     });
 
     return {
-      valid: missingColumns.length === 0,
+      valid: missingColumns.length === 0 && typeMismatches.length === 0,
       missingColumns,
+      typeMismatches,
     };
   }
 
@@ -101,9 +117,18 @@ export class TemplateEngine {
   ): { dashboard: Dashboard; charts: ChartConfig[] } {
     const schemaValidation = this.validateSchema(template.requiredSchema, targetDataset);
     if (!schemaValidation.valid) {
-      throw new Error(
-        `Target dataset "${targetDataset.name}" is missing required columns: ${schemaValidation.missingColumns.join(", ")}`
-      );
+      const problems: string[] = [];
+      if (schemaValidation.missingColumns.length > 0) {
+        problems.push(`missing required columns: ${schemaValidation.missingColumns.join(", ")}`);
+      }
+      if (schemaValidation.typeMismatches.length > 0) {
+        problems.push(
+          `wrong-type columns: ${schemaValidation.typeMismatches
+            .map((m) => `${m.name} (expected ${m.expectedType}, found ${m.actualType})`)
+            .join(", ")}`
+        );
+      }
+      throw new Error(`Target dataset "${targetDataset.name}" is schema-incompatible: ${problems.join("; ")}`);
     }
 
     const newDashboardId = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `dash-${Math.random().toString(36).substring(2, 9)}`;

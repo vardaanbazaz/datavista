@@ -23,6 +23,7 @@ import { SnapshotManager } from "@/features/dashboards/components/SnapshotManage
 import { useTemplateStore } from "@/features/dashboards/store/templateStore";
 import { templateEngine } from "@/features/dashboards/services/templateEngine";
 import { getEffectiveColumnType, getEffectiveColumnTypes } from "@/shared/utils/columnType";
+import { useUiStore } from "@/store/uiStore";
 
 export function DashboardSummary() {
   const dataset = useDatasetStore((state) => state.activeDataset);
@@ -46,7 +47,8 @@ export function DashboardSummary() {
   const [isKpiBuilderOpen, setIsKpiBuilderOpen] = useState(false);
   const [editKpi, setEditKpi] = useState<KPICardConfig | null>(null);
   const [isCreateTemplateOpen, setIsCreateTemplateOpen] = useState(false);
-  const [isSnapshotManagerOpen, setIsSnapshotManagerOpen] = useState(false);
+  const isSnapshotManagerOpen = useUiStore((state) => state.isSnapshotManagerOpen);
+  const setIsSnapshotManagerOpen = useUiStore((state) => state.setIsSnapshotManagerOpen);
 
 
   const activeDashboard = useMemo(() => {

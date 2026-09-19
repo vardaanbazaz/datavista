@@ -160,23 +160,39 @@ export function InstantiateTemplateModal({ isOpen, onClose }: InstantiateTemplat
                 {schemaValidation.valid ? (
                   <>
                     <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
-                    <span>Schema Compatible! All required columns are present in "{targetDataset.name}".</span>
+                    <span>Schema Compatible! All required columns are present in "{targetDataset.name}" with matching types.</span>
                   </>
                 ) : (
                   <>
                     <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
-                    <span>Schema Incompatible! Target dataset is missing required columns:</span>
+                    <span>Schema Incompatible!</span>
                   </>
                 )}
               </div>
 
-              {!schemaValidation.valid && (
-                <div className="flex flex-wrap gap-1 pl-6">
-                  {schemaValidation.missingColumns.map((col) => (
-                    <Badge key={col} variant="destructive" className="text-[10px]">
-                      {col}
-                    </Badge>
-                  ))}
+              {schemaValidation.missingColumns.length > 0 && (
+                <div className="space-y-1 pl-6">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider opacity-80">Missing columns</p>
+                  <div className="flex flex-wrap gap-1">
+                    {schemaValidation.missingColumns.map((col) => (
+                      <Badge key={col} variant="destructive" className="text-[10px]">
+                        {col}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {schemaValidation.typeMismatches.length > 0 && (
+                <div className="space-y-1 pl-6">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider opacity-80">Wrong type</p>
+                  <div className="flex flex-wrap gap-1">
+                    {schemaValidation.typeMismatches.map((m) => (
+                      <Badge key={m.name} variant="destructive" className="text-[10px]">
+                        {m.name}: expected {m.expectedType}, found {m.actualType}
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
               )}
 

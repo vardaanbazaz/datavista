@@ -12,9 +12,10 @@ import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
 import { Badge } from "@/shared/components/ui/badge";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/components/ui/tooltip";
-import { Sparkles, Key, Eye, EyeOff, Check, Cpu, HelpCircle } from "lucide-react";
+import { Sparkles, Key, Eye, EyeOff, Check, Cpu, HelpCircle, CloudOff } from "lucide-react";
 import { useUiStore, LlmProvider } from "@/store/uiStore";
 import { toast } from "@/shared/hooks/use-toast";
+import { providerDisplayName } from "@/features/ai/providerDisplayName";
 
 interface AiSettingsModalProps {
   isOpen?: boolean;
@@ -79,6 +80,24 @@ export function AiSettingsModal({ isOpen: externalIsOpen, onClose: externalOnClo
         </DialogHeader>
 
         <div className="space-y-5 mt-4">
+          {/* AI Active / Offline Status Banner — reflects the currently SAVED provider/key,
+              not the unsaved draft inputs below, so it never claims AI is active mid-edit. */}
+          {llmApiKey ? (
+            <div className="rounded-md border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 px-3 py-2 flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">
+                AI Active — {providerDisplayName(llmProvider)}
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/60 px-3 py-2 flex items-center gap-2">
+              <CloudOff className="h-4 w-4 text-zinc-500 dark:text-zinc-400 shrink-0" />
+              <p className="text-xs font-semibold text-zinc-600 dark:text-zinc-300">
+                Offline Mode — heuristic-based insights only
+              </p>
+            </div>
+          )}
+
           {/* Provider Selector */}
           <div className="space-y-2">
             <Label className="text-xs font-semibold flex items-center gap-1.5">

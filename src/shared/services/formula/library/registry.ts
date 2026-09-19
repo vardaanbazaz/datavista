@@ -14,6 +14,19 @@ export const allFunctions: FunctionDefinition[] = [
   ...logicalFunctions
 ];
 
+/**
+ * Same functions as `allFunctions`, grouped by category. Single source of truth for
+ * anything that needs to present the registry by category (e.g. the AI system prompt) —
+ * consumers should read through this instead of importing math.ts/string.ts/etc directly,
+ * so a function moved or added to a category can't drift out of sync elsewhere.
+ */
+export const functionsByCategory: Record<string, FunctionDefinition[]> = {
+  Math: mathFunctions,
+  String: stringFunctions,
+  Date: dateFunctions,
+  Logical: logicalFunctions,
+};
+
 // Register all functions into the map using uppercase names for case-insensitive lookup
 allFunctions.forEach((func) => {
   formulaRegistry.set(func.name.toUpperCase(), func);

@@ -70,6 +70,30 @@ export function isValidFilterState(obj: unknown): obj is FilterState {
   );
   if (!dateRangeValid) return false;
 
+  // Verify numericRangeFilters structure (optional)
+  if (f.numericRangeFilters !== undefined) {
+    if (typeof f.numericRangeFilters !== "object" || f.numericRangeFilters === null) return false;
+    const numericRangeValid = Object.entries(f.numericRangeFilters as Record<string, unknown>).every(
+      ([_, val]: [string, unknown]) => {
+        if (!val || typeof val !== "object") return false;
+        const v = val as { min?: unknown; max?: unknown };
+        const minValid = v.min === undefined || typeof v.min === "number";
+        const maxValid = v.max === undefined || typeof v.max === "number";
+        return minValid && maxValid;
+      }
+    );
+    if (!numericRangeValid) return false;
+  }
+
+  // Verify textSearchFilters structure (optional)
+  if (f.textSearchFilters !== undefined) {
+    if (typeof f.textSearchFilters !== "object" || f.textSearchFilters === null) return false;
+    const textSearchValid = Object.values(f.textSearchFilters as Record<string, unknown>).every(
+      (val) => typeof val === "string"
+    );
+    if (!textSearchValid) return false;
+  }
+
   // Optionals
   if (f.groupByColumn !== undefined && typeof f.groupByColumn !== "string") return false;
   if (
