@@ -113,11 +113,15 @@ Target Mode Preference: ${mode || 'auto'}
   `;
 
   if (provider === 'gemini') {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(apiKey.trim())}`;
+    // Key goes in the x-goog-api-key header (Google's documented alternative to the
+    // ?key= query param) — a query-param key is more likely to leak into provider
+    // access logs, browser history, or a TLS-inspecting proxy log.
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent`;
     const response = await fetchWithTimeout(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey.trim(),
       },
       body: JSON.stringify({
         contents: [
@@ -191,7 +195,6 @@ function generateOfflineFallback(context: AIPromptContext, mode?: 'query' | 'for
   // Find categorical vs numeric columns
   const catCol = columns.find(c => c.type === 'categorical')?.name || colNames[0] || 'Category';
   const numCol = columns.find(c => c.type === 'numeric')?.name || colNames[1] || 'Sales';
-  const secondNumCol = columns.filter(c => c.type === 'numeric')[1]?.name || numCol;
 
   if (mode === 'formula' || promptLower.includes('calculate') || promptLower.includes('margin') || promptLower.includes('ratio')) {
     if (promptLower.includes('margin') && colNames.includes('Profit') && colNames.includes('Sales')) {

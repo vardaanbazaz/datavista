@@ -1,6 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useMemo } from "react";
-import { ChartConfig } from "@/shared/types";
 import { useDatasetStore } from "@/store/datasetStore";
 import { useChartStore } from "@/store/chartStore";
 import { useDashboardStore } from "@/features/dashboards/store/dashboardStore";

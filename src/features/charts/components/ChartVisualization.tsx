@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import * as d3 from "d3";
-import { ChartConfig, Query, DataRow, FilterOperator } from "@/shared/types";
+import { ChartConfig, Query, FilterOperator } from "@/shared/types";
 import { useDatasetStore } from "@/store/datasetStore";
 import { useDashboardStore } from "@/features/dashboards/store/dashboardStore";
 import { useFilterStore } from "@/store/filterStore";
@@ -8,7 +8,7 @@ import { filterManager } from "@/features/dashboards/services/filterManager";
 import { queryEngine } from "@/shared/services/queryEngine";
 import { formattingEngine } from "@/shared/services/formattingEngine";
 import { useDrillStore } from "@/features/dashboards/store/drillStore";
-import { ArrowUp, GitFork, X, AlertTriangle } from "lucide-react";
+import { ArrowUp, GitFork, AlertTriangle } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import { Badge } from "@/shared/components/ui/badge";
 import { toast } from "@/shared/hooks/use-toast";

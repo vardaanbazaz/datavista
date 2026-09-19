@@ -329,7 +329,11 @@ export const queryEngine = {
           }
           return false;
         default:
-          return true;
+          // Unrecognized operator (e.g. from a malformed AI-generated query) — fail
+          // safe by excluding the row, consistent with the other invalid-shape cases
+          // above ('in' with a non-array value, 'between' with a non-object value),
+          // rather than silently matching every row.
+          return false;
       }
     });
   },

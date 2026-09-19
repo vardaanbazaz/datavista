@@ -1,6 +1,6 @@
 import React from "react";
 import { cn } from "@/shared/lib/utils";
-import { Dataset, ColumnMetadata, AggregationOperator } from "@/shared/types";
+import { Dataset, AggregationOperator } from "@/shared/types";
 import { getEffectiveColumnType } from "@/shared/utils/columnType";
 import { PivotConfig, PivotValueField } from "@/shared/services/pivot";
 import { usePivotStore } from "@/store/pivotStore";
@@ -18,12 +18,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/shared/components/ui/select";
-import { 
-  Plus, 
-  X, 
-  ArrowUp, 
-  ArrowDown, 
-  Database,
+import {
+  X,
+  ArrowUp,
+  ArrowDown,
   Hash,
   Type,
   Calendar,

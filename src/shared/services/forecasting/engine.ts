@@ -15,7 +15,6 @@ export const forecastingEngine = {
       return data.map((d) => ({ ...d, isForecast: false }));
     }
 
-    const n = data.length;
     const yValues: number[] = [];
     const validRows: { row: DataRow; index: number; y: number }[] = [];
 

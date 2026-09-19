@@ -4,6 +4,7 @@ import { useUiStore } from "./uiStore";
 import { useFilterStore } from "./filterStore";
 import { useChartStore } from "./chartStore";
 import { toast } from "@/shared/hooks/use-toast";
+import { db } from "@/shared/lib/db";
 import { formulaEngine } from "@/shared/services/formulaEngine";
 import { windowEngine } from "@/shared/services/window";
 import { queryCache } from "@/shared/services/optimizer";
@@ -228,7 +229,13 @@ export const useDatasetStore = create<DatasetState>((set, get) => {
     
     // Delete associated charts
     useChartStore.getState().deleteDatasetCharts(id);
-    
+
+    // Clean up the dataset's per-id rows in IndexedDB (filters, pivot config) — these
+    // aren't covered by the datasets[] table sync in persistenceService, so without this
+    // they accumulate forever and could leak into a reused dataset id.
+    db.filters.delete(id).catch((e) => console.error("Failed to delete filters for dataset:", e));
+    db.uiState.delete(`pivotConfig::${id}`).catch((e) => console.error("Failed to delete pivot config for dataset:", e));
+
     if (activeDataset && activeDataset.id === id) {
       if (updatedDatasets.length > 0) {
         const nextActive = updatedDatasets[0];

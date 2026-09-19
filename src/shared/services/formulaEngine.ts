@@ -131,7 +131,7 @@ export function tokenize(expr: string): Token[] {
     }
 
     // Single-char operators
-    if ('+-*/%<>=,()'.indexOf(char) !== -1) {
+    if ('+-*/%^<>=,()'.indexOf(char) !== -1) {
       if (char === '(') {
         tokens.push({ type: 'LPAREN', value: char, position: pos });
       } else if (char === ')') {
@@ -329,7 +329,26 @@ class Parser {
       const arg = this.unary();
       return { type: 'UnaryExpression', operator: op, argument: arg };
     }
-    return this.primary();
+    return this.power();
+  }
+
+  /**
+   * Exponentiation binds tighter than unary minus applied to its base (so `-2^2`
+   * parses as `-(2^2) = -4`, matching standard math/Python convention — unary() only
+   * reaches power() once it's out of leading `-` signs to consume), and is
+   * right-associative: the right operand recurses into unary() (not power()), so
+   * `2^3^2` parses as `2^(3^2) = 512`, and a signed exponent like `2^-2` still parses
+   * directly. Compiles to a POWER(base, exponent) FunctionCall node — the same AST
+   * shape POWER() already produces — so evaluation reuses the existing POWER handler
+   * instead of duplicating the math.
+   */
+  private power(): ASTNode {
+    const expr = this.primary();
+    if (this.match('OPERATOR', '^')) {
+      const right = this.unary();
+      return { type: 'FunctionCall', name: 'POWER', args: [expr, right] };
+    }
+    return expr;
   }
 
   private primary(): ASTNode {
@@ -658,7 +677,7 @@ export const formulaEngine = {
     fields.forEach(f => {
       try {
         fieldASTs.set(f.name, compile(f.expression));
-      } catch (e) {
+      } catch {
         // ignore syntax errors during sorting, handled in validation
       }
     });

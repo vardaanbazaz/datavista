@@ -25,7 +25,6 @@ import { BarChart3, Upload, Filter } from "lucide-react";
 import { useUiStore } from "@/store/uiStore";
 import { useDatasetStore } from "@/store/datasetStore";
 import { useFilterStore } from "@/store/filterStore";
-import { useDashboardStore } from "@/features/dashboards/store/dashboardStore";
 
 import { shortcutManager } from "@/features/workspace/services/shortcutManager";
 
@@ -39,7 +38,6 @@ export type FilterState = SharedFilterState;
 export function Dashboard() {
   const activeView = useUiStore((state) => state.activeView);
   const setActiveView = useUiStore((state) => state.setActiveView);
-  const showWelcome = useUiStore((state) => state.showWelcome);
   const setShowWelcome = useUiStore((state) => state.setShowWelcome);
   const isLoading = useUiStore((state) => state.isLoading);
   // The real IndexedDB load, not the synchronous localStorage-only `isHydrated` flag

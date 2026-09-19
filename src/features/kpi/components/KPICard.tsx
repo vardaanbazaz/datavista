@@ -22,7 +22,6 @@ interface KPICardProps {
 
 export function KPICard({ config, onRemove, onEdit, isMobile = false }: KPICardProps) {
   const dataset = useDatasetStore((state) => state.activeDataset);
-  const filteredData = useFilterStore((state) => state.filteredData);
   const activeFilters = useFilterStore((state) => state.activeFilters);
   const activeGlobalFilters = useDashboardStore((state) => state.activeGlobalFilters || []);
 

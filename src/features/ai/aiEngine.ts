@@ -196,9 +196,13 @@ export const aiEngine = {
   },
 
   /**
-   * Executes AI query and dispatches results to dashboard / chart store
+   * Generates and runs an AI query against `dataset`, returning the result for the
+   * caller to preview. Read-only — does NOT touch filterStore/chartStore. The caller
+   * must call `applyAIQueryResult` to actually commit the result (filter the active
+   * view, auto-create a chart), so a generated-but-unreviewed query can't silently
+   * overwrite the user's current filtered view or spawn a stray chart.
    */
-  async executeAIQuery(
+  async generateAIQueryPreview(
     prompt: string,
     dataset: Dataset
   ): Promise<{ response: AIResponse; queryResult: QueryResult }> {
@@ -210,10 +214,26 @@ export const aiEngine = {
 
     const queryResult = queryEngine.execute(dataset, response.query);
 
-    // Apply filters to filterStore
+    return { response, queryResult };
+  },
+
+  /**
+   * Commits a previously-previewed AI query result: applies it to filterStore and, if
+   * a chart type was suggested, auto-creates a chart. Call only once the user has
+   * reviewed and accepted the preview from `generateAIQueryPreview`.
+   */
+  applyAIQueryResult(
+    prompt: string,
+    response: AIResponse,
+    queryResult: QueryResult,
+    dataset: Dataset
+  ): void {
+    if (!response.query) {
+      throw new AiEngineError("AI did not produce a valid query structure.");
+    }
+
     useFilterStore.getState().setFilteredData(queryResult.rows);
 
-    // Auto-create chart if chartType is suggested
     if (response.chartType) {
       const groupByCol = response.query.groupBy?.column;
       const aggCol = response.query.aggregations?.[0]?.alias || response.query.aggregations?.[0]?.column;
@@ -229,8 +249,6 @@ export const aiEngine = {
         datasetId: dataset.id,
       });
     }
-
-    return { response, queryResult };
   },
 
   /**

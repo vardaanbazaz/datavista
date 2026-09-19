@@ -1,5 +1,5 @@
 import { Query, Dataset } from "@/shared/types";
-import { ExecutionPlan, ExecutionNode } from "./types";
+import { ExecutionPlan } from "./types";
 import { hashQuery } from "./hash";
 import { filterCache, processCache } from "./cache";
 

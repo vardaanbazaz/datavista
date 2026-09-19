@@ -35,6 +35,11 @@ export const useViewStore = create<ViewStore>()(
     }),
     {
       name: "datavista-saved-views",
+      version: 1,
+      // No-op for now — bump `version` and replace this when the persisted shape
+      // changes, so old localStorage data from a prior version gets migrated instead
+      // of silently mismatching the new state shape.
+      migrate: (persistedState) => persistedState as ViewStore,
     }
   )
 );

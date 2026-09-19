@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { Button } from "@/shared/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select";
@@ -13,7 +13,7 @@ import { Input } from "@/shared/components/ui/input";
 import { Filter, CalendarIcon, X, RotateCcw, Search } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/shared/lib/utils";
-import { Dataset, DataRow, FilterState } from "@/shared/types";
+import { FilterState } from "@/shared/types";
 import { queryEngine } from "@/shared/services/queryEngine";
 import { useFilterStore } from "@/store/filterStore";
 import { useDatasetStore } from "@/store/datasetStore";
@@ -156,19 +156,19 @@ export function FilterPanel() {
           }
         };
       } else if (type === 'dateRange') {
-        const { [column]: removed, ...rest } = prev.dateRangeFilters;
+        const { [column]: _removed, ...rest } = prev.dateRangeFilters;
         return {
           ...prev,
           dateRangeFilters: rest
         };
       } else if (type === 'numericRange') {
-        const { [column]: removed, ...rest } = prev.numericRangeFilters || {};
+        const { [column]: _removed, ...rest } = prev.numericRangeFilters || {};
         return {
           ...prev,
           numericRangeFilters: rest
         };
       } else if (type === 'textSearch') {
-        const { [column]: removed, ...rest } = prev.textSearchFilters || {};
+        const { [column]: _removed, ...rest } = prev.textSearchFilters || {};
         return {
           ...prev,
           textSearchFilters: rest

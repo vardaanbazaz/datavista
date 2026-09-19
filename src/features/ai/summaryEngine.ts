@@ -86,7 +86,7 @@ TASK: Generate a concise, professional 2 to 3 sentence executive summary describ
           if (typeof candidate === "string" && candidate.trim() !== "") {
             clean = candidate;
           }
-        } catch (e) {
+        } catch {
           // preserve raw clean text
         }
       }

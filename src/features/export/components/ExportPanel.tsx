@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/sha
 import { Separator } from "@/shared/components/ui/separator";
 import { Download, FileImage, FileText, FileSpreadsheet } from "lucide-react";
 import { useMemo } from "react";
-import { ChartConfig, DataRow, Dataset } from "@/shared/types";
+import { ChartConfig } from "@/shared/types";
 import { useDatasetStore } from "@/store/datasetStore";
 import { useFilterStore } from "@/store/filterStore";
 import { useChartStore } from "@/store/chartStore";
@@ -47,7 +47,7 @@ export function ExportPanel() {
         title: "Chart exported",
         description: `${chart.title} exported as ${format.toUpperCase()}`,
       });
-    } catch (error) {
+    } catch {
       toast({
         title: "Export failed",
         description: "Failed to export chart. Please try again.",
@@ -66,7 +66,7 @@ export function ExportPanel() {
         title: "Data exported",
         description: "Filtered dataset exported as CSV",
       });
-    } catch (error) {
+    } catch {
       toast({
         title: "Export failed",
         description: "Failed to export data. Please try again.",
@@ -85,7 +85,7 @@ export function ExportPanel() {
         title: "PDF report generated",
         description: "Complete report with charts and data exported",
       });
-    } catch (error) {
+    } catch {
       toast({
         title: "Export failed",
         description: "Failed to generate PDF report. Please try again.",

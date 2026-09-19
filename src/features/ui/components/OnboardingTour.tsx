@@ -1,9 +1,16 @@
 import React from "react";
 import { Joyride, EventData, STATUS, Step } from "react-joyride";
+import { useShallow } from "zustand/react/shallow";
 import { useUiStore } from "@/store/uiStore";
 
 export const OnboardingTour: React.FC = () => {
-  const { runTour, setRunTour, setHasSeenTour } = useUiStore();
+  const { runTour, setRunTour, setHasSeenTour } = useUiStore(
+    useShallow((state) => ({
+      runTour: state.runTour,
+      setRunTour: state.setRunTour,
+      setHasSeenTour: state.setHasSeenTour,
+    }))
+  );
 
   const steps: Step[] = [
     // --- MAIN FUNCTIONS ---

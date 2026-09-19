@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect } from "react";
 
 import { useUiStore } from "@/store/uiStore";
 
@@ -25,7 +25,6 @@ const ThemeProviderContext = createContext<ThemeProviderState>(initialState);
 
 export function ThemeProvider({
   children,
-  defaultTheme = "system",
   ...props
 }: ThemeProviderProps) {
   const theme = useUiStore((state) => state.theme);

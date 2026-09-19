@@ -18,11 +18,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/shared/components/ui/select";
-import { 
-  BarChart3, 
-  TrendingUp, 
-  AlertTriangle, 
-  Grid3X3, 
+import {
+  TrendingUp,
+  AlertTriangle,
+  Grid3X3,
   HelpCircle,
   Percent,
   Compass,
@@ -166,8 +165,8 @@ export const StatsExplorer: React.FC = () => {
       { label: "Minimum", val: descriptive.min, desc: "Smallest observation in the set." },
       { label: "Maximum", val: descriptive.max, desc: "Largest observation in the set." },
       { label: "Range", val: descriptive.range, desc: "Difference between maximum and minimum values." },
-      { label: "Variance", val: descriptive.variance, desc: "Spread of values around the mean." },
-      { label: "Standard Deviation", val: descriptive.stdDev, desc: "Average distance of values from the mean." },
+      { label: "Variance (Population)", val: descriptive.variance, desc: "Spread of values around the mean, divided by N (population formula, not N-1 sample formula)." },
+      { label: "Standard Deviation (Population)", val: descriptive.stdDev, desc: "Average distance of values from the mean, divided by N (population formula, not N-1 sample formula)." },
       { label: "First Quartile (Q1)", val: descriptive.q1, desc: "25th percentile value." },
       { label: "Third Quartile (Q3)", val: descriptive.q3, desc: "75th percentile value." },
       { label: "Interquartile Range (IQR)", val: descriptive.iqr, desc: "Difference between Q3 and Q1." },
@@ -584,8 +583,8 @@ export const StatsExplorer: React.FC = () => {
                   { label: "Minimum", val: pivotSliceStats.min },
                   { label: "Maximum", val: pivotSliceStats.max },
                   { label: "Range", val: pivotSliceStats.range },
-                  { label: "Variance", val: pivotSliceStats.variance },
-                  { label: "Standard Deviation", val: pivotSliceStats.stdDev },
+                  { label: "Variance (Population)", val: pivotSliceStats.variance },
+                  { label: "Standard Deviation (Population)", val: pivotSliceStats.stdDev },
                   { label: "Q1", val: pivotSliceStats.q1 },
                   { label: "Q3", val: pivotSliceStats.q3 },
                   { label: "IQR", val: pivotSliceStats.iqr }

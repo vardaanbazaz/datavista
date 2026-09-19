@@ -1,4 +1,3 @@
-import { ColumnMetadata } from "@/shared/types";
 
 export interface DescriptiveStats {
   count: number;

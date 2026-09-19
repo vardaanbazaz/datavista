@@ -23,7 +23,11 @@ export default tseslint.config(
         "warn",
         { allowConstantExport: true },
       ],
-      "@typescript-eslint/no-unused-vars": "off",
+      // argsIgnorePattern/varsIgnorePattern: the codebase already uses a leading `_` as
+      // its convention for a deliberately-unused destructured/discarded binding (e.g.
+      // `const { [key]: _, ...rest } = obj`) — this just makes the rule respect that
+      // existing convention instead of flagging it.
+      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
     },
   }
 );

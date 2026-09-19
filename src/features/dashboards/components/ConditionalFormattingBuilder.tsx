@@ -7,7 +7,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Trash2, Palette, Sparkles, CheckCircle2, AlertTriangle, Code } from "lucide-react";
 import { ConditionalFormatRule, FormattingStyle } from "@/shared/types";
 import { compile } from "@/shared/services/formulaEngine";
-import { allFunctions } from "@/shared/services/formula/library";
 
 interface ConditionalFormattingBuilderProps {
   rules: ConditionalFormatRule[];

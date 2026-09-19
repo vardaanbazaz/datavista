@@ -9,7 +9,6 @@ import { Input } from "@/shared/components/ui/input";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { ScrollArea } from "@/shared/components/ui/scroll-area";
-import { Alert, AlertDescription } from "@/shared/components/ui/alert";
 import {
   Search,
   LayoutDashboard,
@@ -43,6 +42,8 @@ import { useDatasetStore } from "@/store/datasetStore";
 import { useDashboardStore } from "@/features/dashboards/store/dashboardStore";
 import { aiEngine } from "@/features/ai/aiEngine";
 import { AiSettingsModal } from "@/features/ai/components/AiSettingsModal";
+import { AIResponse } from "@/features/ai/types";
+import { QueryResult } from "@/shared/types";
 import { toast } from "@/shared/hooks/use-toast";
 
 interface CommandPaletteProps {
@@ -66,6 +67,13 @@ export function CommandPalette({
   const [isAiExecuting, setIsAiExecuting] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  // Generated-but-unreviewed AI query result, awaiting an explicit Apply/Discard before
+  // it's allowed to touch filterStore/chartStore.
+  const [aiPreview, setAiPreview] = useState<{
+    prompt: string;
+    response: AIResponse;
+    queryResult: QueryResult;
+  } | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -83,6 +91,7 @@ export function CommandPalette({
       setSelectedIndex(0);
       setAiError(null);
       setIsAiExecuting(false);
+      setAiPreview(null);
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [isOpen]);
@@ -161,16 +170,11 @@ export function CommandPalette({
     setAiError(null);
 
     try {
-      const { response, queryResult } = await aiEngine.executeAIQuery(promptText, activeDataset);
+      const { response, queryResult } = await aiEngine.generateAIQueryPreview(promptText, activeDataset);
       setIsAiExecuting(false);
-
-      toast({
-        title: response.title || "AI Query Executed",
-        description: `${response.explanation || "Query applied successfully."} (${queryResult.rows.length} rows returned)`,
-      });
-
-      onClose();
-      setActiveView("overview");
+      // Land in a reviewable preview instead of applying immediately — nothing has
+      // touched filterStore/chartStore yet.
+      setAiPreview({ prompt: promptText, response, queryResult });
     } catch (e: unknown) {
       setIsAiExecuting(false);
       const errMsg = e instanceof Error ? e.message : "AI generated an invalid query. Please rephrase.";
@@ -181,6 +185,25 @@ export function CommandPalette({
         variant: "destructive",
       });
     }
+  };
+
+  const handleApplyAiPreview = () => {
+    if (!aiPreview || !activeDataset) return;
+
+    aiEngine.applyAIQueryResult(aiPreview.prompt, aiPreview.response, aiPreview.queryResult, activeDataset);
+
+    toast({
+      title: aiPreview.response.title || "AI Query Applied",
+      description: `${aiPreview.response.explanation || "Query applied successfully."} (${aiPreview.queryResult.rows.length} rows returned)`,
+    });
+
+    setAiPreview(null);
+    onClose();
+    setActiveView("overview");
+  };
+
+  const handleDiscardAiPreview = () => {
+    setAiPreview(null);
   };
 
   const handleExecuteCommand = (cmd: CommandDefinition) => {
@@ -229,6 +252,18 @@ export function CommandPalette({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (aiPreview) {
+      // Input is disabled while a preview is pending — Enter applies it. Escape falls
+      // through to the Dialog's default close behavior, which is fine here: nothing
+      // has been applied to filterStore/chartStore yet, so closing without clicking
+      // Apply is equivalent to Discard.
+      if (e.key === "Enter") {
+        e.preventDefault();
+        handleApplyAiPreview();
+      }
+      return;
+    }
+
     if (e.key === "ArrowDown") {
       e.preventDefault();
       setSelectedIndex((prev) =>
@@ -301,7 +336,7 @@ export function CommandPalette({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={handleKeyDown}
-                disabled={isAiExecuting}
+                disabled={isAiExecuting || !!aiPreview}
                 className="pl-9 pr-36 h-11 bg-gray-100 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 text-sm text-zinc-900 dark:text-zinc-100 focus-visible:ring-primary"
               />
               <div className="absolute right-3 flex items-center gap-1.5">
@@ -344,7 +379,45 @@ export function CommandPalette({
             </div>
           )}
 
-          {!isAiExecuting && (
+          {!isAiExecuting && aiPreview && (
+            <div className="p-4 space-y-3">
+              <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-primary shrink-0" />
+                  <p className="text-sm font-semibold text-foreground truncate">
+                    {aiPreview.response.title || "AI Query Result"}
+                  </p>
+                </div>
+                {aiPreview.response.explanation && (
+                  <p className="text-xs text-muted-foreground">{aiPreview.response.explanation}</p>
+                )}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="outline" className="text-[10px]">
+                    {aiPreview.queryResult.rows.length} row{aiPreview.queryResult.rows.length === 1 ? "" : "s"}
+                  </Badge>
+                  {aiPreview.response.chartType && (
+                    <Badge variant="outline" className="text-[10px] gap-1">
+                      <BarChart3 className="h-3 w-3" /> Will create a {aiPreview.response.chartType} chart
+                    </Badge>
+                  )}
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Nothing has been applied yet — review the result above before applying it.
+              </p>
+              <div className="flex items-center justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={handleDiscardAiPreview}>
+                  Discard
+                </Button>
+                <Button variant="default" size="sm" onClick={handleApplyAiPreview} className="gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Apply
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {!isAiExecuting && !aiPreview && (
             <ScrollArea className="max-h-[300px] overflow-y-auto overflow-x-hidden p-3">
               {flatUnifiedItems.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground space-y-2">

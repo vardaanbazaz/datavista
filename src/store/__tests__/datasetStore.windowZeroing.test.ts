@@ -197,7 +197,7 @@ describe("datasetStore - window/calculated column materialization (item 6 fix)",
     const rawFromArray = useDatasetStore.getState().datasets[0];
     const staleAsIfPersisted: Dataset = {
       ...rawFromArray,
-      data: rawFromArray.data.map(({ running_total, ...rest }) => rest),
+      data: rawFromArray.data.map(({ running_total: _running_total, ...rest }) => rest),
     };
     expect(staleAsIfPersisted.data.every((row) => !("running_total" in row))).toBe(true);
 

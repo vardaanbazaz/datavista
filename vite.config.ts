@@ -43,10 +43,24 @@ export default defineConfig(({ mode }) => ({
               normalizedId.includes("/node_modules/d3") ||
               normalizedId.includes("/node_modules/lucide-react/") ||
               normalizedId.includes("/node_modules/tailwind-merge/") ||
-              normalizedId.includes("/node_modules/recharts/") ||
               normalizedId.includes("/node_modules/framer-motion/")
             ) {
               return "vendor-viz";
+            }
+            // Export pipeline (xlsx/jsPDF/html2canvas) - heavy, only touched by the
+            // Export view, so keep it out of the main chunk everyone downloads.
+            if (
+              normalizedId.includes("/node_modules/xlsx/") ||
+              normalizedId.includes("/node_modules/jspdf/") ||
+              normalizedId.includes("/node_modules/html2canvas/")
+            ) {
+              return "vendor-export";
+            }
+            if (
+              normalizedId.includes("/node_modules/date-fns/") ||
+              normalizedId.includes("/node_modules/react-day-picker/")
+            ) {
+              return "vendor-dates";
             }
           }
         },

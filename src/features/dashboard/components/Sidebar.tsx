@@ -1,4 +1,4 @@
-import { useState, lazy, Suspense } from "react";
+import { useState } from "react";
 import { ErrorBoundary } from "@/shared/components/ErrorBoundary";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/components/ui/button";
@@ -34,7 +34,7 @@ import {
   HelpCircle
 } from "lucide-react";
 import { Dataset } from "@/shared/types";
-import { useUiStore, ViewType } from "@/store/uiStore";
+import { useUiStore } from "@/store/uiStore";
 import { useDatasetStore } from "@/store/datasetStore";
 import { useDashboardStore } from "@/features/dashboards/store/dashboardStore";
 import { InstantiateTemplateModal } from "@/features/dashboards/components/InstantiateTemplateModal";
@@ -42,13 +42,11 @@ import { ThemeToggle } from "@/shared/components/ThemeToggle";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/components/ui/tooltip";
 import { motion } from "framer-motion";
 import { Sparkles } from "lucide-react";
-
-const AiSettingsModal = lazy(() => import("@/features/ai/components/AiSettingsModal").then(m => ({ default: m.AiSettingsModal })));
+import { AiSettingsModal } from "@/features/ai/components/AiSettingsModal";
 
 export function Sidebar({ onOpenSearch }: { onOpenSearch?: () => void }) {
   const activeView = useUiStore((state) => state.activeView);
   const onViewChange = useUiStore((state) => state.setActiveView);
-  const startTour = useUiStore((state) => state.startTour);
   const resetTour = useUiStore((state) => state.resetTour);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isInstantiateModalOpen, setIsInstantiateModalOpen] = useState(false);
@@ -243,12 +241,10 @@ export function Sidebar({ onOpenSearch }: { onOpenSearch?: () => void }) {
         </div>
         
         <ErrorBoundary fallback={null}>
-          <Suspense fallback={null}>
-            <AiSettingsModal
-              isOpen={isAiSettingsModalOpen}
-              onClose={() => setIsAiSettingsModalOpen(false)}
-            />
-          </Suspense>
+          <AiSettingsModal
+            isOpen={isAiSettingsModalOpen}
+            onClose={() => setIsAiSettingsModalOpen(false)}
+          />
         </ErrorBoundary>
 
         <Tooltip>

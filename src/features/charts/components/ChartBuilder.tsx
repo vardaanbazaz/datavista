@@ -5,16 +5,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
 import { Badge } from "@/shared/components/ui/badge";
-import { Trash2, Plus, BarChart, LineChart, PieChart, ScatterChart, X, Palette, Gauge, TrendingUp } from "lucide-react";
+import { Plus, BarChart, LineChart, PieChart, ScatterChart, X, Palette, Gauge, TrendingUp } from "lucide-react";
 import { useMemo } from "react";
-import { Dataset, ChartConfig, ConditionalFormatRule } from "@/shared/types";
+import { ChartConfig, ConditionalFormatRule } from "@/shared/types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/components/ui/dialog";
 import { useDatasetStore } from "@/store/datasetStore";
 import { useFilterStore } from "@/store/filterStore";
 import { useChartStore } from "@/store/chartStore";
 import { useDashboardStore } from "@/features/dashboards/store/dashboardStore";
 import { pluginRegistry } from "@/shared/services/pluginRegistry";
-import { ChartVisualization } from "./ChartVisualization";
 import { ConditionalFormattingBuilder } from "@/features/dashboards/components/ConditionalFormattingBuilder";
 import { motion } from "framer-motion";
 

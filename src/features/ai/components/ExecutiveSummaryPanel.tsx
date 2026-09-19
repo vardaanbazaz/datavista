@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { Card, CardContent } from "@/shared/components/ui/card";
 import { Button } from "@/shared/components/ui/button";
 import { Badge } from "@/shared/components/ui/badge";
@@ -50,9 +51,26 @@ function ExecutiveSummaryPanelInner() {
     detectedAnomalies,
     generateExecutiveSummary,
     dismissExecutiveSummary,
-  } = useDashboardStore();
+  } = useDashboardStore(
+    useShallow((state) => ({
+      executiveSummary: state.executiveSummary,
+      isGeneratingSummary: state.isGeneratingSummary,
+      executiveSummaryDismissed: state.executiveSummaryDismissed,
+      executiveSummarySource: state.executiveSummarySource,
+      detectedAnomalies: state.detectedAnomalies,
+      generateExecutiveSummary: state.generateExecutiveSummary,
+      dismissExecutiveSummary: state.dismissExecutiveSummary,
+    }))
+  );
 
-  const { llmApiKey, llmProvider, hasAcknowledgedAiInsights, setHasAcknowledgedAiInsights } = useUiStore();
+  const { llmApiKey, llmProvider, hasAcknowledgedAiInsights, setHasAcknowledgedAiInsights } = useUiStore(
+    useShallow((state) => ({
+      llmApiKey: state.llmApiKey,
+      llmProvider: state.llmProvider,
+      hasAcknowledgedAiInsights: state.hasAcknowledgedAiInsights,
+      setHasAcknowledgedAiInsights: state.setHasAcknowledgedAiInsights,
+    }))
+  );
 
   // A key is configured, so generating would actually send dataset content to the
   // provider — require one explicit click before that ever happens automatically.

@@ -60,7 +60,7 @@ export class FormattingEngine {
         if (result === true || (typeof result === 'number' && result !== 0 && !isNaN(result))) {
           return rule.styles;
         }
-      } catch (err) {
+      } catch {
         // Condition failed evaluation for this particular row
       }
     }

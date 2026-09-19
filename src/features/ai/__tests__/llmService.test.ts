@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { fetchWithTimeout } from "../llmService";
+import { fetchWithTimeout, callLLM } from "../llmService";
+import { AIPromptContext } from "../types";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -51,5 +52,40 @@ describe("llmService fetchWithTimeout", () => {
 
     const result = await fetchWithTimeout("https://example.com/api", {}, 5000);
     expect(result).toBe(fakeResponse);
+  });
+});
+
+// Regression test for: the Gemini API key was sent as a ?key= URL query param, which is
+// more likely to leak into provider access logs, browser history, or a TLS-inspecting
+// proxy log than a header. Google's own API reference documents x-goog-api-key as the
+// supported header-based alternative, matching the OpenAI path's existing use of an
+// Authorization header instead of a URL-embedded key.
+describe("llmService callLLM - Gemini auth", () => {
+  const context: AIPromptContext = {
+    prompt: "test prompt",
+    columns: [],
+  };
+
+  it("sends the API key via the x-goog-api-key header, not the URL", async () => {
+    const fakeResponse = new Response(
+      JSON.stringify({ candidates: [{ content: { parts: [{ text: "{}" }] } }] }),
+      { status: 200 }
+    );
+    let capturedUrl: string | undefined;
+    let capturedHeaders: HeadersInit | undefined;
+    vi.stubGlobal(
+      "fetch",
+      ((url: string, init?: RequestInit) => {
+        capturedUrl = url;
+        capturedHeaders = init?.headers;
+        return Promise.resolve(fakeResponse);
+      }) as typeof fetch
+    );
+
+    await callLLM("super-secret-key", "gemini", context);
+
+    expect(capturedUrl).not.toContain("super-secret-key");
+    expect(capturedUrl).not.toContain("key=");
+    expect((capturedHeaders as Record<string, string>)["x-goog-api-key"]).toBe("super-secret-key");
   });
 });

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useShallow } from "zustand/react/shallow";
 import {
   Dialog,
   DialogContent,
@@ -34,7 +35,15 @@ export function AiSettingsModal({ isOpen: externalIsOpen, onClose: externalOnClo
     setInternalIsOpen(open);
   };
 
-  const { llmApiKey, llmProvider, setLlmApiKey, setLlmProvider, resetTour } = useUiStore();
+  const { llmApiKey, llmProvider, setLlmApiKey, setLlmProvider, resetTour } = useUiStore(
+    useShallow((state) => ({
+      llmApiKey: state.llmApiKey,
+      llmProvider: state.llmProvider,
+      setLlmApiKey: state.setLlmApiKey,
+      setLlmProvider: state.setLlmProvider,
+      resetTour: state.resetTour,
+    }))
+  );
 
   const [apiKeyInput, setApiKeyInput] = useState(llmApiKey);
   const [providerInput, setProviderInput] = useState<LlmProvider>(llmProvider);

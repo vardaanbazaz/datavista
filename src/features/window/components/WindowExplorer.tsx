@@ -14,9 +14,7 @@ import { DataTable } from "@/features/datasets/components/DataTable";
 import {
   Plus,
   Trash2,
-  Settings,
   Columns,
-  ChevronRight,
   ArrowUpDown,
   Layers,
   HelpCircle,

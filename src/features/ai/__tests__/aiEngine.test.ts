@@ -1,7 +1,10 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { aiEngine, AiEngineError } from "../aiEngine";
 import { Dataset } from "@/shared/types";
 import { Query } from "@/shared/types/query";
+import { useFilterStore } from "@/store/filterStore";
+import { useChartStore } from "@/store/chartStore";
+import { useUiStore } from "@/store/uiStore";
 
 function makeDataset(): Dataset {
   return {
@@ -53,5 +56,50 @@ describe("aiEngine.validateQueryColumns", () => {
       aggregations: [{ column: "NotARealColumn", operator: "sum", alias: "total" }]
     };
     expect(() => aiEngine.validateQueryColumns(dataset, badColumnQuery)).toThrow(AiEngineError);
+  });
+});
+
+// Regression tests for: the AI Co-Pilot's query path used to apply a generated query to
+// filterStore and auto-create a chart in one unreviewable step (audit #22b). It's now
+// split into a preview step (generateAIQueryPreview, read-only) and a commit step
+// (applyAIQueryResult, called only once the user reviews and accepts the preview).
+// No API key is configured in these tests, so callLLM deterministically falls back to
+// the offline heuristic — no network mocking needed.
+describe("aiEngine query preview/apply split (item #8)", () => {
+  beforeEach(() => {
+    useUiStore.setState({ llmApiKey: "", llmProvider: "gemini" });
+    useFilterStore.setState({ filteredData: [] });
+    useChartStore.setState({ charts: [] });
+  });
+
+  it("generateAIQueryPreview computes a result without touching filterStore or chartStore", async () => {
+    const dataset = makeDataset();
+    const { response, queryResult } = await aiEngine.generateAIQueryPreview("top regions by revenue", dataset);
+
+    expect(response.type).toBe("query");
+    expect(queryResult.rows.length).toBeGreaterThan(0);
+    expect(useFilterStore.getState().filteredData).toEqual([]);
+    expect(useChartStore.getState().charts).toEqual([]);
+  });
+
+  it("applyAIQueryResult commits the previewed result to filterStore and creates the suggested chart", async () => {
+    const dataset = makeDataset();
+    const { response, queryResult } = await aiEngine.generateAIQueryPreview("top regions by revenue", dataset);
+
+    aiEngine.applyAIQueryResult("top regions by revenue", response, queryResult, dataset);
+
+    expect(useFilterStore.getState().filteredData).toEqual(queryResult.rows);
+    expect(useChartStore.getState().charts).toHaveLength(1);
+    expect(useChartStore.getState().charts[0].type).toBe(response.chartType);
+  });
+
+  it("discarding a preview (never calling applyAIQueryResult) leaves no trace in either store", async () => {
+    const dataset = makeDataset();
+    await aiEngine.generateAIQueryPreview("top regions by revenue", dataset);
+
+    // Simulates the user clicking Discard: the preview is just dropped, applyAIQueryResult
+    // is never called.
+    expect(useFilterStore.getState().filteredData).toEqual([]);
+    expect(useChartStore.getState().charts).toEqual([]);
   });
 });

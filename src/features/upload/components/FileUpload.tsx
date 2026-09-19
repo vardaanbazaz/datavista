@@ -6,7 +6,6 @@ import { useToast } from "@/shared/hooks/use-toast";
 import { Upload, FileText, AlertCircle, CheckCircle } from "lucide-react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
-import { Dataset } from "@/shared/types";
 import { useDatasetStore } from "@/store/datasetStore";
 import { processRawData } from "@/shared/services/parsingService";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/components/ui/tooltip";
