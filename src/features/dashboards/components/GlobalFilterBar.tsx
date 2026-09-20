@@ -37,8 +37,10 @@ export function GlobalFilterBar() {
   const setAllWidgetDrillStates = useDrillStore((state) => state.setAllWidgetDrillStates);
   const resetAllWidgetDrillStates = useDrillStore((state) => state.resetAllWidgetDrillStates);
 
-  const savedViews = useViewStore((state) =>
-    activeDashboardId ? state.savedViews.filter((v) => v.dashboardId === activeDashboardId) : []
+  const allSavedViews = useViewStore((state) => state.savedViews);
+  const savedViews = useMemo(
+    () => (activeDashboardId ? allSavedViews.filter((v) => v.dashboardId === activeDashboardId) : []),
+    [allSavedViews, activeDashboardId]
   );
   const addSavedView = useViewStore((state) => state.addSavedView);
   const deleteSavedView = useViewStore((state) => state.deleteSavedView);
