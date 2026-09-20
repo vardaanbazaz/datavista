@@ -112,19 +112,23 @@ Follow these simple steps to explore and analyze your datasets with DataVista:
    - Go to **Filters** to construct multi-layered conditions (equals, contains, numeric range) and watch dataset counts update dynamically.
 3. **Exploring Raw Data & Calculated Columns**:
    - Open **Data Explorer** to inspect records, apply conditional formatting, and write AST formula expressions.
+   - Columns DataVista isn't confident about get a **Might be categorical** prompt — override the inferred type (numeric/categorical) with one click, or clear the override to revert to auto-detection.
 4. **Building Visualizations & Charts**:
-   - Navigate to **Charts** to create over 8 interactive visualization types (Bar, Line, Scatter, Pie, Heatmap, Area) with customizable color schemes.
-5. **Multidimensional Pivot Analysis**:
+   - Navigate to **Charts** to create over 8 interactive visualization types (Bar, Line, Scatter, Pie, Heatmap, Area, Histogram, Bubble) with conditional formatting rules.
+5. **Building Custom Dashboards**:
+   - Open **Dashboards** to arrange multiple charts into a custom grid layout, save it as a reusable template, capture point-in-time snapshots, and drill through data points across the whole dashboard with a shared filter bar.
+6. **Multidimensional Pivot Analysis**:
    - Select **Pivot Table** to aggregate fields across Rows, Columns, and Values with automated totals.
-6. **Statistical Summaries & Outliers**:
+7. **Statistical Summaries & Outliers**:
    - Open **Statistics** to calculate mean, median, variance, standard deviation, correlation matrices, and IQR/Z-score outlier detection.
-7. **Window Functions & Rankings**:
+8. **Window Functions & Rankings**:
    - Use **Window Functions** to run rolling calculations, moving averages, cumulative sums, and row rankings (`ROW_NUMBER`, `RANK`, `DENSE_RANK`).
-8. **AI Co-Pilot Assistance**:
-   - Click the **AI Co-Pilot (Star icon)** in the top header to configure your Gemini or GPT-4o API keys for natural language query execution.
-9. **Exporting Data & Reports**:
-   - Visit **Export** to download processed datasets as CSVs or export visual reports directly to your local device.
-10. **Command Palette & Guided Tour**:
+9. **AI Co-Pilot Assistance**:
+   - Click the **AI Co-Pilot (Sparkles icon)** in the top header to configure your Gemini or GPT-4o API key — a status banner always shows whether AI is Active or running in Offline heuristic mode.
+   - Natural-language queries are staged as a **preview** first; review the proposed filter/result before applying it or discarding it.
+10. **Exporting Data & Reports**:
+    - Visit **Export** to download processed datasets as CSVs, export individual charts as PNG or SVG images, or generate a full PDF report.
+11. **Command Palette & Guided Tour**:
     - Press `Cmd+K` (or `Ctrl+K`) anytime to open the Global Search / Command Palette.
     - Click the `?` icon in the top header to restart the **14-step interactive guided tutorial**.
 

@@ -205,7 +205,7 @@ export function FileUpload() {
                   Drop your data file here, or click to browse
                 </p>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Supports CSV, TSV, and XLSX files up to 10MB
+                  Supports CSV, TSV, and XLSX files up to 100MB
                 </p>
                 <input
                   type="file"
