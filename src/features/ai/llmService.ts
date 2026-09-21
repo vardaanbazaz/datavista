@@ -116,7 +116,9 @@ Target Mode Preference: ${mode || 'auto'}
     // Key goes in the x-goog-api-key header (Google's documented alternative to the
     // ?key= query param) — a query-param key is more likely to leak into provider
     // access logs, browser history, or a TLS-inspecting proxy log.
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent`;
+    // "latest" alias tracks Google's current GA Flash model, so a dated model
+    // name (e.g. gemini-1.5-flash) can't silently go stale after deprecation.
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent`;
     const response = await fetchWithTimeout(url, {
       method: 'POST',
       headers: {

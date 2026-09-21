@@ -42,6 +42,7 @@ import { useDatasetStore } from "@/store/datasetStore";
 import { useDashboardStore } from "@/features/dashboards/store/dashboardStore";
 import { aiEngine } from "@/features/ai/aiEngine";
 import { AiSettingsModal } from "@/features/ai/components/AiSettingsModal";
+import { providerDisplayName } from "@/features/ai/providerDisplayName";
 import { AIResponse } from "@/features/ai/types";
 import { QueryResult } from "@/shared/types";
 import { toast } from "@/shared/hooks/use-toast";
@@ -80,6 +81,8 @@ export function CommandPalette({
   const commandMap = useCommandRegistry((state) => state.commands);
   const commands = useMemo(() => Object.values(commandMap), [commandMap]);
   const setActiveView = useUiStore((state) => state.setActiveView);
+  const llmApiKey = useUiStore((state) => state.llmApiKey);
+  const llmProvider = useUiStore((state) => state.llmProvider);
   const activeDataset = useDatasetStore((state) => state.activeDataset);
   const datasets = useDatasetStore((state) => state.datasets);
   const selectDataset = useDatasetStore((state) => state.selectDataset);
@@ -435,6 +438,11 @@ export function CommandPalette({
                       <div className="px-2 py-1 text-[11px] font-semibold text-primary uppercase tracking-wider flex items-center gap-1.5">
                         <Sparkles className="h-3.5 w-3.5 text-primary" /> AI Natural Language Query
                       </div>
+                      {llmApiKey && llmApiKey.trim() !== "" && (
+                        <p className="px-2 pb-1 text-[10px] text-muted-foreground">
+                          Sends this dataset's column names and sample values to {providerDisplayName(llmProvider)}.
+                        </p>
+                      )}
                       {(() => {
                         const currentIndex = globalItemCounter++;
                         const isSelected = selectedIndex === currentIndex;

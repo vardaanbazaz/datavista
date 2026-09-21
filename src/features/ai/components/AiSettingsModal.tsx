@@ -122,7 +122,11 @@ export function AiSettingsModal({ isOpen: externalIsOpen, onClose: externalOnClo
                     onClick={() => setProviderInput("gemini")}
                   >
                     Google Gemini
-                    {providerInput === "gemini" && <Badge variant="secondary" className="text-[9px] px-1 py-0">Active</Badge>}
+                    {providerInput === "gemini" && (
+                      <Badge variant="secondary" className="text-[9px] px-1 py-0">
+                        {apiKeyInput.trim() ? "Active" : "Selected"}
+                      </Badge>
+                    )}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
@@ -139,7 +143,11 @@ export function AiSettingsModal({ isOpen: externalIsOpen, onClose: externalOnClo
                     onClick={() => setProviderInput("openai")}
                   >
                     OpenAI GPT-4o
-                    {providerInput === "openai" && <Badge variant="secondary" className="text-[9px] px-1 py-0">Active</Badge>}
+                    {providerInput === "openai" && (
+                      <Badge variant="secondary" className="text-[9px] px-1 py-0">
+                        {apiKeyInput.trim() ? "Active" : "Selected"}
+                      </Badge>
+                    )}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>

@@ -4,6 +4,7 @@ import { WindowQuery } from "../services/window/types";
 
 import { ConditionalFormatRule } from "./formatting";
 import { ForecastConfig } from "../services/forecasting/types";
+import type { AggregationOperator } from "./query";
 
 export interface DataRow {
   [key: string]: string | number | boolean | null;
@@ -30,6 +31,8 @@ export interface ChartConfig {
   yAxis?: string;
   groupBy?: string;
   sizeBy?: string; // For bubble charts
+  /** How chartData rows sharing an x-axis (and groupBy) key are reduced into yAxis's plotted value. Defaults to 'sum'. */
+  aggregation?: AggregationOperator;
   data: DataRow[];
   datasetId: string; // Tracks which dataset the chart belongs to
   drillPath?: string[]; // Dimension hierarchy for drill-down

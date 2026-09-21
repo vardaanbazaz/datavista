@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import * as d3 from "d3";
-import { ChartConfig, Query, FilterOperator } from "@/shared/types";
+import { ChartConfig, DataRow, Query, FilterOperator } from "@/shared/types";
 import { useDatasetStore } from "@/store/datasetStore";
 import { useDashboardStore } from "@/features/dashboards/store/dashboardStore";
 import { useFilterStore } from "@/store/filterStore";
@@ -243,6 +243,44 @@ function ChartVisualizationContent({ chart }: ChartVisualizationProps) {
       return 'categorical';
     };
 
+    // Reduces rows sharing an x-axis (and groupBy) key into chart.yAxis's plotted value.
+    // 'sum_if' / 'count_if' / 'weighted_average' / 'percentile' need context (a condition
+    // expression, a weight column, a percentile) this chart config doesn't carry, so they
+    // fall back to 'sum' rather than silently miscomputing.
+    const aggregateValues = (rows: typeof chartData, column: string): number => {
+      const numeric = (d: (typeof rows)[number]) => Number(d[column]) || 0;
+      switch (chart.aggregation) {
+        case 'avg':
+          return d3.mean(rows, numeric) ?? 0;
+        case 'min':
+          return d3.min(rows, numeric) ?? 0;
+        case 'max':
+          return d3.max(rows, numeric) ?? 0;
+        case 'count':
+          return rows.length;
+        case 'count_distinct':
+          return new Set(rows.map(d => d[column])).size;
+        case 'median':
+          return d3.median(rows, numeric) ?? 0;
+        case 'stddev':
+          return d3.deviation(rows, numeric) ?? 0;
+        default:
+          return d3.sum(rows, numeric);
+      }
+    };
+
+    const isCountAggregation = chart.aggregation === 'count' || chart.aggregation === 'count_distinct';
+
+    // Line/area plot chartData's rows directly (no per-x rollup, unlike bar/pie), so an
+    // aggregation query's yAxis (one real value per x-key, not per raw row) needs this
+    // explicit collapse first — otherwise it'd plot every raw row's yAxis value instead
+    // of the aggregated one.
+    const aggregateByDimension = (rows: typeof chartData, dimension: string, column: string): DataRow[] =>
+      Array.from(
+        d3.rollup(rows, v => aggregateValues(v, column), d => String(d[dimension])),
+        ([key, value]) => ({ [dimension]: key, [column]: value }) as DataRow
+      );
+
     const xType = currentDimension ? getColumnType(currentDimension) : 'categorical';
     const yType = chart.yAxis ? getColumnType(chart.yAxis) : 'categorical';
     const sizeType = chart.sizeBy ? getColumnType(chart.sizeBy) : null;
@@ -270,13 +308,13 @@ function ChartVisualizationContent({ chart }: ChartVisualizationProps) {
     } else if (['bar', 'line', 'area'].includes(chart.type)) {
       if (!currentDimension || !chart.yAxis) {
         validationError = `${chart.type.charAt(0).toUpperCase() + chart.type.slice(1)} chart requires both X and Y axis fields.`;
-      } else if (yType !== 'numeric') {
+      } else if (yType !== 'numeric' && !isCountAggregation) {
         validationError = `${chart.type.charAt(0).toUpperCase() + chart.type.slice(1)} chart requires a numeric column for the Y-axis.`;
       }
     } else if (chart.type === 'pie') {
       if (!currentDimension || !chart.yAxis) {
         validationError = "Pie chart requires Category and Values fields.";
-      } else if (yType !== 'numeric') {
+      } else if (yType !== 'numeric' && !isCountAggregation) {
         validationError = "Pie chart requires a numeric column for Values.";
       }
     }
@@ -423,13 +461,13 @@ function ChartVisualizationContent({ chart }: ChartVisualizationProps) {
       const aggregatedData = chart.groupBy
         ? d3.rollup(
             chartData,
-            v => d3.sum(v, d => Number(d[chart.yAxis!]) || 0),
+            v => aggregateValues(v, chart.yAxis!),
             d => String(d[currentDimension]),
             d => String(d[chart.groupBy!])
           )
         : d3.rollup(
             chartData,
-            v => d3.sum(v, d => Number(d[chart.yAxis!]) || 0),
+            v => aggregateValues(v, chart.yAxis!),
             d => String(d[currentDimension])
           );
 
@@ -581,7 +619,11 @@ function ChartVisualizationContent({ chart }: ChartVisualizationProps) {
     function renderLineChart() {
       if (!currentDimension || !chart.yAxis) return;
 
-      const data = processedChartData
+      const rows = chart.aggregation
+        ? aggregateByDimension(chartData, currentDimension, chart.yAxis)
+        : processedChartData;
+
+      const data = rows
         .filter(d => d[currentDimension] !== null && d[chart.yAxis!] !== null)
         .sort((a, b) => {
           const aVal = a[currentDimension];
@@ -743,7 +785,7 @@ function ChartVisualizationContent({ chart }: ChartVisualizationProps) {
 
       const aggregatedData = d3.rollup(
         chartData,
-        v => d3.sum(v, d => Number(d[chart.yAxis!]) || 0),
+        v => aggregateValues(v, chart.yAxis!),
         d => String(d[currentDimension])
       );
 
@@ -1023,7 +1065,11 @@ function ChartVisualizationContent({ chart }: ChartVisualizationProps) {
     function renderAreaChart() {
       if (!currentDimension || !chart.yAxis) return;
 
-      const data = processedChartData
+      const rows = chart.aggregation
+        ? aggregateByDimension(chartData, currentDimension, chart.yAxis)
+        : processedChartData;
+
+      const data = rows
         .filter(d => d[currentDimension] !== null && d[chart.yAxis!] !== null)
         .sort((a, b) => {
           const aVal = a[currentDimension];

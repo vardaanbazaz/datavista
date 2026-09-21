@@ -93,6 +93,33 @@ describe("aiEngine query preview/apply split (item #8)", () => {
     expect(useChartStore.getState().charts[0].type).toBe(response.chartType);
   });
 
+  // Regression test for: applyAIQueryResult used to point the created chart's yAxis at
+  // the aggregation's alias (e.g. "Total Revenue") — a key that exists only in this
+  // query's own result rows, not in the dataset. ChartVisualization re-derives its
+  // rendered rows from the live dataset instead of reusing those result rows, so an
+  // alias yAxis resolved to no column anywhere the chart actually reads from and the
+  // chart failed a "requires a numeric column" check despite the data being numeric.
+  it("applyAIQueryResult points the created chart's yAxis at the real aggregated dataset column, not the query alias", async () => {
+    const dataset = makeDataset();
+    const { response, queryResult } = await aiEngine.generateAIQueryPreview("top regions by revenue", dataset);
+
+    // Sanity-check the offline heuristic actually produced an aliased sum aggregation,
+    // otherwise this test would pass vacuously.
+    const agg = response.query?.aggregations?.[0];
+    expect(agg?.column).toBe("Revenue");
+    expect(agg?.alias).not.toBe("Revenue");
+
+    aiEngine.applyAIQueryResult("top regions by revenue", response, queryResult, dataset);
+
+    const chart = useChartStore.getState().charts[0];
+    expect(chart.yAxis).toBe("Revenue");
+    expect(chart.aggregation).toBe("sum");
+    // groupBy is ChartVisualization's series-split dimension, not the SQL group-by —
+    // setting it equal to xAxis would make every AI chart split itself by its own
+    // x-axis.
+    expect(chart.groupBy).toBeUndefined();
+  });
+
   it("discarding a preview (never calling applyAIQueryResult) leaves no trace in either store", async () => {
     const dataset = makeDataset();
     await aiEngine.generateAIQueryPreview("top regions by revenue", dataset);

@@ -236,15 +236,21 @@ export const aiEngine = {
 
     if (response.chartType) {
       const groupByCol = response.query.groupBy?.column;
-      const aggCol = response.query.aggregations?.[0]?.alias || response.query.aggregations?.[0]?.column;
+      const agg = response.query.aggregations?.[0];
 
+      // ChartVisualization re-derives its plotted rows from the live dataset + active
+      // filters at render time (so cross-filtering/drilldown stay correct) rather than
+      // reusing `queryResult.rows` verbatim, then reduces them per xAxis key using
+      // `aggregation`. So yAxis must name a real dataset column — an aggregation alias
+      // like `avg_MonthlyIncome` exists only in queryResult.rows and resolves to no
+      // column anywhere the chart actually reads from.
       useChartStore.getState().createChart({
         id: `ai-chart-${Date.now()}`,
         type: response.chartType,
         title: response.title || `${prompt} (${response.chartType})`,
         xAxis: groupByCol || dataset.columns[0],
-        yAxis: aggCol || dataset.columns[1] || dataset.columns[0],
-        groupBy: groupByCol,
+        yAxis: agg?.column || dataset.columns[1] || dataset.columns[0],
+        aggregation: agg?.operator,
         data: queryResult.rows,
         datasetId: dataset.id,
       });

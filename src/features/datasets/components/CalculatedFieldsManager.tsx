@@ -9,9 +9,11 @@ import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/aler
 import { Settings, Plus, Trash2, HelpCircle, AlertTriangle, Code, Sparkles, Loader2 } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/components/ui/tooltip";
 import { useDatasetStore } from "@/store/datasetStore";
+import { useUiStore } from "@/store/uiStore";
 import { formulaEngine } from "@/shared/services/formulaEngine";
 import { allFunctions } from "@/shared/services/formula/library";
 import { aiEngine } from "@/features/ai/aiEngine";
+import { providerDisplayName } from "@/features/ai/providerDisplayName";
 import { toast } from "@/shared/hooks/use-toast";
 
 interface CalculatedFieldsManagerProps {
@@ -22,6 +24,8 @@ export function CalculatedFieldsManager({ trigger }: CalculatedFieldsManagerProp
   const activeDataset = useDatasetStore((state) => state.activeDataset);
   const addCalculatedField = useDatasetStore((state) => state.addCalculatedField);
   const deleteCalculatedField = useDatasetStore((state) => state.deleteCalculatedField);
+  const llmApiKey = useUiStore((state) => state.llmApiKey);
+  const llmProvider = useUiStore((state) => state.llmProvider);
 
   const [isOpen, setIsOpen] = useState(false);
   const [fieldName, setFieldName] = useState("");
@@ -174,6 +178,11 @@ export function CalculatedFieldsManager({ trigger }: CalculatedFieldsManagerProp
                   </TooltipContent>
                 </Tooltip>
               </div>
+              {llmApiKey && llmApiKey.trim() !== "" && (
+                <p className="text-[10px] text-muted-foreground">
+                  Sends column names and sample data to {providerDisplayName(llmProvider)}.
+                </p>
+              )}
               {aiError && (
                 <p className="text-[11px] text-destructive font-medium">{aiError}</p>
               )}
