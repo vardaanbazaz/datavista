@@ -178,7 +178,9 @@ export function DashboardSummary() {
         animate={{ opacity: 1, y: 0 }}
         className="text-center py-12"
       >
-        <Database className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+        <div className="w-16 h-16 rounded-2xl bg-muted/40 flex items-center justify-center mx-auto mb-4">
+          <Database className="w-8 h-8 text-muted-foreground" />
+        </div>
         <h3 className="text-lg font-semibold mb-2">No Data Loaded</h3>
         <p className="text-muted-foreground">Upload a dataset to see your dashboard summary</p>
       </motion.div>
@@ -195,16 +197,16 @@ export function DashboardSummary() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-3 bg-transparent">
           {activeDashboard ? (
-            <LayoutDashboard className="h-6 w-6 text-zinc-700 dark:text-zinc-300" />
+            <LayoutDashboard className="h-6 w-6 text-muted-foreground" />
           ) : (
-            <TrendingUp className="h-6 w-6 text-zinc-700 dark:text-zinc-300" />
+            <TrendingUp className="h-6 w-6 text-muted-foreground" />
           )}
           <div className="bg-transparent">
-            <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-zinc-900 to-zinc-600 dark:from-white dark:to-zinc-400">
+            <h2 className="text-h1 text-transparent bg-clip-text bg-gradient-to-r from-foreground to-muted-foreground">
               {activeDashboard ? activeDashboard.name : "Dashboard Overview"}
             </h2>
             {activeDashboard ? (
-              <div className="flex items-center gap-4 mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+              <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <Calendar className="h-3 w-3" />
                   Created {new Date(activeDashboard.createdAt).toLocaleDateString()}
@@ -337,8 +339,8 @@ export function DashboardSummary() {
                   <Database className="h-5 w-5 text-zinc-700 dark:text-zinc-300" />
                 </div>
                 <div>
-                  <p className="text-xs uppercase tracking-wider text-zinc-500 dark:text-zinc-400 font-semibold">Total Rows</p>
-                  <p className="text-3xl font-bold text-zinc-900 dark:text-white tracking-tight">{insights.totalRows.toLocaleString()}</p>
+                  <p className="text-caption uppercase text-textTertiary">Total Rows</p>
+                  <p className="font-mono text-kpi text-zinc-900 dark:text-white">{insights.totalRows.toLocaleString()}</p>
                 </div>
               </div>
             </CardContent>
@@ -357,8 +359,8 @@ export function DashboardSummary() {
                   <Users className="h-5 w-5 text-zinc-700 dark:text-zinc-300" />
                 </div>
                 <div>
-                  <p className="text-xs uppercase tracking-wider text-zinc-500 dark:text-zinc-400 font-semibold">Columns</p>
-                  <p className="text-3xl font-bold text-zinc-900 dark:text-white tracking-tight">{insights.totalColumns}</p>
+                  <p className="text-caption uppercase text-textTertiary">Columns</p>
+                  <p className="font-mono text-kpi text-zinc-900 dark:text-white">{insights.totalColumns}</p>
                   <div className="flex gap-1 mt-1">
                     <Badge variant="outline" className="text-[10px] border-gray-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400">
                       {insights.numericColumns} numeric
@@ -385,8 +387,8 @@ export function DashboardSummary() {
                   <Filter className="h-5 w-5 text-zinc-700 dark:text-zinc-300" />
                 </div>
                 <div>
-                  <p className="text-xs uppercase tracking-wider text-zinc-500 dark:text-zinc-400 font-semibold">Filtered Rows</p>
-                  <p className="text-3xl font-bold text-zinc-900 dark:text-white tracking-tight">{insights.filteredRows.toLocaleString()}</p>
+                  <p className="text-caption uppercase text-textTertiary">Filtered Rows</p>
+                  <p className="font-mono text-kpi text-zinc-900 dark:text-white">{insights.filteredRows.toLocaleString()}</p>
                   <Progress value={insights.filterProgress} className="h-1 mt-2 bg-gray-200 dark:bg-zinc-800" />
                 </div>
               </div>
@@ -406,8 +408,8 @@ export function DashboardSummary() {
                   <PieChart className="h-5 w-5 text-zinc-700 dark:text-zinc-300" />
                 </div>
                 <div>
-                  <p className="text-xs uppercase tracking-wider text-zinc-500 dark:text-zinc-400 font-semibold">Charts Created</p>
-                  <p className="text-3xl font-bold text-zinc-900 dark:text-white tracking-tight">{insights.chartsCreated}</p>
+                  <p className="text-caption uppercase text-textTertiary">Charts Created</p>
+                  <p className="font-mono text-kpi text-zinc-900 dark:text-white">{insights.chartsCreated}</p>
                   {insights.activeFilterCount > 0 && (
                     <Badge className="mt-1 text-[10px] bg-gray-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-gray-300 dark:border-zinc-700">
                       {insights.activeFilterCount} filters active
@@ -444,25 +446,25 @@ export function DashboardSummary() {
                     transition={{ delay: 0.6 + index * 0.1 }}
                     className="p-4 rounded-lg border border-border/50 bg-muted/30"
                   >
-                    <h4 className="font-semibold mb-2 text-sm text-muted-foreground uppercase tracking-wide">
+                    <h4 className="text-caption uppercase text-muted-foreground mb-2">
                       {stat.column}
                     </h4>
-                    <div className="space-y-2 text-sm">
+                    <div className="space-y-2 text-body">
                       <div className="flex justify-between">
                         <span>Average:</span>
-                        <span className="font-medium">{stat.avg.toLocaleString()}</span>
+                        <span className="font-mono text-dataTable">{stat.avg.toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between">
                         <span>Maximum:</span>
-                        <span className="font-medium text-green-600">{stat.max.toLocaleString()}</span>
+                        <span className="font-mono text-dataTable text-success">{stat.max.toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between">
                         <span>Minimum:</span>
-                        <span className="font-medium text-blue-600">{stat.min.toLocaleString()}</span>
+                        <span className="font-mono text-dataTable text-muted-foreground">{stat.min.toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between">
                         <span>Total Sum:</span>
-                        <span className="font-medium">{stat.sum.toLocaleString()}</span>
+                        <span className="font-mono text-dataTable">{stat.sum.toLocaleString()}</span>
                       </div>
                     </div>
                   </motion.div>
@@ -484,7 +486,7 @@ export function DashboardSummary() {
           <div className="border-t pt-6 space-y-4">
             <GlobalFilterBar />
             
-            <h3 className="text-xl font-semibold flex items-center gap-2">
+            <h3 className="text-h2 flex items-center gap-2">
               <LayoutDashboard className="h-5 w-5" />
               Dashboard Widgets ({charts.length + (activeDashboard.kpis?.length || 0)})
             </h3>

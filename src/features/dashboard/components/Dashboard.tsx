@@ -52,11 +52,15 @@ export function Dashboard() {
   const filteredData = useFilterStore((state) => state.filteredData);
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchInitialQuery, setSearchInitialQuery] = useState<string | undefined>(undefined);
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
 
   // Initialize global shortcuts (Cmd+K for Command Palette, Cmd+Z, Cmd+Shift+Z, Cmd+P, etc.)
   useEffect(() => {
-    shortcutManager.init(() => setIsSearchOpen((prev) => !prev));
+    shortcutManager.init(() => {
+      setSearchInitialQuery(undefined);
+      setIsSearchOpen((prev) => !prev);
+    });
 
     const handleOpenSnapshots = () => {
       setActiveView("overview");
@@ -134,7 +138,16 @@ export function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-zinc-950 flex flex-col lg:flex-row text-zinc-900 dark:text-zinc-100 transition-colors">
-      <Sidebar onOpenSearch={() => setIsSearchOpen(true)} />
+      <Sidebar
+        onOpenSearch={() => {
+          setSearchInitialQuery(undefined);
+          setIsSearchOpen(true);
+        }}
+        onOpenAiCoPilot={() => {
+          setSearchInitialQuery("/ai ");
+          setIsSearchOpen(true);
+        }}
+      />
       
       <MainContent>
         {isLoading && (
@@ -160,13 +173,13 @@ export function Dashboard() {
                   transition={{ delay: 0.2, duration: 0.5 }}
                   className="mb-12"
                 >
-                  <div className="w-20 h-20 bg-gray-200 dark:bg-zinc-900 border border-gray-300 dark:border-zinc-800 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                    <BarChart3 className="w-10 h-10 text-zinc-800 dark:text-zinc-200" />
+                  <div className="w-20 h-20 bg-primary/10 border border-primary/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                    <BarChart3 className="w-10 h-10 text-primary" />
                   </div>
-                  <h1 className="text-5xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-zinc-900 to-zinc-600 dark:from-white dark:to-zinc-400">
+                  <h1 className="text-5xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-foreground to-muted-foreground">
                     DataVista Dashboard
                   </h1>
-                  <p className="text-xl text-zinc-500 dark:text-zinc-400 mb-8 max-w-2xl mx-auto">
+                  <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
                     Transform your data into beautiful, interactive visualizations with professional-grade analytics tools
                   </p>
                 </motion.div>
@@ -178,25 +191,25 @@ export function Dashboard() {
                   className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12"
                 >
                   <div className="glass p-6 rounded-xl text-center hover:shadow-md transition-all duration-300">
-                    <Upload className="w-12 h-12 mx-auto mb-4 text-zinc-700 dark:text-zinc-300" />
+                    <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
                     <h3 className="text-lg font-semibold mb-2">Import Data</h3>
-                    <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                    <p className="text-sm text-muted-foreground">
                       Upload CSV, TSV, or XLSX files to get started
                     </p>
                   </div>
-                  
+
                   <div className="glass p-6 rounded-xl text-center hover:shadow-md transition-all duration-300">
-                    <Filter className="w-12 h-12 mx-auto mb-4 text-zinc-700 dark:text-zinc-300" />
+                    <Filter className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
                     <h3 className="text-lg font-semibold mb-2">Smart Filtering</h3>
-                    <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                    <p className="text-sm text-muted-foreground">
                       Advanced filters with real-time data grouping
                     </p>
                   </div>
-                  
+
                   <div className="glass p-6 rounded-xl text-center hover:shadow-md transition-all duration-300">
-                    <BarChart3 className="w-12 h-12 mx-auto mb-4 text-zinc-700 dark:text-zinc-300" />
+                    <BarChart3 className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
                     <h3 className="text-lg font-semibold mb-2">8 Chart Types</h3>
-                    <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                    <p className="text-sm text-muted-foreground">
                       Create stunning visualizations with our chart library
                     </p>
                   </div>
@@ -281,7 +294,7 @@ export function Dashboard() {
               transition={{ delay: 0.1, duration: 0.4 }}
               className="flex items-center justify-between"
             >
-              <h2 className="text-3xl font-bold">Data Filters</h2>
+              <h2 className="text-h1">Data Filters</h2>
               <div className="flex gap-2">
                 <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                   <Button 
@@ -319,7 +332,7 @@ export function Dashboard() {
               transition={{ delay: 0.1, duration: 0.4 }}
               className="flex items-center justify-between"
             >
-              <h2 className="text-3xl font-bold">Chart Builder</h2>
+              <h2 className="text-h1">Chart Builder</h2>
               <div className="flex gap-2">
                 {!activeDataset && (
                   <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
@@ -350,7 +363,7 @@ export function Dashboard() {
                   <>
                     <ChartBuilder />
                     <div className="mt-8">
-                      <h3 className="text-xl font-semibold mb-4">Your Charts</h3>
+                      <h3 className="text-h2 mb-4">Your Charts</h3>
                       <ChartGrid />
                     </div>
                   </>
@@ -392,7 +405,7 @@ export function Dashboard() {
         {!isLoading && activeView === 'data' && (
           <div className="space-y-6 animate-fade-in">
             <div className="flex items-center justify-between">
-              <h2 className="text-3xl font-bold">Data Explorer</h2>
+              <h2 className="text-h1">Data Explorer</h2>
               {activeDataset && (
                 <Button 
                   variant="outline" 
@@ -409,7 +422,7 @@ export function Dashboard() {
         {!isLoading && activeView === 'pivot' && (
           <div className="space-y-6 animate-fade-in w-full">
             <div className="flex items-center justify-between">
-              <h2 className="text-3xl font-bold">Pivot Analyzer</h2>
+              <h2 className="text-h1">Pivot Analyzer</h2>
               {activeDataset && (
                 <Button 
                   variant="outline" 
@@ -430,7 +443,7 @@ export function Dashboard() {
         {!isLoading && activeView === 'stats' && (
           <div className="space-y-6 animate-fade-in w-full">
             <div className="flex items-center justify-between">
-              <h2 className="text-3xl font-bold">Statistical Summary</h2>
+              <h2 className="text-h1">Statistical Summary</h2>
               {activeDataset && (
                 <Button 
                   variant="outline" 
@@ -451,7 +464,7 @@ export function Dashboard() {
         {!isLoading && activeView === 'window-builder' && (
           <div className="space-y-6 animate-fade-in w-full">
             <div className="flex items-center justify-between">
-              <h2 className="text-3xl font-bold">Window & Ranking Builder</h2>
+              <h2 className="text-h1">Window & Ranking Builder</h2>
               {activeDataset && (
                 <Button 
                   variant="outline" 
@@ -483,6 +496,7 @@ export function Dashboard() {
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
         onOpenTemplateModal={() => setIsTemplateModalOpen(true)}
+        initialQuery={searchInitialQuery}
       />
       <InstantiateTemplateModal
         isOpen={isTemplateModalOpen}

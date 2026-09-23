@@ -51,6 +51,7 @@ interface CommandPaletteProps {
   isOpen: boolean;
   onClose: () => void;
   onOpenTemplateModal?: () => void;
+  initialQuery?: string;
 }
 
 type UnifiedItem =
@@ -62,6 +63,7 @@ export function CommandPalette({
   isOpen,
   onClose,
   onOpenTemplateModal,
+  initialQuery,
 }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -90,14 +92,18 @@ export function CommandPalette({
 
   useEffect(() => {
     if (isOpen) {
-      setQuery("");
+      const startQuery = initialQuery ?? "";
+      setQuery(startQuery);
       setSelectedIndex(0);
       setAiError(null);
       setIsAiExecuting(false);
       setAiPreview(null);
-      setTimeout(() => inputRef.current?.focus(), 50);
+      setTimeout(() => {
+        inputRef.current?.focus();
+        inputRef.current?.setSelectionRange(startQuery.length, startQuery.length);
+      }, 50);
     }
-  }, [isOpen]);
+  }, [isOpen, initialQuery]);
 
   const isAiMode = query.startsWith("/ai");
   const aiPromptText = isAiMode ? query.substring(3).trim() : query.trim();

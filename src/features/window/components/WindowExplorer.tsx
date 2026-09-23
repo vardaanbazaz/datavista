@@ -17,7 +17,6 @@ import {
   Columns,
   ArrowUpDown,
   Layers,
-  HelpCircle,
   AlertTriangle
 } from "lucide-react";
 
@@ -102,7 +101,7 @@ export const WindowExplorer: React.FC = () => {
     return (
       <div className="flex flex-col items-center justify-center h-[50vh] text-center select-none animate-fade-in">
         <div className="w-16 h-16 rounded-2xl bg-muted/40 flex items-center justify-center mb-4">
-          <HelpCircle className="w-8 h-8 text-muted-foreground" />
+          <Layers className="w-8 h-8 text-muted-foreground" />
         </div>
         <h3 className="text-lg font-semibold mb-1">No Active Dataset</h3>
         <p className="text-sm text-muted-foreground max-w-sm">
@@ -484,7 +483,7 @@ export const WindowExplorer: React.FC = () => {
           <Card className="glass border-border/80 shadow-md">
             <CardHeader className="pb-3 select-none">
               <CardTitle className="text-sm font-bold flex items-center gap-2">
-                <Columns className="w-5 h-5 text-secondary" />
+                <Columns className="w-5 h-5 text-primary" />
                 Configured Window Columns ({activeDataset.windowQueries.length})
               </CardTitle>
             </CardHeader>

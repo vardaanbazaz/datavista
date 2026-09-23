@@ -27,9 +27,13 @@ export function ExportPanel() {
 
   if (!dataset) {
     return (
-      <div className="text-center py-12">
-        <p className="text-muted-foreground">
-          No dataset selected. Upload data to start exporting.
+      <div className="flex flex-col items-center justify-center py-12 text-center select-none">
+        <div className="w-16 h-16 rounded-2xl bg-muted/40 flex items-center justify-center mb-4">
+          <Download className="w-8 h-8 text-muted-foreground" />
+        </div>
+        <h3 className="text-lg font-semibold mb-1">No Active Dataset</h3>
+        <p className="text-sm text-muted-foreground max-w-sm">
+          Upload or select a dataset first to start exporting.
         </p>
       </div>
     );

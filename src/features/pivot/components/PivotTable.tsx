@@ -121,8 +121,8 @@ export const PivotTable: React.FC<PivotTableProps> = ({ result }) => {
             key={`${d}-${colIdx}-${value}`}
             colSpan={span * valueFields.length}
             className={cn(
-              "px-4 py-2 border border-gray-200 dark:border-white/10 text-center text-xs font-semibold uppercase tracking-wider transition-all duration-200",
-              colNode.isTotal ? "bg-accent/30 text-accent-foreground font-bold" : "bg-gray-50 dark:bg-zinc-900/50 text-gray-500 dark:text-zinc-400",
+              "px-4 py-2 border border-border text-center text-caption uppercase transition-all duration-200",
+              colNode.isTotal ? "bg-primary/10 text-primary font-bold" : "bg-muted/50 text-textTertiary",
               d === 0 && "border-t-0"
             )}
           >
@@ -138,17 +138,17 @@ export const PivotTable: React.FC<PivotTableProps> = ({ result }) => {
           {d === 0 && (
             <th
               rowSpan={numDims + (valueFields.length > 1 ? 1 : 0)}
-              className="px-4 py-3 border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-zinc-900/50 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-zinc-400 align-middle min-w-[200px]"
+              className="px-4 py-3 border border-border bg-muted/50 text-left text-caption uppercase text-textTertiary align-middle min-w-[200px]"
             >
               <div className="flex flex-col gap-1">
-                <span className="text-[10px] text-primary tracking-widest font-extrabold uppercase">Rows</span>
-                <span className="text-sm font-semibold text-zinc-900 dark:text-white">
+                <span className="text-caption uppercase text-textTertiary">Rows</span>
+                <span className="text-body font-semibold text-foreground normal-case">
                   {rowDimensions.join(" → ") || "Grand Total"}
                 </span>
                 {columnDimensions.length > 0 && (
                   <>
-                    <span className="text-[10px] text-secondary tracking-widest font-extrabold uppercase mt-1">Columns</span>
-                    <span className="text-xs text-gray-500 dark:text-zinc-400">
+                    <span className="text-caption uppercase text-textTertiary mt-1">Columns</span>
+                    <span className="text-xs text-muted-foreground normal-case">
                       {columnDimensions.join(" → ")}
                     </span>
                   </>
@@ -170,8 +170,8 @@ export const PivotTable: React.FC<PivotTableProps> = ({ result }) => {
             <th
               key={`vf-${colNode.path.join("-")}-${aggregationAdapter.getValueFieldAlias(vf)}`}
               className={cn(
-                "px-2 py-1.5 border border-gray-200 dark:border-white/10 text-center text-[10px] font-medium tracking-wider uppercase bg-gray-50 dark:bg-zinc-900/50 text-gray-500 dark:text-zinc-400",
-                colNode.isTotal && "bg-accent/20 text-accent-foreground font-bold"
+                "px-2 py-1.5 border border-border text-center text-caption uppercase bg-muted/50 text-textTertiary",
+                colNode.isTotal && "bg-primary/10 text-primary font-bold"
               )}
             >
               {vf.displayName}
@@ -200,20 +200,20 @@ export const PivotTable: React.FC<PivotTableProps> = ({ result }) => {
   };
 
   return (
-    <div className="w-full overflow-hidden rounded-xl glass border border-gray-200 dark:border-white/10 shadow-2xl">
+    <div className="w-full overflow-hidden rounded-xl glass border border-border shadow-2xl">
       <div className="w-full overflow-auto max-h-[70vh]">
         <table className="w-full border-collapse text-sm">
           <thead>
             {renderColumnHeaders()}
             {columnDimensions.length === 0 && (
               <tr>
-                <th className="px-4 py-3 border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-zinc-900/50 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-zinc-400 min-w-[200px]">
+                <th className="px-4 py-3 border border-border bg-muted/50 text-left text-caption uppercase text-textTertiary min-w-[200px]">
                   Rows
                 </th>
                 {valueFields.map((vf) => (
                   <th
                     key={`header-vf-${aggregationAdapter.getValueFieldAlias(vf)}`}
-                    className="px-4 py-3 border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-zinc-900/50 text-center text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-zinc-400"
+                    className="px-4 py-3 border border-border bg-muted/50 text-center text-caption uppercase text-textTertiary"
                   >
                     {vf.displayName}
                   </th>
@@ -231,9 +231,9 @@ export const PivotTable: React.FC<PivotTableProps> = ({ result }) => {
                 <tr
                   key={`row-${rowNode.path.join("-")}-${rowNode.key}`}
                   className={cn(
-                    "hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors duration-150 border-b border-gray-100 dark:border-white/5",
-                    isGrandTotalRow && "bg-accent/20 font-bold border-t-2 border-double border-accent/50",
-                    isParentRow && !isGrandTotalRow && "bg-gray-50/50 dark:bg-zinc-900/30 font-semibold"
+                    "hover:bg-muted/50 transition-colors duration-150 border-b border-border/60",
+                    isGrandTotalRow && "bg-tertiary/20 font-bold border-t-2 border-double border-tertiary/40",
+                    isParentRow && !isGrandTotalRow && "bg-muted/30 font-semibold"
                   )}
                 >
                   {/* Row Header Cell with Nesting Indentation */}
@@ -259,8 +259,8 @@ export const PivotTable: React.FC<PivotTableProps> = ({ result }) => {
                         <td
                           key={`cell-${rowNode.path.join("-")}-${colNode.path.join("-")}-${alias}`}
                           className={cn(
-                            "px-4 py-2 border border-border text-right tabular-nums transition-all duration-200",
-                            colNode.isTotal || isGrandTotalRow ? "bg-accent/10 font-semibold" : "",
+                            "px-4 py-2 border border-border text-right font-mono text-dataTable tabular-nums transition-all duration-200",
+                            colNode.isTotal || isGrandTotalRow ? "bg-tertiary/20 font-semibold" : "",
                             isParentRow && !isGrandTotalRow ? "font-semibold" : ""
                           )}
                         >
@@ -289,11 +289,11 @@ export const PivotTable: React.FC<PivotTableProps> = ({ result }) => {
       <div className="p-3 bg-muted/30 border-t border-border flex justify-between items-center text-xs text-muted-foreground select-none">
         <div>
           <span>Processed in </span>
-          <span className="font-semibold text-foreground">{result.metadata.processingTimeMs.toFixed(1)}ms</span>
+          <span className="font-mono text-dataTable text-foreground">{result.metadata.processingTimeMs.toFixed(1)}ms</span>
         </div>
         <div className="flex gap-4">
-          <span>Rows: <span className="font-semibold text-foreground">{result.rows.length}</span></span>
-          <span>Columns: <span className="font-semibold text-foreground">{result.columns.length}</span></span>
+          <span>Rows: <span className="font-mono text-dataTable text-foreground">{result.rows.length}</span></span>
+          <span>Columns: <span className="font-mono text-dataTable text-foreground">{result.columns.length}</span></span>
         </div>
       </div>
     </div>

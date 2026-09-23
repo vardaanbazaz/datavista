@@ -206,7 +206,7 @@ export function GlobalFilterBar() {
                   {isCrossFilter ? (
                     <Tag className="h-3 w-3 text-primary shrink-0" />
                   ) : (
-                    <SlidersHorizontal className="h-3 w-3 text-accent shrink-0" />
+                    <SlidersHorizontal className="h-3 w-3 text-primary shrink-0" />
                   )}
                   <span className="max-w-[200px] truncate" title={filter.label}>
                     {filter.label || `${filter.column} = ${String(filter.value)}`}

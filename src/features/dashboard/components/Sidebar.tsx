@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { ErrorBoundary } from "@/shared/components/ErrorBoundary";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/components/ui/button";
 import { ScrollArea } from "@/shared/components/ui/scroll-area";
@@ -42,16 +41,20 @@ import { ThemeToggle } from "@/shared/components/ThemeToggle";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/components/ui/tooltip";
 import { motion } from "framer-motion";
 import { Sparkles } from "lucide-react";
-import { AiSettingsModal } from "@/features/ai/components/AiSettingsModal";
 
-export function Sidebar({ onOpenSearch }: { onOpenSearch?: () => void }) {
+export function Sidebar({
+  onOpenSearch,
+  onOpenAiCoPilot,
+}: {
+  onOpenSearch?: () => void;
+  onOpenAiCoPilot?: () => void;
+}) {
   const activeView = useUiStore((state) => state.activeView);
   const onViewChange = useUiStore((state) => state.setActiveView);
   const resetTour = useUiStore((state) => state.resetTour);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isInstantiateModalOpen, setIsInstantiateModalOpen] = useState(false);
-  const [isAiSettingsModalOpen, setIsAiSettingsModalOpen] = useState(false);
-  
+
   const datasets = useDatasetStore((state) => state.datasets);
   const activeDataset = useDatasetStore((state) => state.activeDataset);
   const onDatasetSelect = useDatasetStore((state) => state.selectDataset);
@@ -185,10 +188,10 @@ export function Sidebar({ onOpenSearch }: { onOpenSearch?: () => void }) {
             <TrendingUp className="w-5 h-5 text-zinc-800 dark:text-zinc-200" />
           </div>
           <div className="flex-1 bg-transparent">
-            <h1 className="text-transparent bg-clip-text bg-gradient-to-r from-zinc-900 to-zinc-600 dark:from-white dark:to-zinc-400 font-bold text-xl">
+            <h1 className="text-transparent bg-clip-text bg-gradient-to-r from-zinc-900 to-zinc-600 dark:from-white dark:to-zinc-400 text-h2">
               DataVista
             </h1>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">Data Visualization</p>
+            <p className="text-body text-zinc-500 dark:text-zinc-400">Data Visualization</p>
           </div>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -196,15 +199,15 @@ export function Sidebar({ onOpenSearch }: { onOpenSearch?: () => void }) {
                 variant="ghost"
                 size="icon"
                 className="h-9 w-9 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-zinc-900"
-                onClick={() => setIsAiSettingsModalOpen(true)}
-                aria-label="AI Co-Pilot Settings"
+                onClick={() => onOpenAiCoPilot?.()}
+                aria-label="Ask AI Co-Pilot"
                 data-tour="header-copilot"
               >
                 <Sparkles className="h-5 w-5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              <p className="text-xs">Configure AI Co-Pilot settings and API keys</p>
+              <p className="text-xs">Ask AI Co-Pilot (settings available inside)</p>
             </TooltipContent>
           </Tooltip>
 
@@ -239,13 +242,6 @@ export function Sidebar({ onOpenSearch }: { onOpenSearch?: () => void }) {
             <Menu className="h-5 w-5" />
           </Button>
         </div>
-        
-        <ErrorBoundary fallback={null}>
-          <AiSettingsModal
-            isOpen={isAiSettingsModalOpen}
-            onClose={() => setIsAiSettingsModalOpen(false)}
-          />
-        </ErrorBoundary>
 
         <Tooltip>
           <TooltipTrigger asChild>
@@ -341,7 +337,7 @@ export function Sidebar({ onOpenSearch }: { onOpenSearch?: () => void }) {
                   key={index}
                   className={cn(
                     "flex items-center gap-1 rounded-md group pr-1 transition-colors w-full",
-                    activeDataset === dataset && !activeDashboardId ? "bg-secondary" : "hover:bg-muted/50"
+                    activeDataset === dataset && !activeDashboardId ? "bg-primary/15" : "hover:bg-muted/50"
                   )}
                 >
                   <Button
@@ -458,7 +454,7 @@ export function Sidebar({ onOpenSearch }: { onOpenSearch?: () => void }) {
                   key={dash.id}
                   className={cn(
                     "flex items-center gap-1 rounded-md group pr-1 transition-colors w-full",
-                    activeDashboardId === dash.id ? "bg-secondary" : "hover:bg-muted/50"
+                    activeDashboardId === dash.id ? "bg-primary/15" : "hover:bg-muted/50"
                   )}
                 >
                   <Button

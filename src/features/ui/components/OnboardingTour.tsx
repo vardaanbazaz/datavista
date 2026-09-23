@@ -65,7 +65,7 @@ export const OnboardingTour: React.FC = () => {
     // --- HEADER ACTIONS ---
     {
       target: '[data-tour="header-copilot"]',
-      content: "AI Co-Pilot: Click the star to configure your API keys and ask natural language queries.",
+      content: "AI Co-Pilot: Click the star to ask natural language queries. API key settings live inside that panel too.",
     },
     {
       target: '[data-tour="header-tutorial"]',

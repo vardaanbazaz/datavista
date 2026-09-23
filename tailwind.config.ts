@@ -19,7 +19,41 @@ export default {
 			}
 		},
 		extend: {
+			fontFamily: {
+				sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+				mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+			},
+			fontSize: {
+				display: ['2rem', { lineHeight: '2.5rem', fontWeight: '700' }],
+				h1: ['1.5rem', { lineHeight: '2rem', fontWeight: '600' }],
+				h2: ['1.125rem', { lineHeight: '1.625rem', fontWeight: '600' }],
+				h3: ['0.9375rem', { lineHeight: '1.375rem', fontWeight: '600' }],
+				body: ['0.875rem', { lineHeight: '1.25rem', fontWeight: '400' }],
+				caption: ['0.6875rem', { lineHeight: '1rem', fontWeight: '500', letterSpacing: '0.07em' }],
+				kpi: ['1.75rem', { lineHeight: '2rem', fontWeight: '700' }],
+				dataTable: ['0.875rem', { lineHeight: '1.25rem', fontWeight: '500' }],
+			},
 			colors: {
+				zinc: {
+					50: '#fafafa',
+					100: '#f4f4f5',
+					200: '#e4e4e7',
+					300: '#d4d4d8',
+					400: '#a1a1aa',
+					500: '#71717a',
+					600: '#333846',
+					700: '#262A35',
+					800: '#1A1D26',
+					900: '#13151C',
+					950: '#0A0B10',
+				},
+				tertiary: {
+					DEFAULT: 'hsl(var(--tertiary))',
+					foreground: 'hsl(var(--tertiary-foreground))',
+				},
+				success: 'hsl(var(--success))',
+				textTertiary: 'hsl(var(--text-tertiary))',
+				borderStrong: 'hsl(var(--border-strong))',
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',
 				ring: 'hsl(var(--ring))',
@@ -108,8 +142,8 @@ export default {
 					to: { opacity: '1', transform: 'scale(1)' }
 				},
 				'pulse-glow': {
-					'0%, 100%': { opacity: '1', filter: 'drop-shadow(0 0 15px rgba(59, 130, 246, 0.5))' },
-					'50%': { opacity: '0.7', filter: 'drop-shadow(0 0 5px rgba(59, 130, 246, 0.2))' }
+					'0%, 100%': { opacity: '1', filter: 'drop-shadow(0 0 15px rgba(124, 36, 56, 0.5))' },
+					'50%': { opacity: '0.7', filter: 'drop-shadow(0 0 5px rgba(124, 36, 56, 0.2))' }
 				}
 			},
 			animation: {

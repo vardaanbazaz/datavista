@@ -172,7 +172,7 @@ export function KPICard({ config, onRemove, onEdit, isMobile = false }: KPICardP
           {!isMobile && (
             <GripVertical className="h-4 w-4 text-zinc-400 dark:text-zinc-500 cursor-grab active:cursor-grabbing shrink-0" />
           )}
-          <span className="text-xs uppercase tracking-wider text-zinc-500 dark:text-zinc-400 font-semibold truncate">
+          <span className="text-caption uppercase text-textTertiary truncate">
             {config.title}
           </span>
         </div>
@@ -206,7 +206,7 @@ export function KPICard({ config, onRemove, onEdit, isMobile = false }: KPICardP
       >
         <div className="flex flex-col justify-center min-w-0 pr-4">
           <span
-            className="text-3xl font-bold text-zinc-900 dark:text-white tracking-tight truncate leading-none mb-2"
+            className="font-mono text-kpi text-zinc-900 dark:text-white truncate leading-none mb-2"
             style={formatStyle?.textColor ? { color: formatStyle.textColor } : undefined}
           >
             {formattedValue}

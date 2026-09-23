@@ -1,3 +1,10 @@
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+@import "@fontsource/jetbrains-mono/500.css";
+@import "@fontsource/jetbrains-mono/700.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -88,8 +95,14 @@
     --destructive-foreground: 0 0% 98%;
 
     --border: 220 13% 91%;
+    --border-strong: 220 13% 80%;
     --input: 220 13% 91%;
     --ring: 220 90% 56%;
+
+    --tertiary: 46 65% 52%;
+    --tertiary-foreground: 220 25% 15%;
+    --success: 142 71% 45%;
+    --text-tertiary: 220 10% 46%;
 
     --radius: 0.75rem;
 
@@ -125,53 +138,67 @@
   }
 
   .dark {
-    /* Dark Mode - Series-A Dark Depth */
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
+    /* DataVista 2026 redesign — maroon / near-black / gold, per approved Figma tokens.
+       HSL values carried to 4 decimals — verified to round-trip byte-exact to the
+       approved hex (see docs/superpowers/plans/2026-09-21-visual-redesign.md). */
+    --background: 230 23.0769% 5.0980%;
+    --foreground: 220 15.7895% 96.2745%;
 
-    --card: 240 5.9% 10%;
-    --card-foreground: 0 0% 98%;
-    --glass: 240 5.9% 10%;
+    --card: 226.6667 19.1489% 9.2157%;
+    --card-foreground: 220 15.7895% 96.2745%;
+    --glass: 226.6667 19.1489% 9.2157%;
 
-    --popover: 240 5.9% 10%;
-    --popover-foreground: 0 0% 98%;
+    --popover: 226.6667 19.1489% 9.2157%;
+    --popover-foreground: 220 15.7895% 96.2745%;
 
-    --primary: 220 90% 65%;
-    --primary-foreground: 220 25% 8%;
-    --primary-glow: 220 85% 70%;
+    --primary: 346.3636 55.0000% 31.3725%;
+    --primary-foreground: 220 15.7895% 96.2745%;
+    --primary-glow: 346.3636 55.0000% 41.3725%;
 
-    --secondary: 260 85% 65%;
-    --secondary-foreground: 220 25% 8%;
+    --secondary: 30 8.3333% 4.7059%;
+    --secondary-foreground: 220 15.7895% 96.2745%;
 
-    --accent: 280 85% 68%;
-    --accent-foreground: 220 25% 8%;
-    --chart-1: 220 90% 65%;
-    --chart-2: 260 85% 65%;
-    --chart-3: 280 85% 68%;
-    --chart-4: 340 80% 65%;
-    --chart-5: 30 90% 60%;
+    --accent: 225 18.7500% 12.5490%;
+    --accent-foreground: 220 15.7895% 96.2745%;
+    /* Categorical chart ramp — dataviz skill validated default (blue/orange/aqua/
+       yellow/magenta, dark steps), NOT brand Main/Tertiary — series color must
+       stay distinct from Main's "active/selected" UI meaning and Tertiary's
+       AI-accent meaning. Validated vs our #13151C surface: all pass, worst
+       adjacent CVD ΔE 8.4 — floor band, requires legend/direct-label (already
+       present) per dataviz skill's secondary-encoding rule. See plan Decision 4. */
+    --chart-1: 212.7907 76.7857% 56.0784%;
+    --chart-2: 17.0950 70.1961% 50.0000%;
+    --chart-3: 159.2481 72.6776% 35.8824%;
+    --chart-4: 39.7015 100.0000% 39.4118%;
+    --chart-5: 338.1818 61.1111% 57.6471%;
 
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
+    --muted: 225 18.7500% 12.5490%;
+    --muted-foreground: 222 12.1951% 67.8431%;
 
-    --destructive: 0 84% 65%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive: 4.3114 89.3048% 63.3333%;
+    --destructive-foreground: 230 23.0769% 5.0980%;
 
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 220 90% 65%;
+    --border: 224 16.4835% 17.8431%;
+    --border-strong: 224.2105 15.7025% 23.7255%;
+    --input: 224 16.4835% 17.8431%;
+    --ring: 346.3636 55.0000% 31.3725%;
 
-    --gradient-glass: linear-gradient(135deg, rgba(24, 24, 27, 0.9), rgba(24, 24, 27, 0.95));
+    --tertiary: 45.8599 64.6091% 52.3529%;
+    --tertiary-foreground: 230 23.0769% 5.0980%;
+    --success: 142.0859 70.5628% 45.2941%;
+    --text-tertiary: 220 8.9362% 46.0784%;
+
+    --gradient-glass: linear-gradient(135deg, hsl(226.6667 19.1489% 9.2157% / 0.9), hsl(226.6667 19.1489% 9.2157% / 0.95));
     --shadow-glass: none;
 
-    --sidebar-background: 240 10% 3.9%;
-    --sidebar-foreground: 0 0% 98%;
-    --sidebar-primary: 220 90% 65%;
-    --sidebar-primary-foreground: 220 25% 8%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 220 90% 65%;
+    --sidebar-background: 230 23.0769% 5.0980%;
+    --sidebar-foreground: 220 15.7895% 96.2745%;
+    --sidebar-primary: 346.3636 55.0000% 31.3725%;
+    --sidebar-primary-foreground: 220 15.7895% 96.2745%;
+    --sidebar-accent: 225 18.7500% 12.5490%;
+    --sidebar-accent-foreground: 220 15.7895% 96.2745%;
+    --sidebar-border: 224 16.4835% 17.8431%;
+    --sidebar-ring: 346.3636 55.0000% 31.3725%;
   }
 }
 

@@ -97,7 +97,7 @@ export const PivotExplorer: React.FC = () => {
     return (
       <div className="flex flex-col items-center justify-center h-[60vh] text-center select-none animate-fade-in">
         <div className="w-16 h-16 rounded-2xl bg-muted/40 flex items-center justify-center mb-4">
-          <AlertCircle className="w-8 h-8 text-muted-foreground" />
+          <Grid3X3 className="w-8 h-8 text-muted-foreground" />
         </div>
         <h3 className="text-lg font-semibold mb-1">No Active Dataset</h3>
         <p className="text-sm text-muted-foreground max-w-sm">
@@ -124,7 +124,7 @@ export const PivotExplorer: React.FC = () => {
                 </span>
               </div>
               {filteredData.length !== activeDataset.data.length && (
-                <div className="flex items-center gap-1.5 text-xs text-secondary font-medium bg-secondary/10 px-2.5 py-1 rounded-full border border-secondary/20">
+                <div className="flex items-center gap-1.5 text-xs text-primary font-medium bg-primary/10 px-2.5 py-1 rounded-full border border-primary/20">
                   <RefreshCw className="w-3 h-3 animate-spin-slow" />
                   <span>Filtered View Active ({filteredData.length} / {activeDataset.data.length} rows)</span>
                 </div>
@@ -151,8 +151,8 @@ export const PivotExplorer: React.FC = () => {
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center h-[50vh] border border-dashed border-border rounded-xl bg-muted/5 text-center select-none">
-            <div className="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center mb-3">
-              <Grid3X3 className="w-6 h-6 text-accent" />
+            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
+              <Grid3X3 className="w-6 h-6 text-primary" />
             </div>
             <h4 className="text-sm font-semibold mb-1">Pivot Table Unconfigured</h4>
             <p className="text-xs text-muted-foreground max-w-xs px-4">

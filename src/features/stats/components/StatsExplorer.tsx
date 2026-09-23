@@ -22,7 +22,6 @@ import {
   TrendingUp,
   AlertTriangle,
   Grid3X3,
-  HelpCircle,
   Percent,
   Compass,
   ArrowRightLeft
@@ -126,7 +125,7 @@ export const StatsExplorer: React.FC = () => {
     return (
       <div className="flex flex-col items-center justify-center h-[50vh] text-center select-none animate-fade-in">
         <div className="w-16 h-16 rounded-2xl bg-muted/40 flex items-center justify-center mb-4">
-          <HelpCircle className="w-8 h-8 text-muted-foreground" />
+          <TrendingUp className="w-8 h-8 text-muted-foreground" />
         </div>
         <h3 className="text-lg font-semibold mb-1">No Active Dataset</h3>
         <p className="text-sm text-muted-foreground max-w-sm">
@@ -139,8 +138,8 @@ export const StatsExplorer: React.FC = () => {
   if (numericColumns.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-[50vh] text-center select-none animate-fade-in">
-        <div className="w-16 h-16 rounded-2xl bg-muted/40 flex items-center justify-center mb-4">
-          <AlertTriangle className="w-8 h-8 text-amber-500" />
+        <div className="w-16 h-16 rounded-full bg-muted/40 flex items-center justify-center mb-4">
+          <AlertTriangle className="w-8 h-8 text-muted-foreground" />
         </div>
         <h3 className="text-lg font-semibold mb-1">No Numeric Fields</h3>
         <p className="text-sm text-muted-foreground max-w-sm">
@@ -188,7 +187,7 @@ export const StatsExplorer: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fade-in">
         {/* Column Select Panel */}
         <div className="glass p-4 rounded-xl space-y-4">
-          <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider select-none">
+          <label className="text-caption uppercase text-textTertiary select-none">
             Selected Column
           </label>
           <div className="space-y-1.5 max-h-[50vh] overflow-y-auto pr-1">
@@ -215,7 +214,7 @@ export const StatsExplorer: React.FC = () => {
         {/* Statistics Summary Grid */}
         <div className="md:col-span-2 glass p-5 rounded-xl space-y-4">
           <div className="flex justify-between items-center select-none border-b border-border/60 pb-3">
-            <h3 className="font-semibold text-lg flex items-center gap-2">
+            <h3 className="text-h2 flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-primary" />
               <span>Descriptive Analysis: {selectedColumn}</span>
             </h3>
@@ -231,7 +230,10 @@ export const StatsExplorer: React.FC = () => {
                     <span className="text-xs font-semibold text-foreground">{row.label}</span>
                     <p className="text-[10px] text-muted-foreground leading-relaxed select-none">{row.desc}</p>
                   </div>
-                  <span className="text-sm font-bold text-foreground tabular-nums text-left sm:text-right mt-1.5 sm:mt-0 shrink-0">
+                  <span className={cn(
+                    "font-mono text-dataTable tabular-nums text-left sm:text-right mt-1.5 sm:mt-0 shrink-0",
+                    row.label === "Maximum" ? "text-success" : row.label === "Minimum" ? "text-muted-foreground" : "text-foreground"
+                  )}>
                     {formatVal(row.val)}
                   </span>
                 </div>
@@ -261,8 +263,8 @@ export const StatsExplorer: React.FC = () => {
     return (
       <div className="glass p-5 rounded-xl space-y-4 animate-fade-in w-full overflow-hidden">
         <div className="flex justify-between items-center select-none border-b border-border/60 pb-3">
-          <h3 className="font-semibold text-lg flex items-center gap-2">
-            <ArrowRightLeft className="w-5 h-5 text-secondary" />
+          <h3 className="text-h2 flex items-center gap-2">
+            <ArrowRightLeft className="w-5 h-5 text-primary" />
             <span>Pearson Correlation Matrix</span>
           </h3>
           <span className="text-xs text-muted-foreground">Color coding highlights strong relationships (r ≥ ±0.7)</span>
@@ -300,7 +302,7 @@ export const StatsExplorer: React.FC = () => {
                       <td
                         key={`td-${rowCol}-${colCol}`}
                         className={cn(
-                          "px-4 py-2.5 border border-border text-center tabular-nums transition-all duration-200 border-opacity-30",
+                          "px-4 py-2.5 border border-border text-center font-mono text-dataTable tabular-nums transition-all duration-200 border-opacity-30",
                           getCorrBgColor(r)
                         )}
                       >
@@ -326,7 +328,7 @@ export const StatsExplorer: React.FC = () => {
         {/* Outlier Control Panel */}
         <div className="glass p-4 rounded-xl space-y-5">
           <div className="space-y-1">
-            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider select-none">
+            <span className="text-caption uppercase text-textTertiary select-none">
               Selected Column
             </span>
             <Select value={selectedColumn} onValueChange={setSelectedColumn}>
@@ -345,7 +347,7 @@ export const StatsExplorer: React.FC = () => {
 
           {/* Outlier Method */}
           <div className="space-y-2 select-none">
-            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+            <span className="text-caption uppercase text-textTertiary">
               Detection Method
             </span>
             <div className="grid grid-cols-2 gap-2">
@@ -361,7 +363,7 @@ export const StatsExplorer: React.FC = () => {
                 size="sm"
                 variant="outline"
                 onClick={() => setOutlierMethod("zscore")}
-                className={cn("text-xs h-8.5", outlierMethod === "zscore" && "bg-secondary/20 hover:bg-secondary/30 border-secondary text-secondary")}
+                className={cn("text-xs h-8.5", outlierMethod === "zscore" && "bg-primary/15 hover:bg-primary/20 border-primary text-primary")}
               >
                 Z-Score
               </Button>
@@ -371,10 +373,10 @@ export const StatsExplorer: React.FC = () => {
           {/* Slider Threshold */}
           <div className="space-y-2 select-none">
             <div className="flex justify-between items-center">
-              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+              <span className="text-caption uppercase text-textTertiary">
                 Threshold
               </span>
-              <span className="text-xs font-bold text-foreground font-mono">{outlierThreshold.toFixed(1)}</span>
+              <span className="font-mono text-dataTable text-foreground">{outlierThreshold.toFixed(1)}</span>
             </div>
             <input
               type="range"
@@ -395,8 +397,8 @@ export const StatsExplorer: React.FC = () => {
         {/* Outliers List Panel */}
         <div className="md:col-span-2 glass p-5 rounded-xl space-y-4">
           <div className="flex justify-between items-center select-none border-b border-border/60 pb-3">
-            <h3 className="font-semibold text-lg flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-amber-500" />
+            <h3 className="text-h2 flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-tertiary" />
               <span>Outliers Detected ({outliers.count})</span>
             </h3>
             <div className="flex gap-2">
@@ -426,16 +428,16 @@ export const StatsExplorer: React.FC = () => {
                     key={`outlier-${record.index}-${index}`}
                     className="hover:bg-muted/20 border-b border-border/40 transition-colors"
                   >
-                    <td className="px-3 py-2 tabular-nums font-mono text-muted-foreground">{record.index + 1}</td>
-                    <td className="px-3 py-2 tabular-nums font-semibold text-foreground">{record.value.toLocaleString()}</td>
-                    <td className="px-3 py-2 tabular-nums text-right text-destructive font-semibold">
+                    <td className="px-3 py-2 font-mono text-dataTable tabular-nums text-muted-foreground">{record.index + 1}</td>
+                    <td className="px-3 py-2 font-mono text-dataTable tabular-nums text-foreground">{record.value.toLocaleString()}</td>
+                    <td className="px-3 py-2 font-mono text-dataTable tabular-nums text-right text-destructive">
                       {record.score.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 3 })}
                     </td>
                   </tr>
                 ))}
                 {outliers.outliers.length === 0 && (
                   <tr>
-                    <td colSpan={3} className="px-3 py-12 text-center text-muted-foreground italic select-none">
+                    <td colSpan={3} className="px-3 py-12 text-center text-muted-foreground select-none">
                       No outliers detected with current configuration.
                     </td>
                   </tr>
@@ -452,8 +454,8 @@ export const StatsExplorer: React.FC = () => {
     if (!pivotResult) {
       return (
         <div className="flex flex-col items-center justify-center h-[50vh] border border-dashed border-border rounded-xl bg-muted/5 text-center select-none animate-fade-in">
-          <div className="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center mb-3">
-            <Grid3X3 className="w-6 h-6 text-accent" />
+          <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
+            <Grid3X3 className="w-6 h-6 text-primary" />
           </div>
           <h4 className="text-sm font-semibold mb-1">No Active Pivot Grid</h4>
           <p className="text-xs text-muted-foreground max-w-xs px-4">
@@ -480,7 +482,7 @@ export const StatsExplorer: React.FC = () => {
         {/* Pivot Selector Panel */}
         <div className="glass p-4 rounded-xl space-y-4">
           <div className="space-y-2 select-none">
-            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+            <span className="text-caption uppercase text-textTertiary">
               Slicing Mode
             </span>
             <div className="grid grid-cols-2 gap-2">
@@ -496,7 +498,7 @@ export const StatsExplorer: React.FC = () => {
                 size="sm"
                 variant="outline"
                 onClick={() => setPivotSliceType("col")}
-                className={cn("text-xs h-8.5", pivotSliceType === "col" && "bg-secondary/20 hover:bg-secondary/30 border-secondary text-secondary")}
+                className={cn("text-xs h-8.5", pivotSliceType === "col" && "bg-primary/15 hover:bg-primary/20 border-primary text-primary")}
               >
                 Analyze Column
               </Button>
@@ -508,7 +510,7 @@ export const StatsExplorer: React.FC = () => {
           {/* Slices Select */}
           {pivotSliceType === 'row' ? (
             <div className="space-y-1">
-              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+              <span className="text-caption uppercase text-textTertiary">
                 Select Row Group
               </span>
               <Select value={selectedPivotRowKey} onValueChange={setSelectedPivotRowKey}>
@@ -525,7 +527,7 @@ export const StatsExplorer: React.FC = () => {
             </div>
           ) : (
             <div className="space-y-1">
-              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+              <span className="text-caption uppercase text-textTertiary">
                 Select Column Group
               </span>
               <Select value={selectedPivotColKey} onValueChange={setSelectedPivotColKey}>
@@ -544,7 +546,7 @@ export const StatsExplorer: React.FC = () => {
 
           {/* Value Aggregations Select */}
           <div className="space-y-1">
-            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+            <span className="text-caption uppercase text-textTertiary">
               Aggregate Metric
             </span>
             <Select value={selectedPivotValField} onValueChange={setSelectedPivotValField}>
@@ -564,8 +566,8 @@ export const StatsExplorer: React.FC = () => {
         {/* Pivot Slice Summary Panel */}
         <div className="md:col-span-2 glass p-5 rounded-xl space-y-4">
           <div className="flex justify-between items-center select-none border-b border-border/60 pb-3">
-            <h3 className="font-semibold text-lg flex items-center gap-2">
-              <Compass className="w-5 h-5 text-accent" />
+            <h3 className="text-h2 flex items-center gap-2">
+              <Compass className="w-5 h-5 text-primary" />
               <span>
                 Pivot Summary: {pivotSliceType === 'row' ? selectedPivotRowKey : selectedPivotColKey} ({valFields.find(vf => aggregationAdapter.getValueFieldAlias(vf) === selectedPivotValField)?.displayName || selectedPivotValField})
               </span>
@@ -594,7 +596,10 @@ export const StatsExplorer: React.FC = () => {
                     className="flex items-center justify-between p-2.5 rounded-lg bg-muted/20 border border-border/40 hover:bg-muted/30 transition-all"
                   >
                     <span className="text-xs font-semibold text-foreground">{row.label}</span>
-                    <span className="text-xs font-bold text-foreground tabular-nums">
+                    <span className={cn(
+                      "font-mono text-dataTable tabular-nums",
+                      row.label === "Maximum" ? "text-success" : row.label === "Minimum" ? "text-muted-foreground" : "text-foreground"
+                    )}>
                       {formatVal(row.val)}
                     </span>
                   </div>
@@ -642,7 +647,7 @@ export const StatsExplorer: React.FC = () => {
         </div>
         
         {filteredData.length !== activeDataset.data.length && (
-          <div className="flex items-center gap-1.5 text-xs text-secondary font-medium bg-secondary/10 px-2.5 py-1 rounded-full border border-secondary/20 mt-2 sm:mt-0">
+          <div className="flex items-center gap-1.5 text-xs text-primary font-medium bg-primary/10 px-2.5 py-1 rounded-full border border-primary/20 mt-2 sm:mt-0">
             <Percent className="w-3.5 h-3.5" />
             <span>Analyzing Filtered Dataset ({filteredData.length} / {activeDataset.data.length} rows)</span>
           </div>

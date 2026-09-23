@@ -390,7 +390,7 @@ export function DataTable({
         <Dialog open={isFormattingOpen} onOpenChange={setIsFormattingOpen}>
           <DialogContent className="max-w-4xl glass border-white/20 shadow-2xl p-6">
             <DialogHeader>
-              <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <DialogTitle className="text-h2 flex items-center gap-2">
                 <Palette className="h-5 w-5 text-primary" />
                 Data Table Conditional Formatting
               </DialogTitle>
@@ -490,9 +490,9 @@ export function DataTable({
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {Object.entries(summaryStats).map(([column, stats]) => (
-                <div key={column} className="p-3 bg-gray-50 dark:bg-zinc-900/50 border border-gray-200 dark:border-white/5 rounded-lg">
-                  <h4 className="font-semibold text-xs uppercase tracking-wider text-gray-700 dark:text-zinc-300 mb-2">{column}</h4>
-                  <div className="space-y-1 text-sm">
+                <div key={column} className="p-3 bg-muted/50 border border-border rounded-lg">
+                  <h4 className="text-caption uppercase text-textTertiary mb-2">{column}</h4>
+                  <div className="space-y-1 text-body font-mono text-dataTable">
                     <div>Count: {stats.count}</div>
                     <div>Min: {stats.min.toFixed(2)}</div>
                     <div>Max: {stats.max.toFixed(2)}</div>
@@ -510,10 +510,10 @@ export function DataTable({
         <CardContent className="p-0">
           <div 
             ref={parentRef} 
-            className="h-[500px] overflow-auto border border-gray-200 dark:border-white/10 rounded-md relative scroll-container bg-white dark:bg-zinc-950"
+            className="h-[500px] overflow-auto border border-border rounded-md relative scroll-container bg-background"
           >
             <Table className="relative">
-              <TableHeader className="sticky top-0 bg-gray-50 dark:bg-zinc-900/95 backdrop-blur-sm z-10 border-b border-gray-200 dark:border-white/10">
+              <TableHeader className="sticky top-0 bg-popover/95 backdrop-blur-sm z-10 border-b border-border">
                 <TableRow>
                   {dataset.columns.map((column) => {
                     const colMeta = dataset.metadata?.columns.find(c => c.name === column);
@@ -529,10 +529,10 @@ export function DataTable({
                         className={
                           "ml-2 text-[10px] uppercase font-normal cursor-pointer " +
                           (flagged
-                            ? "border-amber-400 text-amber-600 dark:text-amber-400"
+                            ? "border-tertiary text-tertiary"
                             : overridden
                               ? "border-primary text-primary"
-                              : "border-gray-300 dark:border-zinc-700 text-gray-500 dark:text-zinc-400")
+                              : "border-border text-textTertiary")
                         }
                       >
                         {effectiveType}
@@ -543,13 +543,13 @@ export function DataTable({
                     return (
                       <TableHead
                         key={column}
-                        className="bg-gray-50 dark:bg-zinc-900/95 backdrop-blur-sm text-xs uppercase tracking-wider text-gray-500 dark:text-zinc-400 font-semibold py-2"
+                        className="bg-popover/95 backdrop-blur-sm text-caption uppercase text-textTertiary py-2"
                         aria-sort={sortColumn === column ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
                       >
-                        <div className="flex items-center">
+                        <div className={"flex items-center" + (effectiveType === 'numeric' ? " justify-end" : "")}>
                           <Button
                             variant="ghost"
-                            className="h-auto p-2 justify-start font-semibold text-xs uppercase tracking-wider text-gray-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white"
+                            className="h-auto p-2 justify-start text-caption uppercase text-muted-foreground hover:text-foreground"
                             onClick={() => handleSort(column)}
                             aria-label={`Sort by ${column}, currently ${sortColumn === column ? (sortDirection === 'asc' ? 'sorted ascending' : 'sorted descending') : 'unsorted'}`}
                           >
@@ -602,7 +602,7 @@ export function DataTable({
               <TableBody>
                 {rowVirtualizer.getVirtualItems().length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={dataset.columns.length} className="h-24 text-center text-gray-500 dark:text-zinc-400">
+                    <TableCell colSpan={dataset.columns.length} className="h-24 text-center text-muted-foreground">
                       No rows match the current filters.
                     </TableCell>
                   </TableRow>
@@ -620,7 +620,7 @@ export function DataTable({
                         <TableRow 
                           key={virtualRow.key} 
                           data-index={virtualRow.index} 
-                          className="h-[52px] border-b border-gray-100 dark:border-white/5 hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors"
+                          className="h-[52px]"
                           ref={rowVirtualizer.measureElement}
                         >
                           {dataset.columns.map((column) => {
@@ -629,6 +629,7 @@ export function DataTable({
                               row,
                               column
                             );
+                            const isNumeric = getEffectiveColumnType(dataset, column) === 'numeric';
                             return (
                               <TableCell
                                 key={column}
@@ -642,9 +643,9 @@ export function DataTable({
                                     : undefined
                                 }
                               >
-                                <div className="truncate font-medium">
+                                <div className={isNumeric ? "truncate text-right font-mono text-dataTable tabular-nums" : "truncate text-body"}>
                                   {row[column] === null || row[column] === undefined ? (
-                                    <span className="text-muted-foreground italic">null</span>
+                                    <span className="text-muted-foreground italic font-sans">null</span>
                                   ) : (
                                     String(row[column])
                                   )}
