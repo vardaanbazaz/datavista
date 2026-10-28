@@ -45,7 +45,8 @@ export interface QueryGroupBy {
 }
 
 export type AggregationOperator = 
-  | 'count' 
+  | 'count_rows' // every row in the slice, whatever the column holds
+  | 'count' // numeric column: valid numbers only; other columns: non-blank cells
   | 'sum' 
   | 'avg' 
   | 'min' 

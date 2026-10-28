@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import Papa from 'papaparse';
+import { parseCsvText } from '../csvParse';
 import { processRawData } from '../parsingService';
 import { queryEngine } from '../queryEngine';
 import { pivotEngine } from '../pivot';
@@ -12,7 +12,7 @@ import { Dataset, DataRow, QueryAggregation } from '../../types';
 /**
  * Golden numeric tests: every engine checked against values computed independently by
  * pandas (scripts/golden/generate_hr_golden.py -> tests/fixtures/hr-attrition.golden.json).
- * Conventions (population variance, linear quantiles, stable ROW_NUMBER ties, peer-inclusive
+ * Conventions (sample variance, linear quantiles, stable ROW_NUMBER ties, peer-inclusive
  * running total) are documented in the generator. Never edit the golden file to make a test
  * pass; regenerate it with `npm run golden:regen` only when the oracle itself changes.
  */
@@ -31,11 +31,10 @@ function expectClose(actual: unknown, expected: number, label: string) {
   expect(Math.abs(a - expected), `${label}: expected ${expected}, got ${a}`).toBeLessThanOrEqual(tol);
 }
 
-// Same path as FileUpload.tsx: PapaParse (same options) -> processRawData.
+// Same path as FileUpload.tsx: the shared CSV parse (csvParse.ts) -> processRawData.
 function loadDataset(): Dataset {
   const csv = readFileSync(resolve(FIXTURES, 'hr-attrition.csv'), 'utf8');
-  const parsed = Papa.parse<Record<string, unknown>>(csv, { header: true, skipEmptyLines: 'greedy' });
-  return processRawData(parsed.data, 'hr-attrition.csv');
+  return processRawData(parseCsvText(csv).rows, 'hr-attrition.csv');
 }
 
 function groupBy(ds: Dataset, column: string, aggregations: QueryAggregation[]): Map<string, DataRow> {

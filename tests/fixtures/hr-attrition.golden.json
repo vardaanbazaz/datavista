@@ -6,8 +6,8 @@
       "rank": "SQL RANK (min), DENSE_RANK (dense)",
       "rowNumberTies": "original CSV row order",
       "runningTotal": "RANGE UNBOUNDED PRECEDING..CURRENT ROW (peer-inclusive)",
-      "variance": "population (ddof=0)",
-      "zscoreOutliers": "|z|>3 with population std"
+      "variance": "sample (ddof=1)",
+      "zscoreOutliers": "|z|>3 with sample std"
     },
     "generator": "scripts/golden/generate_hr_golden.py",
     "numpy": "2.5.4",
@@ -935,8 +935,8 @@
       "min": 18.0,
       "q1": 30.0,
       "q3": 43.0,
-      "stdDev": 9.132265690615387,
-      "variance": 83.39827664399093,
+      "stdDev": 9.135373489136732,
+      "variance": 83.45504878602223,
       "zscoreOutlierCount": 0
     },
     "MonthlyIncome": {
@@ -948,8 +948,8 @@
       "min": 1009.0,
       "q1": 2911.0,
       "q3": 8379.0,
-      "stdDev": 4706.355164823003,
-      "variance": 22149778.937456153,
+      "stdDev": 4707.956783097994,
+      "variance": 22164857.07151841,
       "zscoreOutlierCount": 0
     },
     "TotalWorkingYears": {
@@ -961,8 +961,8 @@
       "min": 0.0,
       "q1": 6.0,
       "q3": 15.0,
-      "stdDev": 7.778134700893234,
-      "variance": 60.499379425239475,
+      "stdDev": 7.780781675514997,
+      "variance": 60.54056348202997,
       "zscoreOutlierCount": 16
     }
   },

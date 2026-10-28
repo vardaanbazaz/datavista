@@ -2,6 +2,62 @@
 
 Newest first. Entries marked `Source: inferred` were reconstructed from existing code; their "Why" is a guess and should be corrected by the author.
 
+### 2026-10-28 — One numeric rule for every aggregation (`src/shared/utils/numeric.ts`)
+- **Decision:** `toNumberOrNull` is the only cell → number conversion for aggregations: statsEngine (descriptive, outliers, correlation), queryEngine (`aggregateRows`, used by `computeAggregations`, group-by, KPI cards, pivot), chart `aggregateValues` (now delegates to `aggregateRows`), Overview (`DashboardSummary`), DataTable column stats, PDF export summary, window functions, advanced aggregations (`aggregations/core.ts`), anomaly detector mean, forecasting input, gauge plugin, and filter comparisons (`toComparableNumber`). A finite JS number, or a string that after ASCII trimming matches `^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$`, is a number. Everything else — blanks, null tokens ("", n/a, na, nan, null, none, #n/a, -, undefined; case-insensitive), junk, hex, Infinity, currency, thousands separators, booleans — is null and excluded. Never 0. Loop-based `minMax`/`sum`/`sampleVariance` live in the same module so engines agree to the bit.
+- **Why:** The audit found three different means for one column (charts counted junk and blanks as 0; queryEngine counted blanks as 0 via `Number(null)`; Overview's sum was average × a count that included junk). One function removes the room for drift.
+- **Alternatives considered:** Turning null tokens into null at ingest (`cleanValue`) — rejected: it changes missing counts and the type-vote denominator, which is type-inference scope (a later batch). Per-engine fixes — rejected, that is how they drifted apart.
+- **Tradeoff accepted:** "NaN"/"-"/"none" cells stay in the data as text (they show in the table and count as non-missing in column metadata) but are excluded from every number. Persisted datasets keep any value an older version converted with `Number()` (e.g. "0x1A" stored as 26); re-upload to re-parse.
+- **Source:** `made-now`
+
+### 2026-10-28 — Strict number parsing at ingest and in the type vote
+- **Decision:** `processRawData` converts a cell to a number with the same strict parser (`parseStrictNumber`), and `detectColumnType`'s numeric vote uses it too. The 80% threshold and every other type rule are unchanged.
+- **Why:** Ingest and aggregation must agree on what a number is; `Number()` accepted "0x1A" (26), "Infinity" and Unicode-whitespace-padded values.
+- **Alternatives considered:** Strict only at aggregation — rejected, a column of hex strings would be typed numeric but every value would aggregate to null.
+- **Tradeoff accepted:** A value with a non-breaking space next to the digits ("12\u00a0") is now text, not 12. Checked on all 6 local audit CSVs and the HR fixture: no column changed type or name.
+- **Source:** `made-now`
+
+### 2026-10-28 — Sample (n − 1) variance and std everywhere
+- **Decision:** statsEngine, queryEngine/KPI/pivot, charts and z-score outliers all use the sample variance/std (`numeric.ts:sampleVariance`). Labels read "Variance (sample)" and "Std. deviation (sample)". With n < 2 the value is 0, not NaN. Skewness and kurtosis keep their population-moment definitions (they use the population std internally). `generate_hr_golden.py` moved to `ddof=1`; regenerating changed the three variances/std values and no z-score outlier counts.
+- **Why:** User decision "A" on audit A11: the same column showed different std on the Stats page (population) and in charts (sample, d3). Sample matches pandas, Excel STDEV.S and what analysts expect.
+- **Alternatives considered:** Population everywhere — rejected by the user. Keeping both with a toggle — not asked for.
+- **Tradeoff accepted:** Every std/variance the app shows moved slightly (e.g. Cafe Total Spent 6.009603 → 6.009919).
+- **Source:** `made-now`
+
+### 2026-10-28 — `count` counts valid numbers; new explicit `count_rows`
+- **Decision:** `count` on an (effective) numeric column counts its valid numbers; on any other column it counts non-blank cells (pivot counts of categories keep working). New operator `count_rows` counts every row and is offered as "Count of rows" in KPI and Pivot builders and the LLM query schema. Charts label `count` as "Count of <column>" and `count_rows` as "Count of rows". The type set comes from `queryEngine.numericColumnSet(dataset)` (honours user type overrides) and is passed to `computeAggregations`, group-by, pivot and chart `aggregateValues`.
+- **Why:** The user's rule: "count of a column = count of valid numbers; Count of rows stays separate and explicitly named". A blanket valid-number count would have turned every pivot count of a text column into 0.
+- **Alternatives considered:** Type-free `count` = valid numbers always — rejected for the pivot reason above. Inferring "numeric" from the slice's values — rejected, it would flip per group.
+- **Tradeoff accepted:** Saved charts/KPIs with `count` change meaning on numeric columns (a chart that showed row counts now shows valid-number counts; switch to "Count of rows" to get the old value). ChartBuilder has no aggregation picker, so `count_rows` reaches charts only via AI queries and saved configs.
+- **Source:** `made-now`
+
+### 2026-10-28 — Overview and DataTable stats computed from rows, no metadata shortcut
+- **Decision:** `DashboardSummary` and `DataTable` column stats (and the PDF export summary) call `stats/columnSummary.ts:summarizeNumericColumns` on the rows shown. The unfiltered fast path that read `metadata.average` and `rowCount − missingValueCount` is gone.
+- **Why:** Metadata has no valid-number count, so the shortcut counted junk strings and its sum (average × count) was wrong (Cafe Total Spent 87,699.61 vs 84,763.5). It would also have kept stale numbers for datasets already in IndexedDB.
+- **Alternatives considered:** Adding `validNumericCount`/`numericSum` to `ColumnMetadata` with a load-time backfill — rejected, two code paths to keep in agreement plus a migration, for a loop that costs ~tens of ms on 1M rows.
+- **Tradeoff accepted:** One O(rows × numeric columns) pass per change of the shown rows, instead of a metadata read.
+- **Source:** `made-now`
+
+### 2026-10-28 — One shared CSV parse path with pandas header names
+- **Decision:** `src/shared/services/csvParse.ts` (`parseCsvFile` / `parseCsvText`) runs Papa with `header: false`, strips a BOM, names headers with `parsingService.ts:normalizeHeaders` (pandas C-parser rule: blank → "Unnamed: <i>", repeats → "Name.1", "Name.2", skipping suffixes already in the file) and builds the records itself. FileUpload, DataTable "replace data", and both golden suites use it. `processRawData` no longer drops blank header keys (that re-indexed every later column onto the wrong name); it names them the same way. Field-count mismatches are still reported (`TooFewFields`/`TooManyFields`); a short row's missing cells become null, extra fields are dropped.
+- **Why:** Audit A10 (highest severity): pandas' default `df.to_csv()` writes a blank first header, which shifted every column. Papa's header mode had already keyed blanks as "" and renamed duplicates "Name_1" before `processRawData` ran, so the fix had to own the header row.
+- **Alternatives considered:** A stateful `transformHeader` — rejected, Papa calls it from two places (parser and streamer), so dedup state would double-apply. Fixing only `processRawData` — rejected, it can't produce "Name.1".
+- **Tradeoff accepted:** Duplicate columns are now named "Name.1" instead of "Name_2" (saved charts on a re-uploaded file with duplicate headers would need re-pointing). XLSX import still uses `sheet_to_json` keys ("__EMPTY") — XLSX is a later batch.
+- **Source:** `made-now`
+
+### 2026-10-28 — Trimming removes ASCII whitespace only
+- **Decision:** `cleanValue` and header trimming use `numeric.ts:trimAscii` (space, \t, \n, \v, \f, \r) instead of `String.prototype.trim`.
+- **Why:** Audit A20: `.trim()` silently stripped non-breaking spaces that are part of the value (Netflix "Consequences\u00a0").
+- **Alternatives considered:** None worth keeping; `.trim()` also strips U+FEFF, so the BOM is now stripped explicitly in `csvParse.ts`.
+- **Tradeoff accepted:** Values padded with NBSP/em spaces keep them, so they don't match their unpadded twins in filters and group-by.
+- **Source:** `made-now`
+
+### 2026-10-28 — Messy-data golden fixtures with their own pandas oracle
+- **Decision:** `tests/fixtures/messy/{cafe,playstore,netflix,glassdoor}.csv` (byte-exact subsets, rows from the audit's section C; licences in `tests/fixtures/README.md`; `.gitattributes` keeps them `-text`). `scripts/golden/generate_messy_golden.py` (`npm run golden:regen-messy`) re-implements the numeric rule in Python (reads `dtype=str, keep_default_na=False`) and writes `messy.golden.json`. `golden.messy.test.ts` loads each file through `parseCsvText` → `processRawData` and checks row/column counts, header names, the expected numeric-column set, and that statsEngine (full and filtered path), queryEngine/KPI, chart `aggregateValues`, Overview (`summarizeNumericColumns`) and group-by totals all equal the oracle. Glassdoor Rating/Founded (-1 sentinels) and Play Store Rating (shifted row 10473) are only checked for engine-vs-engine agreement; their oracle check, "$" prices and dates are `it.todo`.
+- **Why:** The HR fixture is clean, so it couldn't catch the junk/blank bugs. A separate script keeps the HR oracle unchanged in purpose.
+- **Alternatives considered:** Extending `generate_hr_golden.py` — rejected, different inputs and rules. Including the Lab file — rejected, licence unknown.
+- **Tradeoff accepted:** The oracle JSON encodes the current rule, including -1 sentinels and the shifted row; the suite deliberately doesn't compare those three columns with it until the later batches. Play Store `Price` is categorical in this subset (it oversamples "$" prices), so it isn't checked as numeric.
+- **Source:** `made-now`
+
 ### 2026-10-28 — e2e suite runs in CI before the build
 - **Decision:** `deploy.yml` runs `npm run test:e2e` right after the unit tests. The Playwright Chromium install moved up to run before it; the production smoke gate still runs after the build.
 - **Why:** The e2e suite had rotted (3 of 5 failing) because nothing ran it. Running it before the build fails fast without building a deploy artifact.
@@ -10,6 +66,7 @@ Newest first. Entries marked `Source: inferred` were reconstructed from existing
 - **Source:** `made-now`
 
 ### 2026-10-28 — Golden numeric tests use a pandas oracle and a committed JSON file
+- **Note:** The "population variance" convention below is superseded by "Sample (n − 1) variance and std everywhere".
 - **Decision:** `scripts/golden/generate_hr_golden.py` (pandas, pinned in `scripts/golden/requirements.txt`) computes expected values for `tests/fixtures/hr-attrition.csv` into `tests/fixtures/hr-attrition.golden.json`. `golden.hrAttrition.test.ts` loads the CSV through PapaParse + `processRawData` (the upload path) and checks queryEngine, pivotEngine, statsEngine and windowEngine against it. Floats use `|a−b| ≤ 1e-9·max(1,|a|,|b|)`; counts and ranks must match exactly. `npm run golden:regen` reruns the script.
 - **Why:** The oracle must not share code with the engines under test. Committing the JSON keeps Python out of CI.
 - **Alternatives considered:** Hand-computed expected values — rejected, they can't cover 1,470 rows. A JS reference implementation — rejected, not independent. Pure relative tolerance — rejected, it fails when the expected value is 0.
@@ -31,6 +88,7 @@ Newest first. Entries marked `Source: inferred` were reconstructed from existing
 - **Source:** `made-now`
 
 ### 2026-10-28 — Chart axis/tooltip labels name the aggregation; numeric/date X keys sorted
+- **Note:** `count` labelled "Count of rows" and `aggregateValues` "same behaviour" are superseded by "`count` counts valid numbers; new explicit `count_rows`" and "One numeric rule for every aggregation".
 - **Decision:** New `src/features/charts/lib/chartAggregation.ts`: `chartYValueLabel` / `aggregationLabel` ("Sum of Education", "Average of …", "Count of rows"), `aggregateValues` (moved out of `ChartVisualization`, same behaviour), and `sortAxisKeys` (numeric ascending, dates chronological, categorical unchanged). Bar, line and area Y axes, every chart's SVG `<title>` tooltip, and the screen-reader summary use them. The histogram's Y label "Frequency" became "Count of rows". The heatmap's x/y sort is numeric or chronological for those types and stays alphabetical for categories. The non-functional `title` attributes on SVG shapes were replaced with `<title>` children.
 - **Why:** A bar chart of Age × Education showed "Education" while plotting SUM per age, and bars came out in first-appearance order (41, 49, 37…). Pure helpers can be unit-tested under Vitest's node environment.
 - **Alternatives considered:** A sort option in ChartBuilder — not added. Neither `ChartConfig` nor the builder has one, and the request said to respect it only if one existed.

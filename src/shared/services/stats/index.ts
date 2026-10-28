@@ -4,3 +4,4 @@ export * from "./correlation";
 export * from "./outliers";
 export * from "./resultModel";
 export * from "./engine";
+export * from "./columnSummary";

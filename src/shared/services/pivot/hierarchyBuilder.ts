@@ -190,13 +190,14 @@ export function groupRowsByColumnPath(
 export function computeNodeValues(
   rowNode: PivotRowNode & { rows: DataRow[] },
   columnDimensions: string[],
-  aggregations: QueryAggregation[]
+  aggregations: QueryAggregation[],
+  numericColumns?: ReadonlySet<string>
 ): void {
   const colGroups = groupRowsByColumnPath(rowNode.rows, columnDimensions);
 
   colGroups.forEach((rows, colKey) => {
     // Consume existing QueryEngine aggregation service
-    rowNode.values[colKey] = queryEngine.computeAggregations(rows, aggregations);
+    rowNode.values[colKey] = queryEngine.computeAggregations(rows, aggregations, numericColumns);
   });
 }
 
@@ -206,12 +207,13 @@ export function computeNodeValues(
 export function computeHierarchyValues(
   rowNode: PivotRowNode & { rows: DataRow[] },
   columnDimensions: string[],
-  aggregations: QueryAggregation[]
+  aggregations: QueryAggregation[],
+  numericColumns?: ReadonlySet<string>
 ): void {
-  computeNodeValues(rowNode, columnDimensions, aggregations);
+  computeNodeValues(rowNode, columnDimensions, aggregations, numericColumns);
 
   for (const child of rowNode.children) {
-    computeHierarchyValues(child as PivotRowNode & { rows: DataRow[] }, columnDimensions, aggregations);
+    computeHierarchyValues(child as PivotRowNode & { rows: DataRow[] }, columnDimensions, aggregations, numericColumns);
   }
 }
 

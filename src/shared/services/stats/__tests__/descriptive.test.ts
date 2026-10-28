@@ -65,6 +65,7 @@ describe("computeDescriptive isFullDataset flag", () => {
     expect(stats.sum).toBe(265);
     expect(stats.mean).toBe(53);
     expect(stats.median).toBe(53);
-    expect(stats.variance).toBeCloseTo(2, 5);
+    // Sample variance: sum of squared deviations 10 / (n − 1 = 4)
+    expect(stats.variance).toBeCloseTo(2.5, 5);
   });
 });

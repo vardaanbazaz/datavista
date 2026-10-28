@@ -1,0 +1,259 @@
+{
+  "_meta": {
+    "generator": "scripts/golden/generate_messy_golden.py",
+    "pandas": "3.1.0",
+    "rule": "ASCII trim; null tokens , #n/a, -, n/a, na, nan, none, null, undefined; strict decimal; sample std"
+  },
+  "cafe.csv": {
+    "rowCount": 81,
+    "columns": [
+      "Transaction ID",
+      "Item",
+      "Quantity",
+      "Price Per Unit",
+      "Total Spent",
+      "Payment Method",
+      "Location",
+      "Transaction Date"
+    ],
+    "numericStats": {
+      "Quantity": {
+        "count": 68,
+        "sum": 207.0,
+        "mean": 3.0441176470588234,
+        "min": 1.0,
+        "max": 5.0,
+        "std": 1.5005851945994595
+      },
+      "Price Per Unit": {
+        "count": 68,
+        "sum": 198.5,
+        "mean": 2.9191176470588234,
+        "min": 1.0,
+        "max": 5.0,
+        "std": 1.4052415050250713
+      },
+      "Total Spent": {
+        "count": 68,
+        "sum": 656.0,
+        "mean": 9.647058823529411,
+        "min": 1.0,
+        "max": 25.0,
+        "std": 6.966904076732979
+      }
+    }
+  },
+  "playstore.csv": {
+    "rowCount": 80,
+    "columns": [
+      "App",
+      "Category",
+      "Rating",
+      "Reviews",
+      "Size",
+      "Installs",
+      "Type",
+      "Price",
+      "Content Rating",
+      "Genres",
+      "Last Updated",
+      "Current Ver",
+      "Android Ver"
+    ],
+    "numericStats": {
+      "Category": {
+        "count": 1,
+        "sum": 1.9,
+        "mean": 1.9,
+        "min": 1.9,
+        "max": 1.9,
+        "std": 0.0
+      },
+      "Rating": {
+        "count": 65,
+        "sum": 281.4,
+        "mean": 4.329230769230769,
+        "min": 1.0,
+        "max": 19.0,
+        "std": 2.0508933325598533
+      },
+      "Reviews": {
+        "count": 79,
+        "sum": 223194823.0,
+        "mean": 2825250.924050633,
+        "min": 0.0,
+        "max": 78158306.0,
+        "std": 13192050.814835584
+      },
+      "Installs": {
+        "count": 1,
+        "sum": 0.0,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "std": 0.0
+      },
+      "Type": {
+        "count": 1,
+        "sum": 0.0,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "std": 0.0
+      },
+      "Price": {
+        "count": 62,
+        "sum": 0.0,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "std": 0.0
+      },
+      "Current Ver": {
+        "count": 24,
+        "sum": 48.363,
+        "mean": 2.015125,
+        "min": 1.0,
+        "max": 8.0,
+        "std": 1.6535923821499505
+      }
+    }
+  },
+  "netflix.csv": {
+    "rowCount": 64,
+    "columns": [
+      "show_id",
+      "type",
+      "title",
+      "director",
+      "cast",
+      "country",
+      "date_added",
+      "release_year",
+      "rating",
+      "duration",
+      "listed_in",
+      "description"
+    ],
+    "numericStats": {
+      "title": {
+        "count": 4,
+        "sum": 5834.0,
+        "mean": 1458.5,
+        "min": 122.0,
+        "max": 3022.0,
+        "std": 1309.7464131146405
+      },
+      "release_year": {
+        "count": 64,
+        "sum": 128811.0,
+        "mean": 2012.671875,
+        "min": 1925.0,
+        "max": 2021.0,
+        "std": 15.54517705791429
+      }
+    }
+  },
+  "glassdoor.csv": {
+    "rowCount": 31,
+    "columns": [
+      "index",
+      "Job Title",
+      "Salary Estimate",
+      "Job Description",
+      "Rating",
+      "Company Name",
+      "Location",
+      "Headquarters",
+      "Size",
+      "Founded",
+      "Type of ownership",
+      "Industry",
+      "Sector",
+      "Revenue",
+      "Competitors"
+    ],
+    "numericStats": {
+      "index": {
+        "count": 31,
+        "sum": 4791.0,
+        "mean": 154.5483870967742,
+        "min": 0.0,
+        "max": 365.0,
+        "std": 126.84658416362063
+      },
+      "Rating": {
+        "count": 31,
+        "sum": 91.4,
+        "mean": 2.948387096774194,
+        "min": -1.0,
+        "max": 5.0,
+        "std": 2.085644739281986
+      },
+      "Headquarters": {
+        "count": 5,
+        "sum": -5.0,
+        "mean": -1.0,
+        "min": -1.0,
+        "max": -1.0,
+        "std": 0.0
+      },
+      "Size": {
+        "count": 4,
+        "sum": -4.0,
+        "mean": -1.0,
+        "min": -1.0,
+        "max": -1.0,
+        "std": 0.0
+      },
+      "Founded": {
+        "count": 31,
+        "sum": 41527.0,
+        "mean": 1339.5806451612902,
+        "min": -1.0,
+        "max": 2019.0,
+        "std": 942.0253632181231
+      },
+      "Type of ownership": {
+        "count": 4,
+        "sum": -4.0,
+        "mean": -1.0,
+        "min": -1.0,
+        "max": -1.0,
+        "std": 0.0
+      },
+      "Industry": {
+        "count": 9,
+        "sum": -9.0,
+        "mean": -1.0,
+        "min": -1.0,
+        "max": -1.0,
+        "std": 0.0
+      },
+      "Sector": {
+        "count": 9,
+        "sum": -9.0,
+        "mean": -1.0,
+        "min": -1.0,
+        "max": -1.0,
+        "std": 0.0
+      },
+      "Revenue": {
+        "count": 4,
+        "sum": -4.0,
+        "mean": -1.0,
+        "min": -1.0,
+        "max": -1.0,
+        "std": 0.0
+      },
+      "Competitors": {
+        "count": 23,
+        "sum": -23.0,
+        "mean": -1.0,
+        "min": -1.0,
+        "max": -1.0,
+        "std": 0.0
+      }
+    }
+  }
+}

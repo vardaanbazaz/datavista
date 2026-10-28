@@ -1,5 +1,5 @@
-import * as d3 from "d3";
 import { AggregationOperator, ChartConfig, DataRow } from "@/shared/types";
+import { aggregateRows } from "@/shared/services/queryEngine";
 
 export type AxisValueType = "numeric" | "categorical" | "date";
 
@@ -9,10 +9,20 @@ export type AxisValueType = "numeric" | "categorical" | "date";
  * weight column, a percentile) the chart config doesn't carry, so they fall back to 'sum'
  * rather than silently miscomputing — and are labelled as the sum they really are.
  */
-export type ChartReduction = "sum" | "avg" | "min" | "max" | "count" | "count_distinct" | "median" | "stddev";
+export type ChartReduction =
+  | "sum"
+  | "avg"
+  | "min"
+  | "max"
+  | "count"
+  | "count_rows"
+  | "count_distinct"
+  | "median"
+  | "stddev";
 
 export function chartReduction(aggregation?: AggregationOperator): ChartReduction {
   switch (aggregation) {
+    case "count_rows":
     case "avg":
     case "min":
     case "max":
@@ -26,20 +36,21 @@ export function chartReduction(aggregation?: AggregationOperator): ChartReductio
   }
 }
 
-const REDUCTION_PREFIX: Record<Exclude<ChartReduction, "count">, string> = {
+const REDUCTION_PREFIX: Record<Exclude<ChartReduction, "count_rows">, string> = {
   sum: "Sum of",
   avg: "Average of",
   min: "Minimum of",
   max: "Maximum of",
+  count: "Count of",
   count_distinct: "Distinct count of",
   median: "Median of",
-  stddev: "Std. deviation of",
+  stddev: "Std. deviation (sample) of",
 };
 
 /** Axis/tooltip label naming what was computed, e.g. "Sum of Education", "Count of rows". */
 export function aggregationLabel(aggregation: AggregationOperator | undefined, column: string): string {
   const reduction = chartReduction(aggregation);
-  if (reduction === "count") return "Count of rows";
+  if (reduction === "count_rows") return "Count of rows";
   return `${REDUCTION_PREFIX[reduction]} ${column}`;
 }
 
@@ -58,27 +69,21 @@ export function chartYValueLabel(chart: Pick<ChartConfig, "type" | "yAxis" | "ag
   return reduces ? aggregationLabel(chart.aggregation, chart.yAxis) : chart.yAxis;
 }
 
-/** Reduces rows sharing an x-axis (and groupBy) key into the column's plotted value. */
-export function aggregateValues(rows: DataRow[], column: string, aggregation?: AggregationOperator): number {
-  const numeric = (d: DataRow) => Number(d[column]) || 0;
-  switch (chartReduction(aggregation)) {
-    case "avg":
-      return d3.mean(rows, numeric) ?? 0;
-    case "min":
-      return d3.min(rows, numeric) ?? 0;
-    case "max":
-      return d3.max(rows, numeric) ?? 0;
-    case "count":
-      return rows.length;
-    case "count_distinct":
-      return new Set(rows.map(d => d[column])).size;
-    case "median":
-      return d3.median(rows, numeric) ?? 0;
-    case "stddev":
-      return d3.deviation(rows, numeric) ?? 0;
-    default:
-      return d3.sum(rows, numeric);
-  }
+/**
+ * Reduces rows sharing an x-axis (and groupBy) key into the column's plotted value, with
+ * the query engine's own aggregation (same numeric rule, same sample std), so a chart
+ * shows the numbers the Stats page and KPI cards show. `numericColumns` gives `count`
+ * its meaning (see queryEngine.aggregateRows); without it, `count` counts valid numbers.
+ */
+export function aggregateValues(
+  rows: DataRow[],
+  column: string,
+  aggregation?: AggregationOperator,
+  numericColumns?: ReadonlySet<string>
+): number {
+  const reduction = chartReduction(aggregation);
+  if (reduction === "count_distinct") return new Set(rows.map(d => d[column])).size;
+  return aggregateRows(rows, column, reduction, numericColumns);
 }
 
 /**

@@ -1,5 +1,6 @@
 import { ChartConfig, DataRow, Dataset } from "@/shared/types";
 import { computeOutliers } from "@/shared/services/stats/outliers";
+import { mean as meanOf, numericValues } from "@/shared/utils/numeric";
 
 export interface DetectedAnomaly {
   id: string;
@@ -32,8 +33,7 @@ export const anomalyDetector = {
 
     if (outlierResult.count === 0) return [];
 
-    const sum = rawValues.reduce<number>((acc, v) => acc + (Number(v) || 0), 0);
-    const mean = sum / (rawValues.length || 1);
+    const mean = meanOf(numericValues(rawValues));
 
     return outlierResult.outliers.map((outlier, idx) => {
       const row = chart.data[outlier.index];
@@ -90,8 +90,7 @@ export const anomalyDetector = {
       const res = computeOutliers(rawValues, 'iqr', { threshold: 1.5 });
       if (res.count === 0) continue;
 
-      const sum = rawValues.reduce<number>((acc, v) => acc + (Number(v) || 0), 0);
-      const mean = sum / (rawValues.length || 1);
+      const mean = meanOf(numericValues(rawValues));
 
       res.outliers.slice(0, 3).forEach((outlier, idx) => {
         const row = data[outlier.index];

@@ -1,6 +1,7 @@
 import { DataRow } from "@/shared/types";
 import { PartitionItem } from "./partitioner";
 import { WindowOrderBy } from "./types";
+import { toNumberOrNull } from "@/shared/utils/numeric";
 
 /**
  * Checks if two rows are peers (have identical values for all ORDER BY columns).
@@ -145,12 +146,9 @@ function getFrameNumericValues(
 ): number[] {
   const values: number[] = [];
   for (let i = start; i <= end; i++) {
-    const val = partition[i].row[targetColumn];
-    if (val !== null && val !== undefined && val !== "") {
-      const num = Number(val);
-      if (!isNaN(num)) {
-        values.push(num);
-      }
+    const num = toNumberOrNull(partition[i].row[targetColumn]);
+    if (num !== null) {
+      values.push(num);
     }
   }
   return values;
@@ -224,10 +222,7 @@ export function computeWindowMax(
  * Extracts a single numeric value (or null for missing/non-numeric) from a partition row.
  */
 function getNumericValue(partition: PartitionItem[], targetColumn: string, i: number): number | null {
-  const val = partition[i].row[targetColumn];
-  if (val === null || val === undefined || val === "") return null;
-  const num = Number(val);
-  return isNaN(num) ? null : num;
+  return toNumberOrNull(partition[i].row[targetColumn]);
 }
 
 /**

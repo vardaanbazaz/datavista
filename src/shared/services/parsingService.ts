@@ -1,11 +1,13 @@
 import { Dataset, DataRow, DatasetMetadata, ColumnMetadata } from "@/shared/types";
+import { parseStrictNumber, toNumberOrNull, trimAscii } from "@/shared/utils/numeric";
 
 /**
- * Trims whitespace and handles empty strings, converting them to null.
+ * Trims ASCII whitespace and handles empty strings, converting them to null. Non-breaking
+ * and other Unicode spaces are part of the value and are kept.
  */
 export const cleanValue = (val: unknown): string | number | null => {
   if (val === null || val === undefined) return null;
-  const strVal = String(val).trim();
+  const strVal = trimAscii(String(val));
   if (strVal === "" || strVal.toLowerCase() === "null" || strVal.toLowerCase() === "undefined" || strVal.toLowerCase() === "n/a") {
     return null;
   }
@@ -45,6 +47,30 @@ const isDateString = (val: string): boolean => {
 const hasLeadingZero = (val: string): boolean => /^0\d+/.test(val);
 
 /**
+ * Header names the way pandas' read_csv (C parser) names them: a blank header becomes
+ * "Unnamed: <index>", and a repeated name gets ".1", ".2", ... skipping any suffix that
+ * is already a header in the file ("Name,Name,Name.1" -> "Name", "Name.2", "Name.1").
+ * Already-unique, non-blank names are returned unchanged.
+ */
+export const normalizeHeaders = (headers: string[]): string[] => {
+  const names = headers.map((h, i) => (h === "" ? `Unnamed: ${i}` : h));
+  const counts = new Map<string, number>();
+  for (let i = 0; i < names.length; i++) {
+    const base = names[i];
+    let name = base;
+    let cur = counts.get(name) ?? 0;
+    while (cur > 0) {
+      counts.set(base, cur + 1);
+      name = `${base}.${cur}`;
+      cur = names.includes(name) ? cur + 1 : (counts.get(name) ?? 0);
+    }
+    names[i] = name;
+    counts.set(name, cur + 1);
+  }
+  return names;
+};
+
+/**
  * Detects the type of a column based on its non-null values.
  */
 export const detectColumnType = (values: DataRow[string][]): 'numeric' | 'categorical' | 'date' => {
@@ -66,8 +92,8 @@ export const detectColumnType = (values: DataRow[string][]): 'numeric' | 'catego
 
   nonNullValues.forEach(val => {
     const strVal = String(val);
-    // Check numeric
-    if (!isNaN(Number(strVal)) && strVal !== "") {
+    // Check numeric (the same strict rule every aggregation uses, see utils/numeric.ts)
+    if (parseStrictNumber(strVal) !== null) {
       numericCount++;
     }
     // Check date
@@ -99,40 +125,28 @@ export const processRawData = (rawData: Record<string, unknown>[], fileName: str
     throw new Error("The file contains no data rows.");
   }
 
-  // Retrieve columns from headers, filtering out empty headers
-  const rawColumns = Object.keys(rawData[0]).map(c => c.trim()).filter(Boolean);
-  if (rawColumns.length === 0) {
+  // Name every header (blank -> "Unnamed: <i>", repeats -> "Name.1"), one per original key,
+  // so names and values stay aligned. Dropping blank headers here used to shift every
+  // later column onto its left neighbour's name.
+  const originalKeys = Object.keys(rawData[0]);
+  const columns = normalizeHeaders(originalKeys.map(k => trimAscii(k)));
+  if (columns.length === 0) {
     throw new Error("No valid columns found in the dataset headers.");
   }
 
-  // Ensure unique column names to prevent duplicate key crashes
-  const columnCounts: Record<string, number> = {};
-  const columns = rawColumns.map(col => {
-    if (columnCounts[col] === undefined) {
-      columnCounts[col] = 1;
-      return col;
-    } else {
-      columnCounts[col]++;
-      return `${col}_${columnCounts[col]}`;
-    }
+  // Map original column keys to the normalized column names
+  const colMapping: Record<string, string> = {};
+  const originalHeadersMap: Record<string, string> = {};
+  originalKeys.forEach((key, idx) => {
+    colMapping[key] = columns[idx];
+    originalHeadersMap[columns[idx]] = key;
   });
-
-  // Map original columns keys to the deduplicated columns list
-  const colMapping = rawColumns.reduce((acc, col, idx) => {
-    acc[Object.keys(rawData[0])[idx]] = columns[idx];
-    return acc;
-  }, {} as Record<string, string>);
-
-  const originalHeadersMap = columns.reduce((acc, col, idx) => {
-    acc[col] = Object.keys(rawData[0])[idx];
-    return acc;
-  }, {} as Record<string, string>);
 
   const data: DataRow[] = rawData.map(row => {
     const processedRow: DataRow = {};
     Object.keys(row).forEach(originalCol => {
       const col = colMapping[originalCol];
-      if (!col) return; // Skip if header was empty/filtered
+      if (!col) return; // Key not present in the header row
 
       const cleanValResult = cleanValue(row[originalCol]);
       if (cleanValResult === null) {
@@ -143,8 +157,8 @@ export const processRawData = (rawData: Record<string, unknown>[], fileName: str
         // to 'categorical' so the column type stays consistent with these string cells.
         processedRow[col] = cleanValResult;
       } else {
-        const numVal = Number(cleanValResult);
-        if (!isNaN(numVal) && cleanValResult !== "") {
+        const numVal = parseStrictNumber(String(cleanValResult));
+        if (numVal !== null) {
           processedRow[col] = numVal;
         } else {
           processedRow[col] = String(cleanValResult);
@@ -262,8 +276,8 @@ export const generateDatasetMetadata = (
         stats.uniqueValuesMap.set(strVal, count + 1);
 
         if (type === 'numeric') {
-          const num = Number(val);
-          if (!isNaN(num)) {
+          const num = toNumberOrNull(val);
+          if (num !== null) {
             stats.validNumCount++;
             stats.sum += num;
             if (num < stats.min) stats.min = num;

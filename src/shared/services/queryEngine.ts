@@ -2,6 +2,7 @@ import { Dataset, DataRow, Query, QueryResult, QuerySort, QueryFilters, FilterCo
 import { windowEngine } from "./window";
 import { executionPlanner, filterCache, processCache, queryCache } from "./optimizer";
 import { aggregationsAdapter } from "./aggregations";
+import { columnNumbers, mean, median, minMax, sampleStdDev, sum, toNumberOrNull } from "@/shared/utils/numeric";
 
 /**
  * Standard ISO week string helper: YYYY-Www
@@ -27,19 +28,9 @@ function parseDate(val: string | number | boolean | Date | null | undefined): Da
 }
 
 /**
- * Helper to compute standard deviation
- */
-function calculateStdDev(values: number[]): number {
-  if (values.length <= 1) return 0;
-  const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
-  const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length;
-  return Math.sqrt(variance);
-}
-
-/**
  * Resolves a filter operand (cell value or filter target) to a comparable number for
- * greaterThan/lessThan/between. Plain numbers and numeric strings use Number() as before;
- * date strings/Date objects (which Number() turns into NaN) fall back to date parsing so
+ * greaterThan/lessThan/between. Plain numbers and numeric strings use the shared numeric
+ * rule (a blank cell is not 0); date strings/Date objects fall back to date parsing so
  * date-range filters don't silently match zero rows.
  */
 function toComparableNumber(v: unknown): number | null {
@@ -47,8 +38,8 @@ function toComparableNumber(v: unknown): number | null {
     const t = v.getTime();
     return isNaN(t) ? null : t;
   }
-  const n = Number(v);
-  if (!isNaN(n)) return n;
+  const n = toNumberOrNull(v);
+  if (n !== null) return n;
   // Only fall back to date parsing for strings that plausibly encode a date (contain a
   // 4-digit year). JS's Date parser is permissive enough that ambiguous, non-date strings
   // like "5/3" or "10-20" (a categorical code, a ratio, ...) silently resolve to a real but
@@ -62,16 +53,59 @@ function toComparableNumber(v: unknown): number | null {
 }
 
 /**
- * Helper to compute median
+ * Columns whose `count` means "count of valid numbers" (effective type numeric, so a
+ * user's type override applies). Every other column counts its non-null cells.
  */
-function calculateMedian(values: number[]): number {
-  if (values.length === 0) return 0;
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  if (sorted.length % 2 !== 0) {
-    return sorted[mid];
+export function numericColumnSet(dataset: Dataset): Set<string> {
+  // Calculated/window columns are in both lists today; reading metadata too keeps `count`
+  // right for any column that only metadata knows about.
+  const names = new Set([...dataset.columns, ...(dataset.metadata?.columns.map(c => c.name) ?? [])]);
+  const numeric = new Set<string>();
+  for (const col of names) {
+    const meta = dataset.metadata?.columns.find(c => c.name === col);
+    const type = meta?.userOverrideType ?? dataset.columnTypes[col] ?? meta?.inferredDataType;
+    if (type === 'numeric') numeric.add(col);
   }
-  return (sorted[mid - 1] + sorted[mid]) / 2;
+  return numeric;
+}
+
+/**
+ * One non-advanced aggregation over a slice of rows. Values go through the shared numeric
+ * rule (utils/numeric.ts): blanks, null tokens and junk are excluded, never counted as 0.
+ * Without `numericColumns`, `count` counts valid numbers. With no valid numbers, every
+ * result is 0 (the result type has no "empty" value). Std. deviation is the sample one.
+ */
+export function aggregateRows(
+  rows: DataRow[],
+  column: string,
+  operator: QueryAggregation['operator'],
+  numericColumns?: ReadonlySet<string>
+): number {
+  if (operator === 'count_rows') return rows.length;
+  if (operator === 'count' && numericColumns && !numericColumns.has(column)) {
+    let n = 0;
+    for (const r of rows) if (r[column] !== null && r[column] !== undefined && r[column] !== '') n++;
+    return n;
+  }
+  const values = columnNumbers(rows, column);
+  switch (operator) {
+    case 'count':
+      return values.length;
+    case 'sum':
+      return sum(values);
+    case 'avg':
+      return mean(values);
+    case 'min':
+      return minMax(values)?.min ?? 0;
+    case 'max':
+      return minMax(values)?.max ?? 0;
+    case 'median':
+      return median(values);
+    case 'stddev':
+      return sampleStdDev(values);
+    default:
+      return 0;
+  }
 }
 
 export const queryEngine = {
@@ -100,6 +134,8 @@ export const queryEngine = {
           return acc;
         }, {} as Record<string, 'numeric' | 'categorical' | 'date'>)
       : dataset.columnTypes;
+
+    const numericColumns = numericColumnSet(dataset);
 
     const bypassCache = !!query.options?.bypassCache;
     const plan = bypassCache
@@ -148,13 +184,14 @@ export const queryEngine = {
           query.groupBy,
           query.aggregations || [],
           columnTypes,
-          columns
+          columns,
+          numericColumns
         );
         if (query.sorting && query.sorting.length > 0) {
           processedData = this.applySorting(processedData, query.sorting);
         }
       } else if (query.aggregations && query.aggregations.length > 0) {
-        summary = this.computeAggregations(processedData, query.aggregations);
+        summary = this.computeAggregations(processedData, query.aggregations, numericColumns);
       }
 
       if (query.windowQueries && query.windowQueries.length > 0) {
@@ -376,7 +413,8 @@ export const queryEngine = {
     groupBy: QueryGroupBy,
     aggregations: QueryAggregation[],
     columnTypes: Record<string, 'numeric' | 'categorical' | 'date'>,
-    allColumns: string[]
+    allColumns: string[],
+    numericColumns?: ReadonlySet<string>
   ): DataRow[] {
     const { column, period } = groupBy;
     const isDateCol = columnTypes[column] === 'date';
@@ -448,39 +486,7 @@ export const queryEngine = {
         if (aggregationsAdapter.isAdvanced(operator)) {
           value = aggregationsAdapter.evaluate(agg, groupRows);
         } else {
-          const numericValues = groupRows
-            .map(r => Number(r[aggCol]))
-            .filter(v => !isNaN(v) && v !== null && v !== undefined);
-
-          switch (operator) {
-            case 'count':
-              value = groupRows.filter(r => r[aggCol] !== null && r[aggCol] !== undefined).length;
-              break;
-            case 'sum':
-              value = numericValues.reduce((s, v) => s + v, 0);
-              break;
-            case 'avg':
-              value = numericValues.length > 0 
-                ? numericValues.reduce((s, v) => s + v, 0) / numericValues.length 
-                : 0;
-              break;
-            case 'min':
-              value = numericValues.length > 0
-                ? numericValues.reduce((m, v) => (v < m ? v : m), numericValues[0])
-                : 0;
-              break;
-            case 'max':
-              value = numericValues.length > 0
-                ? numericValues.reduce((m, v) => (v > m ? v : m), numericValues[0])
-                : 0;
-              break;
-            case 'median':
-              value = calculateMedian(numericValues);
-              break;
-            case 'stddev':
-              value = calculateStdDev(numericValues);
-              break;
-          }
+          value = aggregateRows(groupRows, aggCol, operator, numericColumns);
         }
         resultRow[alias] = value;
       });
@@ -494,7 +500,11 @@ export const queryEngine = {
   /**
    * Computes aggregations over the entire dataset (no grouping)
    */
-  computeAggregations(data: DataRow[], aggregations: QueryAggregation[]): Record<string, number> {
+  computeAggregations(
+    data: DataRow[],
+    aggregations: QueryAggregation[],
+    numericColumns?: ReadonlySet<string>
+  ): Record<string, number> {
     const summary: Record<string, number> = {};
 
     aggregations.forEach(agg => {
@@ -504,39 +514,7 @@ export const queryEngine = {
       if (aggregationsAdapter.isAdvanced(operator)) {
         value = aggregationsAdapter.evaluate(agg, data);
       } else {
-        const numericValues = data
-          .map(r => Number(r[column]))
-          .filter(v => !isNaN(v) && v !== null && v !== undefined);
-
-        switch (operator) {
-          case 'count':
-            value = data.filter(r => r[column] !== null && r[column] !== undefined).length;
-            break;
-          case 'sum':
-            value = numericValues.reduce((s, v) => s + v, 0);
-            break;
-          case 'avg':
-            value = numericValues.length > 0 
-              ? numericValues.reduce((s, v) => s + v, 0) / numericValues.length 
-              : 0;
-            break;
-          case 'min':
-            value = numericValues.length > 0
-              ? numericValues.reduce((m, v) => (v < m ? v : m), numericValues[0])
-              : 0;
-            break;
-          case 'max':
-            value = numericValues.length > 0
-              ? numericValues.reduce((m, v) => (v > m ? v : m), numericValues[0])
-              : 0;
-            break;
-          case 'median':
-            value = calculateMedian(numericValues);
-            break;
-          case 'stddev':
-            value = calculateStdDev(numericValues);
-            break;
-        }
+        value = aggregateRows(data, column, operator, numericColumns);
       }
       summary[alias] = value ?? 0;
     });

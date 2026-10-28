@@ -11,16 +11,15 @@ Run:  npm run golden:regen   (needs: pip install -r scripts/golden/requirements.
 Conventions (chosen to match the app's documented/implemented behaviour; where the app's
 choice is non-standard that is called out, not hidden):
 
-* Variance / standard deviation: POPULATION (ddof=0, divide by N). The app uses population
-  everywhere (stats/descriptive.ts "Population Variance", queryEngine calculateStdDev,
-  outliers.ts z-score). This differs from pandas' and Excel STDEV.S's sample default
-  (ddof=1); the app only documents it in a code comment and in docs/AUDIT-2026-09-10.md #27,
-  and the UI labels it plain "Variance"/"Standard Deviation".
+* Variance / standard deviation: SAMPLE (ddof=1, divide by N - 1), pandas' and Excel
+  STDEV.S's default. Changed 2026-10-28 from population (ddof=0): the app now uses sample
+  std everywhere (stats/descriptive.ts, queryEngine, charts, z-score outliers) and labels it
+  "Std. deviation (sample)" / "Variance (sample)". Skewness/kurtosis are not checked here.
 * Quantiles: linear interpolation between closest ranks (numpy/pandas default "linear",
   Hyndman-Fan type 7): idx = (n - 1) * p.
 * Median: middle value, mean of the two middle values for even n.
 * IQR outliers: Tukey fences, value < Q1 - 1.5*IQR or value > Q3 + 1.5*IQR (strict).
-* Z-score outliers: |(x - mean) / population_std| > 3 (strict).
+* Z-score outliers: |(x - mean) / sample_std| > 3 (strict).
 * Pearson r: pairwise complete observations, population/sample choice cancels out.
 * Window functions (PARTITION BY Department ORDER BY MonthlyIncome DESC):
   - ROW_NUMBER: ties broken by original CSV row order. The app's sort is stable; that rule
@@ -72,7 +71,7 @@ def quantile_linear(s: pd.Series, q: float) -> float:
 def describe(s: pd.Series) -> dict:
     s = s.astype(float)
     mean = s.mean()
-    std = s.std(ddof=0)
+    std = s.std(ddof=1)
     q1 = quantile_linear(s, 0.25)
     q3 = quantile_linear(s, 0.75)
     iqr = q3 - q1
@@ -82,7 +81,7 @@ def describe(s: pd.Series) -> dict:
         "count": int(s.count()),
         "mean": float(mean),
         "median": float(s.median()),
-        "variance": float(s.var(ddof=0)),
+        "variance": float(s.var(ddof=1)),
         "stdDev": float(std),
         "min": float(s.min()),
         "max": float(s.max()),
@@ -136,10 +135,10 @@ def main() -> int:
             "numpy": np.__version__,
             "rowCount": int(len(df)),
             "conventions": {
-                "variance": "population (ddof=0)",
+                "variance": "sample (ddof=1)",
                 "quantile": "linear interpolation, idx=(n-1)*p (numpy 'linear', type 7)",
                 "iqrOutliers": "strictly outside Q1-1.5*IQR .. Q3+1.5*IQR",
-                "zscoreOutliers": "|z|>3 with population std",
+                "zscoreOutliers": "|z|>3 with sample std",
                 "rowNumberTies": "original CSV row order",
                 "rank": "SQL RANK (min), DENSE_RANK (dense)",
                 "runningTotal": "RANGE UNBOUNDED PRECEDING..CURRENT ROW (peer-inclusive)",

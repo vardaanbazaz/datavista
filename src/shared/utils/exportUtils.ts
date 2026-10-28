@@ -2,6 +2,7 @@ import html2canvas from 'html2canvas';
 import { saveAs } from 'file-saver';
 import jsPDF from 'jspdf';
 import { ChartConfig, DataRow, Dataset } from '@/shared/types';
+import { summarizeNumericColumns } from '@/shared/services/stats/columnSummary';
 
 /**
  * Recursively copy computed styles from source elements to target cloned elements
@@ -175,19 +176,9 @@ export const generatePDFReport = async (
         .filter(([_, type]) => type === 'numeric')
         .map(([col, _]) => col);
 
-      numericColumns.forEach(col => {
-        const values = filteredData
-          .map(row => Number(row[col]))
-          .filter(val => !isNaN(val));
-        
-        if (values.length > 0) {
-          const min = Math.min(...values);
-          const max = Math.max(...values);
-          const avg = values.reduce((a, b) => a + b, 0) / values.length;
-          
-          pdf.text(`${col}: Min=${min.toFixed(2)}, Max=${max.toFixed(2)}, Avg=${avg.toFixed(2)}`, 20, yPosition);
-          yPosition += 6;
-        }
+      summarizeNumericColumns(filteredData, numericColumns).forEach(({ column: col, min, max, mean: avg }) => {
+        pdf.text(`${col}: Min=${min.toFixed(2)}, Max=${max.toFixed(2)}, Avg=${avg.toFixed(2)}`, 20, yPosition);
+        yPosition += 6;
       });
       
       yPosition += 10;

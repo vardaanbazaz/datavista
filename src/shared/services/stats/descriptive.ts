@@ -1,5 +1,6 @@
 import { DescriptiveStats } from "./types";
 import { ColumnMetadata } from "@/shared/types";
+import { minMax, sampleVariance, sum as sumOf, toNumberOrNull } from "@/shared/utils/numeric";
 
 /**
  * Computes the median of an array of numbers.
@@ -79,8 +80,8 @@ export function computeDescriptive(
       rawMissingCount++;
     } else {
       uniqueSet.add(v);
-      const num = Number(v);
-      if (!isNaN(num)) {
+      const num = toNumberOrNull(v);
+      if (num !== null) {
         numericValues.push(num);
       }
     }
@@ -115,11 +116,12 @@ export function computeDescriptive(
     };
   }
 
-  const min = useCachedMetadata && metadata!.minimumValue !== undefined ? metadata!.minimumValue : Math.min(...numericValues);
-  const max = useCachedMetadata && metadata!.maximumValue !== undefined ? metadata!.maximumValue : Math.max(...numericValues);
+  const bounds = minMax(numericValues)!;
+  const min = useCachedMetadata && metadata!.minimumValue !== undefined ? metadata!.minimumValue : bounds.min;
+  const max = useCachedMetadata && metadata!.maximumValue !== undefined ? metadata!.maximumValue : bounds.max;
   const range = max - min;
 
-  const sum = numericValues.reduce((s, v) => s + v, 0);
+  const sum = sumOf(numericValues);
   const mean = sum / validCount;
 
   const median = calculateMedian(numericValues);
@@ -132,22 +134,26 @@ export function computeDescriptive(
   const q3 = calculatePercentile(sortedNumeric, 75);
   const iqr = q3 - q1;
 
-  // Population Variance & Standard Deviation (consistent with unified query engine)
-  const variance = numericValues.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / validCount;
+  // SAMPLE variance & standard deviation (n − 1), the same as every other engine
+  const variance = sampleVariance(numericValues);
   const stdDev = Math.sqrt(variance);
+
+  // Skewness and excess kurtosis keep their population-moment definitions (m3 / m2^1.5,
+  // m4 / m2^2 − 3), so they use the population std, not the sample one above.
+  const popStdDev = Math.sqrt(numericValues.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / validCount);
 
   // Skewness
   let skewness = 0;
-  if (stdDev > 0) {
+  if (popStdDev > 0) {
     const sumCubes = numericValues.reduce((s, v) => s + Math.pow(v - mean, 3), 0);
-    skewness = (sumCubes / validCount) / Math.pow(stdDev, 3);
+    skewness = (sumCubes / validCount) / Math.pow(popStdDev, 3);
   }
 
   // Kurtosis
   let kurtosis = 0;
-  if (stdDev > 0) {
+  if (popStdDev > 0) {
     const sumQuads = numericValues.reduce((s, v) => s + Math.pow(v - mean, 4), 0);
-    kurtosis = (sumQuads / validCount) / Math.pow(stdDev, 4) - 3;
+    kurtosis = (sumQuads / validCount) / Math.pow(popStdDev, 4) - 3;
   }
 
   return {

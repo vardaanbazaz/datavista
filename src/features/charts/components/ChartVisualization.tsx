@@ -14,6 +14,7 @@ import { Badge } from "@/shared/components/ui/badge";
 import { toast } from "@/shared/hooks/use-toast";
 import { ErrorBoundary, WidgetError } from "@/shared/components/ErrorBoundary";
 import { getEffectiveColumnType } from "@/shared/utils/columnType";
+import { numericValues, toNumberOrNull } from "@/shared/utils/numeric";
 import {
   aggregateValues as aggregateRows,
   chartYValueLabel,
@@ -279,10 +280,15 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
     };
 
     // Reduces rows sharing an x-axis (and groupBy) key into chart.yAxis's plotted value.
+    // `count` on a numeric column counts its valid numbers, elsewhere its non-blank cells.
+    const numericColumns = new Set(
+      chart.yAxis && getColumnType(chart.yAxis) === 'numeric' ? [chart.yAxis] : []
+    );
     const aggregateValues = (rows: typeof chartData, column: string): number =>
-      aggregateRows(rows, column, chart.aggregation);
+      aggregateRows(rows, column, chart.aggregation, numericColumns);
 
-    const isCountAggregation = chart.aggregation === 'count' || chart.aggregation === 'count_distinct';
+    const isCountAggregation =
+      chart.aggregation === 'count' || chart.aggregation === 'count_rows' || chart.aggregation === 'count_distinct';
 
     // Line/area plot chartData's rows directly (no per-x rollup, unlike bar/pie), so an
     // aggregation query's yAxis (one real value per x-key, not per raw row) needs this
@@ -873,8 +879,8 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
     function renderScatterPlot() {
       if (!currentDimension || !chart.yAxis) return;
 
-      const data = chartData.filter(d => 
-        d[currentDimension] !== null && d[chart.yAxis!] !== null
+      const data = chartData.filter(d =>
+        toNumberOrNull(d[currentDimension]) !== null && toNumberOrNull(d[chart.yAxis!]) !== null
       );
 
       const xScale = d3.scaleLinear()
@@ -940,9 +946,7 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
     function renderHistogram() {
       if (!currentDimension) return;
 
-      const data = chartData
-        .map(d => Number(d[currentDimension]))
-        .filter(d => !isNaN(d));
+      const data = numericValues(chartData.map(d => d[currentDimension]));
 
       const xScale = d3.scaleLinear()
         .domain(d3.extent(data) as [number, number])
@@ -1270,8 +1274,11 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
       if (!currentDimension || !chart.yAxis || !chart.sizeBy) return;
 
       const data = chartData
-        .filter(d => d[currentDimension] !== null && d[chart.yAxis!] !== null && d[chart.sizeBy!] !== null)
-        .filter(d => !isNaN(Number(d[currentDimension])) && !isNaN(Number(d[chart.yAxis!])) && !isNaN(Number(d[chart.sizeBy!])));
+        .filter(d =>
+          toNumberOrNull(d[currentDimension]) !== null &&
+          toNumberOrNull(d[chart.yAxis!]) !== null &&
+          toNumberOrNull(d[chart.sizeBy!]) !== null
+        );
 
       if (!data.length) {
         renderErrorMessage("No valid numeric records found for bubble chart.");

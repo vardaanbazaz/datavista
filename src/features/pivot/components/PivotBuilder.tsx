@@ -34,14 +34,22 @@ interface PivotBuilderProps {
   dataset: Dataset;
 }
 
+// "COUNT_ROWS of Item" would read as a count of Item's values; it counts every row.
+const valueFieldDisplayName = (operator: AggregationOperator, column: string) => {
+  if (operator === "count_rows") return "Count of rows";
+  if (operator === "stddev") return `Std. deviation (sample) of ${column}`;
+  return `${operator.toUpperCase()} of ${column}`;
+};
+
 const AGGREGATION_OPTIONS: { value: AggregationOperator; label: string }[] = [
   { value: "sum", label: "Sum" },
   { value: "avg", label: "Average" },
   { value: "count", label: "Count" },
+  { value: "count_rows", label: "Count of rows" },
   { value: "min", label: "Minimum" },
   { value: "max", label: "Maximum" },
   { value: "median", label: "Median" },
-  { value: "stddev", label: "Std Dev" },
+  { value: "stddev", label: "Std. deviation (sample)" },
   { value: "count_distinct", label: "Distinct Count" },
   { value: "weighted_average", label: "Weighted Average" },
   { value: "percentile", label: "Percentile" },
@@ -142,7 +150,7 @@ export const PivotBuilder: React.FC<PivotBuilderProps> = ({ dataset }) => {
     const vf: PivotValueField = {
       column: colName,
       operator: resolvedOp,
-      displayName: `${resolvedOp.toUpperCase()} of ${colName}`,
+      displayName: valueFieldDisplayName(resolvedOp, colName),
     };
     updateConfig({
       valueFields: [...currentConfig.valueFields, vf],
@@ -200,7 +208,7 @@ export const PivotBuilder: React.FC<PivotBuilderProps> = ({ dataset }) => {
     list[idx] = {
       ...list[idx],
       operator,
-      displayName: `${operator.toUpperCase()} of ${list[idx].column}`,
+      displayName: valueFieldDisplayName(operator, list[idx].column),
       percentileValue: operator === 'percentile' ? (list[idx].percentileValue ?? 90) : list[idx].percentileValue,
       weightColumn: operator === 'weighted_average' ? (list[idx].weightColumn ?? "") : list[idx].weightColumn,
       conditionExpression: (operator === 'sum_if' || operator === 'count_if') ? (list[idx].conditionExpression ?? "") : list[idx].conditionExpression,
@@ -467,7 +475,7 @@ export const PivotBuilder: React.FC<PivotBuilderProps> = ({ dataset }) => {
                           <SelectItem
                             key={opt.value}
                             value={opt.value}
-                            disabled={!isNumeric && !["count", "count_distinct", "count_if"].includes(opt.value)}
+                            disabled={!isNumeric && !["count", "count_rows", "count_distinct", "count_if"].includes(opt.value)}
                           >
                             {opt.label}
                           </SelectItem>

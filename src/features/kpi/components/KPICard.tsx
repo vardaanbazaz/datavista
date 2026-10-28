@@ -8,6 +8,7 @@ import { useDashboardStore } from "@/features/dashboards/store/dashboardStore";
 import { formattingEngine } from "@/shared/services/formattingEngine";
 import { KPICardConfig } from "../types";
 import { kpiEngine } from "../kpiEngine";
+import { minMax } from "@/shared/utils/numeric";
 import { Edit2, Trash2, GripVertical, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { useDrillStore } from "@/features/dashboards/store/drillStore";
 import { filterManager } from "@/features/dashboards/services/filterManager";
@@ -125,8 +126,7 @@ export function KPICard({ config, onRemove, onEdit, isMobile = false }: KPICardP
   const sparklineSvg = useMemo(() => {
     if (!kpiData || kpiData.sparklineData.length < 2) return null;
     const values = kpiData.sparklineData.map((d) => d.value);
-    const min = Math.min(...values);
-    const max = Math.max(...values);
+    const { min, max } = minMax(values)!;
     const range = max - min === 0 ? 1 : max - min;
 
     const width = 120;

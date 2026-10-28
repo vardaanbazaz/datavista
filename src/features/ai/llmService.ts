@@ -41,7 +41,7 @@ Response JSON Schema:
     "aggregations": [
       {
         "column": "string",
-        "operator": "count" | "sum" | "avg" | "min" | "max" | "median" | "stddev" | "count_distinct",
+        "operator": "count_rows" | "count" | "sum" | "avg" | "min" | "max" | "median" | "stddev" | "count_distinct",
         "alias": "string"
       }
     ],

@@ -20,7 +20,8 @@ import { CreateTemplateModal } from "@/features/dashboards/components/CreateTemp
 import { SnapshotManager } from "@/features/dashboards/components/SnapshotManager";
 import { useTemplateStore } from "@/features/dashboards/store/templateStore";
 import { templateEngine } from "@/features/dashboards/services/templateEngine";
-import { getEffectiveColumnType, getEffectiveColumnTypes } from "@/shared/utils/columnType";
+import { getEffectiveColumnTypes } from "@/shared/utils/columnType";
+import { summarizeNumericColumns } from "@/shared/services/stats/columnSummary";
 import { useUiStore } from "@/store/uiStore";
 import { Hint } from "@/shared/components/Hint";
 import { modKey } from "@/shared/lib/platform";
@@ -90,48 +91,17 @@ export function DashboardSummary() {
     const activeFilterCount = Object.keys(activeFilters.categoricalFilters || {}).length + 
                              Object.keys(activeFilters.dateRangeFilters || {}).length;
 
-    // Calculate some basic statistics
-    let numericStats;
-    const isFiltered = filteredRows !== totalRows || activeFilterCount > 0 || !!activeFilters.groupByColumn;
-    
-    if (!isFiltered && dataset.metadata) {
-      numericStats = dataset.metadata.columns
-        .filter(c => getEffectiveColumnType(dataset, c.name) === 'numeric' && c.minimumValue !== undefined && c.maximumValue !== undefined && c.average !== undefined)
-        .map(col => {
-          const count = dataset.metadata!.rowCount - col.missingValueCount;
-          const sum = (col.average || 0) * count;
-          return {
-            column: col.name,
-            sum,
-            avg: col.average !== undefined ? Math.round(col.average * 100) / 100 : 0,
-            max: col.maximumValue || 0,
-            min: col.minimumValue || 0,
-            count
-          };
-        });
-    } else {
-      numericStats = numericColumns.map(col => {
-        const values = filteredData
-          .map(row => Number(row[col]))
-          .filter(val => !isNaN(val));
-        
-        if (values.length === 0) return null;
-        
-        const sum = values.reduce((a, b) => a + b, 0);
-        const avg = sum / values.length;
-        const max = Math.max(...values);
-        const min = Math.min(...values);
-        
-        return {
-          column: col,
-          sum,
-          avg: Math.round(avg * 100) / 100,
-          max,
-          min,
-          count: values.length
-        };
-      }).filter(Boolean);
-    }
+    // Real count/sum/avg/min/max of the valid numbers in the rows shown (shared numeric rule).
+    // No metadata shortcut: metadata has no valid-number count, and rowCount − missing
+    // counted junk strings, which inflated count and sum.
+    const numericStats = summarizeNumericColumns(filteredData, numericColumns).map(s => ({
+      column: s.column,
+      sum: s.sum,
+      avg: Math.round(s.mean * 100) / 100,
+      max: s.max,
+      min: s.min,
+      count: s.count
+    }));
 
     return {
       totalRows,

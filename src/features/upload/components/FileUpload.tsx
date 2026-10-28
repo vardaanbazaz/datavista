@@ -4,7 +4,7 @@ import { Button } from "@/shared/components/ui/button";
 import { Progress } from "@/shared/components/ui/progress";
 import { useToast } from "@/shared/hooks/use-toast";
 import { Upload, FileText, AlertCircle, CheckCircle } from "lucide-react";
-import Papa from "papaparse";
+import { parseCsvFile } from "@/shared/services/csvParse";
 import * as XLSX from "xlsx";
 import { useDatasetStore } from "@/store/datasetStore";
 import { processRawData } from "@/shared/services/parsingService";
@@ -47,18 +47,15 @@ export function FileUpload() {
       let rawData: Record<string, unknown>[] = [];
 
       if (fileExtension === 'csv' || fileExtension === 'tsv') {
-        // Parse CSV/TSV with Papa Parse
-        Papa.parse(file, {
-          header: true,
-          skipEmptyLines: 'greedy', // Clean empty/spaces rows
-          delimiter: fileExtension === 'tsv' ? '\t' : undefined,
-          complete: (results) => {
+        // Parse CSV/TSV with Papa Parse (shared path: pandas-style header names)
+        parseCsvFile(file, fileExtension === 'tsv' ? '\t' : undefined).then(
+          (results) => {
             try {
               if (results.errors.length > 0) {
                 console.warn('CSV parsing warnings:', results.errors);
               }
               
-              rawData = results.data as Record<string, unknown>[];
+              rawData = results.rows;
               setUploadProgress(70);
               
               const dataset = processRawData(rawData, fileName);
@@ -79,7 +76,7 @@ export function FileUpload() {
               setUploadProgress(0);
             }
           },
-          error: (error) => {
+          (error: Error) => {
             toast({
               title: "Parse error",
               description: `CSV parsing error: ${error.message}`,
@@ -88,7 +85,7 @@ export function FileUpload() {
             setIsUploading(false);
             setUploadProgress(0);
           }
-        });
+        );
       } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
         // Parse Excel files
         const arrayBuffer = await file.arrayBuffer();

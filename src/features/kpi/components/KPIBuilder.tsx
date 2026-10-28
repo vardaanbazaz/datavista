@@ -170,10 +170,11 @@ export function KPIBuilder({ isOpen, onClose, onSave, editKpi = null }: KPIBuild
                     <SelectItem value="sum">Sum</SelectItem>
                     <SelectItem value="avg">Average</SelectItem>
                     <SelectItem value="count">Count</SelectItem>
+                    <SelectItem value="count_rows">Count of rows</SelectItem>
                     <SelectItem value="min">Minimum</SelectItem>
                     <SelectItem value="max">Maximum</SelectItem>
                     <SelectItem value="median">Median</SelectItem>
-                    <SelectItem value="stddev">Std Deviation</SelectItem>
+                    <SelectItem value="stddev">Std. deviation (sample)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

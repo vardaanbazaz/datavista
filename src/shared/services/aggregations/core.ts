@@ -1,5 +1,6 @@
 import { DataRow } from "@/shared/types";
 import { compile, evaluateAST } from "@/shared/services/formulaEngine";
+import { numericValues, toNumberOrNull } from "@/shared/utils/numeric";
 
 /**
  * Counts unique non-null, non-undefined, non-empty values.
@@ -24,22 +25,10 @@ export function weightedAverage(values: unknown[], weights: unknown[]): number |
   const len = Math.min(values.length, weights.length);
 
   for (let i = 0; i < len; i++) {
-    const rawVal = values[i];
-    const rawWeight = weights[i];
+    const val = toNumberOrNull(values[i]);
+    const w = toNumberOrNull(weights[i]);
 
-    if (
-      rawVal === null ||
-      rawVal === undefined ||
-      rawWeight === null ||
-      rawWeight === undefined
-    ) {
-      continue;
-    }
-
-    const val = Number(rawVal);
-    const w = Number(rawWeight);
-
-    if (isNaN(val) || isNaN(w)) {
+    if (val === null || w === null) {
       continue;
     }
 
@@ -55,9 +44,7 @@ export function weightedAverage(values: unknown[], weights: unknown[]): number |
  */
 export const percentile = (values: unknown[], p: number): number | null => {
   // 1. Filter out all non-numeric values and sort
-  const valid = values
-    .filter((v): v is number => typeof v === 'number' && !Number.isNaN(v))
-    .sort((a, b) => a - b);
+  const valid = numericValues(values).sort((a, b) => a - b);
 
   // 2. Guard clause: return null for empty arrays (Fixes Failure 1)
   if (valid.length === 0) return null;
@@ -101,8 +88,8 @@ export function conditionalAggregate(
       if (type === "count") {
         result++;
       } else {
-        const val = Number(row[targetColumn]);
-        if (!isNaN(val) && row[targetColumn] !== null && row[targetColumn] !== undefined) {
+        const val = toNumberOrNull(row[targetColumn]);
+        if (val !== null) {
           result += val;
         }
       }

@@ -1,5 +1,6 @@
 import { DataRow } from "@/shared/types";
 import { CorrelationMatrix } from "./types";
+import { toNumberOrNull } from "@/shared/utils/numeric";
 
 /**
  * Calculates the Pearson correlation coefficient between two numeric arrays.
@@ -53,19 +54,11 @@ export function computeCorrelationMatrix(
       const y: number[] = [];
 
       for (const row of data) {
-        const valA = row[colA];
-        const valB = row[colB];
-
-        if (
-          valA !== null && valA !== undefined && valA !== "" &&
-          valB !== null && valB !== undefined && valB !== ""
-        ) {
-          const numA = Number(valA);
-          const numB = Number(valB);
-          if (!isNaN(numA) && !isNaN(numB)) {
-            x.push(numA);
-            y.push(numB);
-          }
+        const numA = toNumberOrNull(row[colA]);
+        const numB = toNumberOrNull(row[colB]);
+        if (numA !== null && numB !== null) {
+          x.push(numA);
+          y.push(numB);
         }
       }
 

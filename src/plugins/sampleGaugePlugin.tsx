@@ -3,6 +3,7 @@ import React from "react";
 import { DataVistaPlugin } from "@/shared/types/plugins";
 import { ChartConfig, DataRow } from "@/shared/types";
 import { FunctionDefinition } from "@/shared/services/formula/library/types";
+import { toNumberOrNull } from "@/shared/utils/numeric";
 
 interface GaugeComponentProps {
   chart: ChartConfig;
@@ -17,8 +18,7 @@ export const GaugeChartComponent: React.FC<GaugeComponentProps> = ({ chart, data
     if (!data.length) return 0;
     if (!yCol) return data.length;
     return data.reduce((acc, row) => {
-      const val = Number(row[yCol]);
-      return acc + (isNaN(val) ? 0 : val);
+      return acc + (toNumberOrNull(row[yCol]) ?? 0);
     }, 0);
   }, [data, yCol]);
 

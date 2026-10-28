@@ -24,3 +24,30 @@ describe('queryEngine.applyCondition - unrecognized operator', () => {
     expect(result).toEqual([]);
   });
 });
+
+// Numeric comparisons use the shared numeric rule: a blank or junk cell is not 0, so it
+// never matches lessThan/greaterThan/between.
+describe('queryEngine.applyCondition - blanks and junk are not 0', () => {
+  const data: DataRow[] = [
+    { id: 'a', amount: 3 },
+    { id: 'blank', amount: null },
+    { id: 'junk', amount: 'ERROR' },
+    { id: 'token', amount: 'N/A' },
+    { id: 'b', amount: 8 },
+  ];
+
+  it('lessThan excludes blank/junk cells', () => {
+    const result = queryEngine.applyCondition(data, { column: 'amount', operator: 'lessThan', value: 5 });
+    expect(result.map(r => r.id)).toEqual(['a']);
+  });
+
+  it('greaterThan with a negative bound excludes blank/junk cells', () => {
+    const result = queryEngine.applyCondition(data, { column: 'amount', operator: 'greaterThan', value: -1 });
+    expect(result.map(r => r.id)).toEqual(['a', 'b']);
+  });
+
+  it('between excludes blank/junk cells', () => {
+    const result = queryEngine.applyCondition(data, { column: 'amount', operator: 'between', value: { start: 0, end: 10 } });
+    expect(result.map(r => r.id)).toEqual(['a', 'b']);
+  });
+});

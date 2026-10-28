@@ -1,5 +1,6 @@
 import { OutlierInfo, OutlierRecord } from "./types";
 import { calculatePercentile } from "./descriptive";
+import { sampleStdDev, toNumberOrNull } from "@/shared/utils/numeric";
 
 /**
  * Identifies outliers in a column using either the IQR or Z-score method.
@@ -13,12 +14,9 @@ export function computeOutliers(
 
   const numericData: { index: number; value: number }[] = [];
   for (let i = 0; i < allValues.length; i++) {
-    const v = allValues[i];
-    if (v !== null && v !== undefined && v !== "") {
-      const num = Number(v);
-      if (!isNaN(num)) {
-        numericData.push({ index: i, value: num });
-      }
+    const num = toNumberOrNull(allValues[i]);
+    if (num !== null) {
+      numericData.push({ index: i, value: num });
     }
   }
 
@@ -54,11 +52,10 @@ export function computeOutliers(
       }
     }
   } else {
-    // Z-Score method
-    const sum = numericData.reduce((s, d) => s + d.value, 0);
-    const mean = sum / n;
-    const variance = numericData.reduce((s, d) => s + Math.pow(d.value - mean, 2), 0) / n;
-    const stdDev = Math.sqrt(variance);
+    // Z-Score method, with the SAMPLE standard deviation (n − 1)
+    const values = numericData.map(d => d.value);
+    const mean = values.reduce((s, v) => s + v, 0) / n;
+    const stdDev = sampleStdDev(values);
 
     if (stdDev > 0) {
       for (const item of numericData) {

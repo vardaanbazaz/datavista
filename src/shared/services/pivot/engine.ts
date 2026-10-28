@@ -5,6 +5,7 @@ import { PivotResultModel } from "./resultModel";
 import { aggregationAdapter } from "./aggregationAdapter";
 import { flattenRowHierarchy, flattenColumnHierarchy } from "./utilities";
 import { getCachedPivotResult, setCachedPivotResult } from "./cache";
+import { numericColumnSet } from "@/shared/services/queryEngine";
 
 export const pivotEngine = {
   /**
@@ -25,7 +26,7 @@ export const pivotEngine = {
     const columnHierarchy = buildColumnHierarchy(dataset.data, config.columnDimensions, config.dimensionSorts);
 
     // 3. Compute cell values (aggregations) recursively
-    computeHierarchyValues(rowHierarchy, config.columnDimensions, queryAggs);
+    computeHierarchyValues(rowHierarchy, config.columnDimensions, queryAggs, numericColumnSet(dataset));
 
     // 4. Apply value-based sorts if specified
     if (config.valueSorts && config.valueSorts.length > 0) {

@@ -1,0 +1,155 @@
+import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
+import { parseCsvText } from '../csvParse';
+import { processRawData } from '../parsingService';
+import { queryEngine, numericColumnSet } from '../queryEngine';
+import { statsEngine } from '../stats';
+import { summarizeNumericColumns } from '../stats/columnSummary';
+import { aggregateValues } from '@/features/charts/lib/chartAggregation';
+import { Dataset, QueryAggregation } from '../../types';
+
+/**
+ * Messy-data golden tests: real-world dirty CSV subsets (tests/fixtures/messy, sources and
+ * row lists in tests/fixtures/README.md) loaded through the real parse path, and every
+ * engine that shows count/sum/mean/min/max/std checked against each other and against an
+ * independent pandas oracle (scripts/golden/generate_messy_golden.py ->
+ * tests/fixtures/messy/messy.golden.json). Regenerate with `npm run golden:regen-messy`;
+ * never edit the golden file by hand.
+ */
+
+const DIR = resolve(__dirname, '../../../../tests/fixtures/messy');
+const golden = JSON.parse(readFileSync(resolve(DIR, 'messy.golden.json'), 'utf8'));
+
+type Stat = { count: number; sum: number; mean: number; min: number; max: number; std: number };
+
+function expectClose(actual: number, expected: number, label: string) {
+  const tol = 1e-9 * Math.max(1, Math.abs(actual), Math.abs(expected));
+  expect(Math.abs(actual - expected), `${label}: expected ${expected}, got ${actual}`).toBeLessThanOrEqual(tol);
+}
+
+function expectStat(actual: Stat, expected: Stat, label: string) {
+  expect(actual.count, `${label} count`).toBe(expected.count);
+  for (const k of ['sum', 'mean', 'min', 'max', 'std'] as const) expectClose(actual[k], expected[k], `${label} ${k}`);
+}
+
+function load(file: string): Dataset {
+  return processRawData(parseCsvText(readFileSync(resolve(DIR, file), 'utf8')).rows, file);
+}
+
+const OPS = ['count', 'sum', 'avg', 'min', 'max', 'stddev'] as const;
+const toStat = (r: Record<string, number>): Stat => ({
+  count: r.count, sum: r.sum, mean: r.avg, min: r.min, max: r.max, std: r.stddev,
+});
+
+/** Each engine's view of one numeric column over the whole dataset. */
+function engines(ds: Dataset, col: string): Record<string, Stat> {
+  const numeric = numericColumnSet(ds);
+  const full = statsEngine.calculateDatasetStats(ds, { isFullDataset: true }).descriptive[col];
+  const raw = statsEngine.calculateDatasetStats(ds, { isFullDataset: false }).descriptive[col];
+  const fromDescriptive = (d: typeof full): Stat => ({
+    count: d.count, sum: d.sum, mean: d.mean, min: d.min, max: d.max, std: d.stdDev,
+  });
+
+  // KPI cards run exactly this query (kpiEngine.calculateKPIData -> queryEngine.execute)
+  const aggs: QueryAggregation[] = OPS.map(op => ({ column: col, operator: op, alias: op }));
+  const kpi = queryEngine.execute(ds, { aggregations: aggs, pagination: { pageSize: 'all' }, options: { bypassCache: true } });
+
+  const chart = Object.fromEntries(OPS.map(op => [op, aggregateValues(ds.data, col, op, numeric)]));
+  const summary = summarizeNumericColumns(ds.data, [col])[0];
+
+  return {
+    'statsEngine (full)': fromDescriptive(full),
+    'statsEngine (filtered path)': fromDescriptive(raw),
+    'queryEngine / KPI': toStat(kpi.summary!),
+    'chart aggregateValues': toStat(chart),
+    'DashboardSummary': summary,
+  };
+}
+
+/**
+ * Columns whose current-rule values are knowingly wrong and fixed in a later batch, so they
+ * are NOT compared with the oracle yet (see the it.todo's). Engines must still agree.
+ */
+const NOT_ORACLE_CHECKED: Record<string, Record<string, string>> = {
+  'playstore.csv': { Rating: 'shifted row 10473 (Rating 19) is still included' },
+  'glassdoor.csv': {
+    Rating: '-1 sentinel is still included',
+    Founded: '-1 sentinel is still included',
+  },
+};
+
+const FIXTURES: { file: string; rows: number; numeric: string[] }[] = [
+  { file: 'cafe.csv', rows: 81, numeric: ['Quantity', 'Price Per Unit', 'Total Spent'] },
+  // Price is categorical in this subset: it oversamples "$x.xx" prices (later batch: currency)
+  { file: 'playstore.csv', rows: 80, numeric: ['Rating', 'Reviews'] },
+  { file: 'netflix.csv', rows: 64, numeric: ['release_year'] },
+  { file: 'glassdoor.csv', rows: 31, numeric: ['index', 'Rating', 'Founded'] },
+];
+
+describe('golden: messy-data fixtures', () => {
+  for (const { file, rows, numeric } of FIXTURES) {
+    describe(file, () => {
+      const ds = load(file);
+      const g = golden[file];
+
+      it('row and column counts and header names match pandas', () => {
+        expect(ds.data.length).toBe(rows);
+        expect(g.rowCount).toBe(rows);
+        expect(ds.columns).toEqual(g.columns);
+      });
+
+      it('numeric columns are the expected ones', () => {
+        const numericCols = ds.columns.filter(c => ds.columnTypes[c] === 'numeric');
+        expect(numericCols).toEqual(numeric);
+      });
+
+      for (const col of numeric) {
+        const skipOracle = NOT_ORACLE_CHECKED[file]?.[col];
+        // Oracle-checked columns: every engine equals pandas. Others: every engine equals
+        // statsEngine (agreement only), until the later batch fixes the value itself.
+        const reference = (): Stat =>
+          skipOracle ? engines(ds, col)['statsEngine (full)'] : (g.numericStats[col] as Stat);
+
+        it(skipOracle ? `${col}: every engine agrees (oracle check deferred: ${skipOracle})` : `${col}: every engine agrees with the oracle`, () => {
+          const expected = reference();
+          expect(expected, `no reference stats for ${col}`).toBeDefined();
+          for (const [engine, stat] of Object.entries(engines(ds, col))) {
+            expectStat(stat, expected, `${file} ${col} [${engine}]`);
+          }
+        });
+
+        it(`${col}: group-by counts add up to the column count`, () => {
+          // Filter group-by path: one group per non-blank value of the first column, then
+          // the per-group count/sum of `col` must add up to the oracle's totals.
+          const by = ds.columns.find(c => c !== col && ds.data.every(r => r[c] !== null && r[c] !== undefined))!;
+          const res = queryEngine.execute(ds, {
+            groupBy: { column: by },
+            aggregations: [
+              { column: col, operator: 'count', alias: 'n' },
+              { column: col, operator: 'sum', alias: 's' },
+            ],
+            pagination: { pageSize: 'all' },
+            options: { bypassCache: true },
+          });
+          const n = res.rows.reduce((a, r) => a + (r.n as number), 0);
+          const s = res.rows.reduce((a, r) => a + (r.s as number), 0);
+          const expected = reference();
+          expect(n).toBe(expected.count);
+          expectClose(s, expected.sum, `${file} ${col} group-by sum`);
+        });
+      }
+    });
+  }
+
+  it('netflix: a trailing non-breaking space in a title is kept (s6530)', () => {
+    const ds = load('netflix.csv');
+    const row = ds.data.find(r => r.show_id === 's6530')!;
+    expect(row.title).toBe('Consequences\u00a0');
+  });
+
+  it.todo('glassdoor: Rating/Founded match the oracle with the -1 sentinel excluded (later batch: sentinel handling)');
+  it.todo('playstore: Rating matches the oracle with shifted row 10473 (Rating 19) excluded (later batch: malformed-row handling)');
+  it.todo('playstore: Price "$x.xx" values parse as numbers (later batch: currency parsing)');
+  it.todo('dates: Netflix date_added, Play Store Last Updated, Cafe Transaction Date keep the calendar day in every time zone (later batch: date handling)');
+});

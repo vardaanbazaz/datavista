@@ -19,9 +19,10 @@ describe("aggregationLabel", () => {
     expect(aggregationLabel("min", "Age")).toBe("Minimum of Age");
     expect(aggregationLabel("max", "Age")).toBe("Maximum of Age");
     expect(aggregationLabel("median", "Age")).toBe("Median of Age");
-    expect(aggregationLabel("stddev", "Age")).toBe("Std. deviation of Age");
+    expect(aggregationLabel("stddev", "Age")).toBe("Std. deviation (sample) of Age");
     expect(aggregationLabel("count_distinct", "JobRole")).toBe("Distinct count of JobRole");
-    expect(aggregationLabel("count", "Education")).toBe("Count of rows");
+    expect(aggregationLabel("count", "Education")).toBe("Count of Education");
+    expect(aggregationLabel("count_rows", "Education")).toBe("Count of rows");
   });
 
   it("labels the operators charts can't compute as the sum they fall back to", () => {
@@ -35,7 +36,8 @@ describe("chartYValueLabel", () => {
   it("prefixes the aggregation for bar and pie (which always reduce, default sum)", () => {
     expect(chartYValueLabel({ type: "bar", yAxis: "Education" })).toBe("Sum of Education");
     expect(chartYValueLabel({ type: "bar", yAxis: "Education", aggregation: "avg" })).toBe("Average of Education");
-    expect(chartYValueLabel({ type: "pie", yAxis: "Sales", aggregation: "count" })).toBe("Count of rows");
+    expect(chartYValueLabel({ type: "pie", yAxis: "Sales", aggregation: "count" })).toBe("Count of Sales");
+    expect(chartYValueLabel({ type: "pie", yAxis: "Sales", aggregation: "count_rows" })).toBe("Count of rows");
   });
 
   it("prefixes line/area only when an aggregation is set (otherwise raw row values are plotted)", () => {

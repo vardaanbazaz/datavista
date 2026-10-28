@@ -9,7 +9,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/compo
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/components/ui/tooltip";
 import { Search, ArrowUpDown, Download, Palette, RefreshCw } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import { Dataset, Query, DataRow, ConditionalFormatRule, DatasetMetadata } from "@/shared/types";
 import { queryEngine } from "@/shared/services/queryEngine";
@@ -23,6 +22,8 @@ import { QueryPerformanceBadge } from "@/features/dashboard/components/QueryPerf
 import { ConditionalFormattingBuilder } from "@/features/dashboards/components/ConditionalFormattingBuilder";
 import { DatasetUpdateModal } from "./DatasetUpdateModal";
 import { getEffectiveColumnType, mightBeCategorical } from "@/shared/utils/columnType";
+import { summarizeNumericColumns } from "@/shared/services/stats/columnSummary";
+import { parseCsvFile } from "@/shared/services/csvParse";
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/components/ui/popover";
 
 interface DataTableProps {
@@ -71,30 +72,24 @@ export function DataTable({
       let rawData: Record<string, unknown>[] = [];
 
       if (ext === "csv" || ext === "tsv") {
-        Papa.parse(file, {
-          header: true,
-          skipEmptyLines: "greedy",
-          delimiter: ext === "tsv" ? "\t" : undefined,
-          complete: (results) => {
-            try {
-              rawData = results.data as Record<string, unknown>[];
-              const processed = processRawData(rawData, fileName);
-              setNewParsedData({
-                data: processed.data,
-                columns: processed.columns,
-                columnTypes: processed.columnTypes,
-                metadata: processed.metadata,
-              });
-              setIsUpdateModalOpen(true);
-            } catch (err: unknown) {
-              toast({
-                title: "Processing Failed",
-                description: (err as Error)?.message || "Failed to process raw CSV data.",
-                variant: "destructive",
-              });
-            }
-          },
-        });
+        const parsed = await parseCsvFile(file, ext === "tsv" ? "\t" : undefined);
+        try {
+          rawData = parsed.rows;
+          const processed = processRawData(rawData, fileName);
+          setNewParsedData({
+            data: processed.data,
+            columns: processed.columns,
+            columnTypes: processed.columnTypes,
+            metadata: processed.metadata,
+          });
+          setIsUpdateModalOpen(true);
+        } catch (err: unknown) {
+          toast({
+            title: "Processing Failed",
+            description: (err as Error)?.message || "Failed to process raw CSV data.",
+            variant: "destructive",
+          });
+        }
       } else if (ext === "xlsx" || ext === "xls") {
         const buffer = await file.arrayBuffer();
         const workbook = XLSX.read(buffer, { type: "array" });
@@ -255,47 +250,15 @@ export function DataTable({
   const summaryStats = useMemo(() => {
     if (!dataset) return {};
     const stats: Record<string, { min: number; max: number; mean: number; count: number }> = {};
-    
-    // Performance optimization: if no filters are active, use precomputed metadata
-    const isFiltered = filteredData.length !== dataset.data.length || !!searchTerm || (filterColumn !== 'none' && !!filterValue);
-    if (!isFiltered && dataset.metadata) {
-      dataset.metadata.columns.forEach(col => {
-        if (
-          getEffectiveColumnType(dataset, col.name) === 'numeric' &&
-          col.minimumValue !== undefined &&
-          col.maximumValue !== undefined &&
-          col.average !== undefined
-        ) {
-          stats[col.name] = {
-            min: col.minimumValue,
-            max: col.maximumValue,
-            mean: col.average,
-            count: dataset.metadata!.rowCount - col.missingValueCount
-          };
-        }
-      });
-      return stats;
+    // Computed from the shown rows with the shared numeric rule. The old unfiltered
+    // shortcut took count from metadata (rowCount − missing), which counted junk strings.
+    const numericColumns = dataset.columns.filter(col => getEffectiveColumnType(dataset, col) === 'numeric');
+    for (const s of summarizeNumericColumns(filteredData, numericColumns)) {
+      stats[s.column] = { min: s.min, max: s.max, mean: s.mean, count: s.count };
     }
     
-    dataset.columns.forEach(col => {
-      if (getEffectiveColumnType(dataset, col) === 'numeric') {
-        const values = filteredData
-          .map(row => row[col])
-          .filter(val => val !== null && val !== undefined && typeof val === 'number') as number[];
-        
-        if (values.length > 0) {
-          stats[col] = {
-            min: Math.min(...values),
-            max: Math.max(...values),
-            mean: values.reduce((sum, val) => sum + val, 0) / values.length,
-            count: values.length
-          };
-        }
-      }
-    });
-    
     return stats;
-  }, [dataset, filteredData, searchTerm, filterColumn, filterValue]);
+  }, [dataset, filteredData]);
 
   if (!dataset) {
     return (

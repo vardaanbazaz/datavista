@@ -1,5 +1,6 @@
 import { DataRow } from "@/shared/types";
 import { ForecastConfig, ForecastPoint } from "./types";
+import { toNumberOrNull } from "@/shared/utils/numeric";
 
 export const forecastingEngine = {
   /**
@@ -19,8 +20,8 @@ export const forecastingEngine = {
     const validRows: { row: DataRow; index: number; y: number }[] = [];
 
     data.forEach((row, i) => {
-      const val = Number(row[yCol]);
-      if (!isNaN(val) && row[yCol] !== null && row[yCol] !== undefined) {
+      const val = toNumberOrNull(row[yCol]);
+      if (val !== null) {
         yValues.push(val);
         validRows.push({ row, index: i, y: val });
       }
