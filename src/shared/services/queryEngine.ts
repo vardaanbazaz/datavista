@@ -125,7 +125,7 @@ export const queryEngine = {
       } else {
         filteredData = [...dataset.data];
         if (query.filters) {
-          filteredData = this.applyFilters(filteredData, query.filters, columnTypes);
+          filteredData = this.applyFilters(filteredData, query.filters);
         }
         if (!bypassCache) {
           filterCache.set(plan.filterCacheKey, dataset.id, filteredData, filteredData.length);
@@ -220,8 +220,7 @@ export const queryEngine = {
    */
   applyFilters(
     data: DataRow[],
-    filters: QueryFilters,
-    columnTypes: Record<string, 'numeric' | 'categorical' | 'date'>
+    filters: QueryFilters
   ): DataRow[] {
     let result = data;
 

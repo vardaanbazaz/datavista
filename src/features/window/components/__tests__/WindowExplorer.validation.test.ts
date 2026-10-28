@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ORDER_BY_REQUIRED_REASONS, isOrderByMissing } from "../WindowExplorer";
+import { ORDER_BY_REQUIRED_REASONS, isOrderByMissing } from "../orderByRequirements";
 import { WindowFunctionType, WindowOrderBy } from "@/shared/services/window/types";
 
 // Every function type from WindowFunctionType (types.ts), split by whether it
