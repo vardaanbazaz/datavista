@@ -43,6 +43,12 @@ jobs:
       - name: Build Artifact
         run: npm run build
 
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Production Smoke Gate
+        run: npx playwright test --config playwright.prod.config.ts
+
       - name: Upload Artifact
         uses: actions/upload-pages-artifact@v3
         with:

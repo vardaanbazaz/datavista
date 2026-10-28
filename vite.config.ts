@@ -78,7 +78,7 @@ export default defineConfig(({ mode }) => ({
   test: {
     globals: true,
     environment: "node",
-    exclude: ['**/node_modules/**', '**/dist/**', 'tests/e2e/**']
+    exclude: ['**/node_modules/**', '**/dist/**', 'tests/e2e/**', 'tests/smoke/**']
   },
 }));
 
