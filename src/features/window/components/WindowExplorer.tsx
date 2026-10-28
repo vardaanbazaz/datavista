@@ -20,6 +20,7 @@ import {
   Layers,
   AlertTriangle
 } from "lucide-react";
+import { Hint } from "@/shared/components/Hint";
 
 export const WindowExplorer: React.FC = () => {
   const activeDataset = useDatasetStore((state) => state.activeDataset);
@@ -472,12 +473,14 @@ export const WindowExplorer: React.FC = () => {
                   >
                     <span className="font-semibold text-foreground">{q.alias}</span>
                     <span className="text-[10px] text-muted-foreground font-mono">({q.functionType})</span>
-                    <button 
-                      onClick={() => deleteWindowQuery(q.alias)} 
-                      className="text-muted-foreground hover:text-destructive transition-colors shrink-0 pl-1 border-l border-border/85"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    <Hint label={`Delete window column ${q.alias}`}>
+                      <button 
+                        onClick={() => deleteWindowQuery(q.alias)} 
+                        className="text-muted-foreground hover:text-destructive transition-colors shrink-0 pl-1 border-l border-border/85"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </Hint>
                   </Badge>
                 ))}
               </div>

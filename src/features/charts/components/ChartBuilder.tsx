@@ -16,6 +16,7 @@ import { useDashboardStore } from "@/features/dashboards/store/dashboardStore";
 import { pluginRegistry } from "@/shared/services/pluginRegistry";
 import { ConditionalFormattingBuilder } from "@/features/dashboards/components/ConditionalFormattingBuilder";
 import { motion } from "framer-motion";
+import { Hint } from "@/shared/components/Hint";
 
 export function ChartBuilder() {
   const activeDataset = useDatasetStore((state) => state.activeDataset);
@@ -266,7 +267,7 @@ export function ChartBuilder() {
                 setXAxis(val);
                 setDrillPath([]);
               }}>
-                <SelectTrigger>
+                <SelectTrigger aria-label="X axis column">
                   <SelectValue placeholder="Select column" />
                 </SelectTrigger>
                 <SelectContent>
@@ -314,14 +315,16 @@ export function ChartBuilder() {
                     <span className="text-muted-foreground text-xs">→</span>
                     <Badge variant="outline" className="gap-1 pr-1">
                       {idx + 2}. {col}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-3 w-3 rounded-full p-0 text-muted-foreground hover:text-destructive hover:bg-muted"
-                        onClick={() => setDrillPath(drillPath.filter((_, i) => i !== idx))}
-                      >
-                        <X className="h-2.5 w-2.5" />
-                      </Button>
+                      <Hint label={`Remove ${col} from the drill-down path`}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-3 w-3 rounded-full p-0 text-muted-foreground hover:text-destructive hover:bg-muted"
+                          onClick={() => setDrillPath(drillPath.filter((_, i) => i !== idx))}
+                        >
+                          <X className="h-2.5 w-2.5" />
+                        </Button>
+                      </Hint>
                     </Badge>
                   </div>
                 ))}
@@ -360,7 +363,7 @@ export function ChartBuilder() {
               <div className="space-y-2">
                 <Label>Y Axis</Label>
                 <Select value={yAxis} onValueChange={setYAxis}>
-                  <SelectTrigger>
+                  <SelectTrigger aria-label="Y axis column">
                     <SelectValue placeholder="Select column" />
                   </SelectTrigger>
                   <SelectContent>
@@ -384,7 +387,7 @@ export function ChartBuilder() {
               <div className="space-y-2">
                 <Label>Size By</Label>
                 <Select value={sizeBy} onValueChange={setSizeBy}>
-                  <SelectTrigger>
+                  <SelectTrigger aria-label="Size by column">
                     <SelectValue placeholder="Select size column" />
                   </SelectTrigger>
                   <SelectContent>
@@ -407,7 +410,7 @@ export function ChartBuilder() {
             <div className="space-y-2">
               <Label>Group By (Optional)</Label>
               <Select value={groupBy} onValueChange={setGroupBy}>
-                <SelectTrigger>
+                <SelectTrigger aria-label="Group by column">
                   <SelectValue placeholder="Select grouping column" />
                 </SelectTrigger>
                 <SelectContent>

@@ -22,6 +22,7 @@ import { format } from "date-fns";
 import { useViewStore } from "../store/viewStore";
 import { useDrillStore } from "../store/drillStore";
 import { SaveViewModal } from "./SaveViewModal";
+import { Hint } from "@/shared/components/Hint";
 
 export function GlobalFilterBar() {
   const activeDashboardId = useDashboardStore((state) => state.activeDashboardId);
@@ -211,14 +212,16 @@ export function GlobalFilterBar() {
                   <span className="max-w-[200px] truncate" title={filter.label}>
                     {filter.label || `${filter.column} = ${String(filter.value)}`}
                   </span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-4.5 w-4.5 rounded-full p-0 text-muted-foreground hover:text-destructive hover:bg-muted transition-colors shrink-0"
-                    onClick={() => removeGlobalFilter(filter.id)}
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
+                  <Hint label={`Remove filter: ${filter.label || filter.column}`}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-4.5 w-4.5 rounded-full p-0 text-muted-foreground hover:text-destructive hover:bg-muted transition-colors shrink-0"
+                      onClick={() => removeGlobalFilter(filter.id)}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </Hint>
                 </Badge>
               );
             })
@@ -262,17 +265,19 @@ export function GlobalFilterBar() {
                   <Bookmark className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
                   <span className="truncate font-medium">{view.name}</span>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity p-0"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    deleteSavedView(view.id);
-                  }}
-                >
-                  <Trash2 className="h-3 w-3 text-destructive" />
-                </Button>
+                <Hint label={`Delete saved view “${view.name}”`}>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-5 w-5 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 focus:opacity-100 transition-opacity p-0"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteSavedView(view.id);
+                    }}
+                  >
+                    <Trash2 className="h-3 w-3 text-destructive" />
+                  </Button>
+                </Hint>
               </DropdownMenuItem>
             ))}
           </DropdownMenuContent>

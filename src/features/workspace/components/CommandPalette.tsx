@@ -46,6 +46,7 @@ import { providerDisplayName } from "@/features/ai/providerDisplayName";
 import { AIResponse } from "@/features/ai/types";
 import { QueryResult } from "@/shared/types";
 import { toast } from "@/shared/hooks/use-toast";
+import { Hint } from "@/shared/components/Hint";
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -358,15 +359,16 @@ export function CommandPalette({
                 >
                   <Sparkles className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-300" /> /ai
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
-                  onClick={() => setIsSettingsOpen(true)}
-                  title="AI Co-Pilot Settings"
-                >
-                  <Settings className="h-3.5 w-3.5" />
-                </Button>
+                <Hint label="AI Co-Pilot settings (provider and API key)">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+                    onClick={() => setIsSettingsOpen(true)}
+                  >
+                    <Settings className="h-3.5 w-3.5" />
+                  </Button>
+                </Hint>
               </div>
             </div>
           </DialogHeader>

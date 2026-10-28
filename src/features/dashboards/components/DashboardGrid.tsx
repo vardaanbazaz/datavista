@@ -2,6 +2,8 @@ import React, { useMemo, useState, useEffect } from "react";
 import { Responsive, WidthProvider } from "react-grid-layout/legacy";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { ChartVisualization } from "@/features/charts/components/ChartVisualization";
+import { ChartExpandButton } from "@/features/charts/components/ChartExpandButton";
+import { Hint } from "@/shared/components/Hint";
 import { useDashboardStore } from "@/features/dashboards/store/dashboardStore";
 import { Button } from "@/shared/components/ui/button";
 import { GripVertical, X } from "lucide-react";
@@ -170,15 +172,19 @@ export function DashboardGrid({ charts, activeDashboardId, onEditKpi }: Dashboar
                       {widget.title}
                     </CardTitle>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
-                    onClick={() => handleRemoveChartFromDashboard(widget.id)}
-                    title="Remove from Dashboard"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </Button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <ChartExpandButton chart={widget.data} className="h-6" />
+                    <Hint label="Remove this chart from the dashboard">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 focus:opacity-100 transition-opacity"
+                        onClick={() => handleRemoveChartFromDashboard(widget.id)}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </Hint>
+                  </div>
                 </CardHeader>
                 <CardContent className="p-3 sm:p-4 flex-1 min-w-0 min-h-0 w-full relative overflow-hidden flex flex-col justify-between">
                   <ChartVisualization chart={widget.data} />

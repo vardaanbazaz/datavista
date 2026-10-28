@@ -11,6 +11,7 @@ import { useUiStore } from "@/store/uiStore";
 import { motion, AnimatePresence } from "framer-motion";
 import { ErrorBoundary } from "@/shared/components/ErrorBoundary";
 import { providerDisplayName } from "@/features/ai/providerDisplayName";
+import { Hint } from "@/shared/components/Hint";
 
 /**
  * Public entry point: wrapped in its own local error boundary so a rendering failure
@@ -257,15 +258,16 @@ function ExecutiveSummaryPanelInner() {
                   </Tooltip>
                 )}
 
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={dismissExecutiveSummary}
-                  className="h-8 w-8 text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
-                  title="Dismiss Insight"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
+                <Hint label="Dismiss this AI summary">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={dismissExecutiveSummary}
+                    className="h-8 w-8 text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </Hint>
               </div>
             </div>
           </CardContent>

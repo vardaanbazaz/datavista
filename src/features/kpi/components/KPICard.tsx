@@ -12,6 +12,7 @@ import { Edit2, Trash2, GripVertical, TrendingUp, TrendingDown, Minus } from "lu
 import { useDrillStore } from "@/features/dashboards/store/drillStore";
 import { filterManager } from "@/features/dashboards/services/filterManager";
 import { Query } from "@/shared/types";
+import { Hint } from "@/shared/components/Hint";
 
 interface KPICardProps {
   config: KPICardConfig;
@@ -176,25 +177,27 @@ export function KPICard({ config, onRemove, onEdit, isMobile = false }: KPICardP
             {config.title}
           </span>
         </div>
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6 text-zinc-400 hover:text-zinc-900 dark:hover:text-white shrink-0"
-            onClick={onEdit}
-            title="Edit KPI Card"
-          >
-            <Edit2 className="h-3 w-3" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6 text-zinc-400 hover:text-rose-500 shrink-0"
-            onClick={onRemove}
-            title="Remove KPI Card"
-          >
-            <Trash2 className="h-3 w-3" />
-          </Button>
+        <div className="flex items-center gap-1 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+          <Hint label="Edit this KPI card">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 text-zinc-400 hover:text-zinc-900 dark:hover:text-white shrink-0"
+              onClick={onEdit}
+            >
+              <Edit2 className="h-3 w-3" />
+            </Button>
+          </Hint>
+          <Hint label="Remove this KPI card">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 text-zinc-400 hover:text-rose-500 shrink-0"
+              onClick={onRemove}
+            >
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          </Hint>
         </div>
       </div>
 

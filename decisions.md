@@ -2,6 +2,34 @@
 
 Newest first. Entries marked `Source: inferred` were reconstructed from existing code; their "Why" is a guess and should be corrected by the author.
 
+### 2026-10-28 — Expanded chart view re-renders via `fitHeight`, using Radix Dialog
+- **Decision:** Add an opt-in `fitHeight` prop to `ChartVisualization` that measures the plot area's height (ResizeObserver) and draws at it, instead of the fixed 300px viewBox height. The full-screen viewer (`ChartExpandButton`) is a Radix `Dialog` that mounts a second `ChartVisualization chart={...} fitHeight`. The Charts view grid (`ChartGrid`) also uses `fitHeight` with a definite card height (`clamp(360px, 60vh, 600px)`) and one chart per row below `2xl`.
+- **Why:** With a fixed viewBox, a bigger container only scales the drawing up (fonts and strokes included). Redrawing at the real size keeps axes and labels legible and hit areas correct. Radix Dialog already provides the focus trap, Esc/backdrop/close dismissal and focus return to the trigger, so none of that is hand-rolled.
+- **Alternatives considered:** Making every chart fit its container's height — rejected for now. Containers with auto height (e.g. the Export panel's off-screen render) would make the measured height follow the SVG's own size; opt-in keeps current behaviour everywhere else. CSS-scaling the existing SVG into the modal — rejected, it is the scaled-bitmap look the request rules out. A separate fullscreen route — rejected as heavier than a dialog.
+- **Tradeoff accepted:** While the modal is open there are two mounted instances with the same `data-chart-id`. `exportUtils` takes the first match in DOM order, which is the in-page one (the dialog portals to the end of `<body>`). Dashboard grid cards (react-grid-layout) still use the fixed height.
+- **Source:** `made-now`
+
+### 2026-10-28 — Single shared tooltip wrapper `Hint` for icon-only controls
+- **Decision:** All icon-only controls use `src/shared/components/Hint.tsx`, which wraps the existing shadcn/Radix tooltip, sets the control's `aria-label` from the same text, and appends a platform-formatted shortcut (`src/shared/lib/platform.ts`, now also the source of `modKey` for `commandRegistry`). Hover-revealed controls (`opacity-0 group-hover:opacity-100`) are only hidden on devices that can hover (`[@media(hover:hover)]:`). The mobile section menu and the chart Expand button show visible text on small/touch screens.
+- **Why:** One place to restyle for the upcoming redesign. The label and aria-label can't drift apart. Radix opens tooltips on keyboard focus as well as hover. Touch users get the aria-label and visible text instead.
+- **Alternatives considered:** An `IconButton` component that owns the button too — rejected, many icon controls are Radix triggers (`DropdownMenuTrigger`, `DialogTrigger`) that need `asChild` composition; a wrapper composes with all of them. Native `title` attributes — rejected, they don't appear on keyboard focus and can't show shortcuts consistently.
+- **Tradeoff accepted:** Disabled buttons (e.g. Undo with empty history) do not show a tooltip, because disabled elements get no pointer/focus events; their aria-label is still set.
+- **Source:** `made-now`
+
+### 2026-10-28 — `VIEW_TYPES` const array as single source for views
+- **Decision:** `src/store/viewTypes.ts` exports `VIEW_TYPES` (as const), `ViewType` derived from it, and `isViewType`. `uiStore` re-exports the type, and `isValidUIState` uses `isViewType` instead of its own list.
+- **Why:** The validator's hardcoded list had drifted (missing `pivot`, `stats`, `window-builder`), so those views were rejected when restoring from IndexedDB. A TS union has no runtime value to check against, so the array has to be the source.
+- **Alternatives considered:** Keeping the union and adding a test that compares it to the validator's list — rejected, that still leaves two lists to keep in sync.
+- **Tradeoff accepted:** None.
+- **Source:** `made-now`
+
+### 2026-10-28 — e2e tests seed "tour seen" via a shared helper
+- **Decision:** `tests/e2e/helpers.ts:startFreshSessionWithoutTour` clears storage and marks the onboarding tour and welcome dialog as seen, matching what `global-filter-bar-regression.spec.ts` already did inline. `dashboard.spec.ts` now uses it, and three stale assertions in it were corrected (dataset name has no `.csv`; wait for sample load before navigating, because `uploadDataset` forces Overview after its 1s delay; Export heading is "Export Dashboard").
+- **Why:** 3 of 5 e2e tests were failing before this change because the Joyride overlay intercepted clicks. The stale assertions behind it were never reached.
+- **Alternatives considered:** Disabling the tour in test builds via an env flag — rejected, it changes app code for test convenience.
+- **Tradeoff accepted:** The tour itself has no e2e coverage.
+- **Source:** `made-now`
+
 ### 2026-10-28 — Type check gate in CI (`npm run typecheck`), strict still off
 - **Decision:** Fix all 44 `tsc --noEmit -p tsconfig.app.json` errors, add `"typecheck"` script, and run it in `deploy.yml` right after Lint. `strict` stays `false`.
 - **Why:** `vite build` uses SWC and never type-checks, so type errors (including ones hiding real bugs: malformed built-in template KPIs, KPI columns missing from extracted template schemas) shipped unnoticed.

@@ -14,6 +14,7 @@ import { ScrollArea } from "@/shared/components/ui/scroll-area";
 import { Camera, History, Trash2, RotateCcw, Save, CheckCircle2 } from "lucide-react";
 import { useSnapshotStore } from "../store/snapshotStore";
 import { useDashboardStore } from "../store/dashboardStore";
+import { Hint } from "@/shared/components/Hint";
 
 interface SnapshotManagerProps {
   isOpen: boolean;
@@ -186,15 +187,16 @@ export function SnapshotManager({ isOpen, onClose }: SnapshotManagerProps) {
                         >
                           <RotateCcw className="h-3.5 w-3.5" /> Restore
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                          onClick={() => deleteSnapshot(snap.id)}
-                          title="Delete Snapshot"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <Hint label="Delete this snapshot">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                            onClick={() => deleteSnapshot(snap.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </Hint>
                       </div>
                     </div>
                   ))}

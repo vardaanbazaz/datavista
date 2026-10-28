@@ -22,6 +22,8 @@ import { useTemplateStore } from "@/features/dashboards/store/templateStore";
 import { templateEngine } from "@/features/dashboards/services/templateEngine";
 import { getEffectiveColumnType, getEffectiveColumnTypes } from "@/shared/utils/columnType";
 import { useUiStore } from "@/store/uiStore";
+import { Hint } from "@/shared/components/Hint";
+import { modKey } from "@/shared/lib/platform";
 
 export function DashboardSummary() {
   const dataset = useDatasetStore((state) => state.activeDataset);
@@ -227,26 +229,28 @@ export function DashboardSummary() {
         <div className="flex items-center gap-3 flex-wrap">
           {/* Undo/Redo & Snapshot Toolbar Controls */}
           <div className="flex items-center gap-1.5 border-r border-gray-200 dark:border-zinc-800 pr-3 mr-1">
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 hover:bg-gray-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300"
-              onClick={undo}
-              disabled={past.length === 0}
-              title="Undo (Ctrl+Z)"
-            >
-              <RotateCcw className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 hover:bg-gray-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300"
-              onClick={redo}
-              disabled={future.length === 0}
-              title="Redo (Ctrl+Shift+Z)"
-            >
-              <RotateCw className="h-4 w-4" />
-            </Button>
+            <Hint label="Undo last change" shortcut={[modKey, "Z"]}>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 hover:bg-gray-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300"
+                onClick={undo}
+                disabled={past.length === 0}
+              >
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+            </Hint>
+            <Hint label="Redo last undone change" shortcut={[modKey, "⇧", "Z"]}>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 hover:bg-gray-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300"
+                onClick={redo}
+                disabled={future.length === 0}
+              >
+                <RotateCw className="h-4 w-4" />
+              </Button>
+            </Hint>
             <Button
               variant="outline"
               size="sm"

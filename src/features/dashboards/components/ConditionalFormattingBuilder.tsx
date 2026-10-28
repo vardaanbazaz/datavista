@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Trash2, Palette, Sparkles, CheckCircle2, AlertTriangle, Code } from "lucide-react";
 import { ConditionalFormatRule, FormattingStyle } from "@/shared/types";
 import { compile } from "@/shared/services/formulaEngine";
+import { Hint } from "@/shared/components/Hint";
 
 interface ConditionalFormattingBuilderProps {
   rules: ConditionalFormatRule[];
@@ -183,17 +184,19 @@ export function ConditionalFormattingBuilder({
                       >
                         Aa
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRemoveRule(rule.id);
-                        }}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                      <Hint label="Delete this formatting rule">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveRule(rule.id);
+                          }}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </Hint>
                     </div>
                   </div>
                 );

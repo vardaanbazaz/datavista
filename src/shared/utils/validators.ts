@@ -1,5 +1,5 @@
 import { Dataset, ChartConfig, FilterState, Dashboard } from "@/shared/types";
-import type { ViewType } from "@/store/uiStore";
+import { isViewType, type ViewType } from "@/store/viewTypes";
 
 export function isValidDataset(obj: unknown): obj is Dataset {
   if (!obj || typeof obj !== "object") return false;
@@ -128,7 +128,7 @@ export function isValidUIState(key: string, value: unknown): boolean {
     case "theme":
       return value === "light" || value === "dark" || value === "system";
     case "activeView":
-      return typeof value === "string" && ["overview", "upload", "charts", "data", "filters", "export"].includes(value);
+      return isViewType(value);
     case "showWelcome":
       return typeof value === "boolean";
     case "activeDatasetId":

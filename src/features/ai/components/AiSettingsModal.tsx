@@ -12,6 +12,7 @@ import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
 import { Badge } from "@/shared/components/ui/badge";
+import { Hint } from "@/shared/components/Hint";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/components/ui/tooltip";
 import { Sparkles, Key, Eye, EyeOff, Check, Cpu, HelpCircle, CloudOff } from "lucide-react";
 import { useUiStore, LlmProvider } from "@/store/uiStore";
@@ -171,22 +172,17 @@ export function AiSettingsModal({ isOpen: externalIsOpen, onClose: externalOnClo
                 onChange={(e) => setApiKeyInput(e.target.value)}
                 className="pr-10 text-xs font-mono"
               />
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-1 h-7 w-7 text-muted-foreground hover:text-foreground"
-                    onClick={() => setShowKey(!showKey)}
-                  >
-                    {showKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p className="text-xs">{showKey ? "Hide API key" : "Show API key"}</p>
-                </TooltipContent>
-              </Tooltip>
+              <Hint label={showKey ? "Hide API key" : "Show API key"}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-1 h-7 w-7 text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowKey(!showKey)}
+                >
+                  {showKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                </Button>
+              </Hint>
             </div>
             <p className="text-[11px] text-muted-foreground">
               {apiKeyInput ? (

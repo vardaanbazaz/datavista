@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/components/ui/button";
 import { ScrollArea } from "@/shared/components/ui/scroll-area";
@@ -30,7 +30,8 @@ import {
   Columns,
   LayoutTemplate,
   Search,
-  HelpCircle
+  HelpCircle,
+  X
 } from "lucide-react";
 import { Dataset } from "@/shared/types";
 import { useUiStore } from "@/store/uiStore";
@@ -38,7 +39,8 @@ import { useDatasetStore } from "@/store/datasetStore";
 import { useDashboardStore } from "@/features/dashboards/store/dashboardStore";
 import { InstantiateTemplateModal } from "@/features/dashboards/components/InstantiateTemplateModal";
 import { ThemeToggle } from "@/shared/components/ThemeToggle";
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/components/ui/tooltip";
+import { Hint } from "@/shared/components/Hint";
+import { modKey, formatShortcut } from "@/shared/lib/platform";
 import { motion } from "framer-motion";
 import { Sparkles } from "lucide-react";
 
@@ -54,6 +56,7 @@ export function Sidebar({
   const resetTour = useUiStore((state) => state.resetTour);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isInstantiateModalOpen, setIsInstantiateModalOpen] = useState(false);
+  const sidebarRef = useRef<HTMLDivElement>(null);
 
   const datasets = useDatasetStore((state) => state.datasets);
   const activeDataset = useDatasetStore((state) => state.activeDataset);
@@ -67,6 +70,34 @@ export function Sidebar({
   const renameDashboard = useDashboardStore((state) => state.renameDashboard);
   const deleteDashboard = useDashboardStore((state) => state.deleteDashboard);
   const loadDashboard = useDashboardStore((state) => state.loadDashboard);
+
+  // Mobile menu: close whenever the view changes, from the menu itself or from any other
+  // source (command palette, keyboard shortcut, a button inside a view).
+  useEffect(() => {
+    setIsMobileOpen(false);
+  }, [activeView]);
+
+  // Mobile menu: close on Esc and on a tap/click outside the sidebar.
+  useEffect(() => {
+    if (!isMobileOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsMobileOpen(false);
+    };
+    const handlePointerDown = (e: PointerEvent) => {
+      const target = e.target as Element | null;
+      if (!target || sidebarRef.current?.contains(target)) return;
+      // Menus and dialogs opened from inside the sidebar render in portals outside it.
+      if (target.closest("[data-radix-popper-content-wrapper], [role='dialog'], [role='menu']")) return;
+      setIsMobileOpen(false);
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("pointerdown", handlePointerDown);
+    };
+  }, [isMobileOpen]);
+
   const navItems = [
     {
       id: 'overview' as const,
@@ -172,10 +203,19 @@ export function Sidebar({
   const handleDatasetSelect = (dataset: Dataset) => {
     useDashboardStore.setState({ activeDashboardId: null });
     onDatasetSelect(dataset);
+    setIsMobileOpen(false);
   };
+
+  const handleDashboardSelect = (id: string) => {
+    loadDashboard(id);
+    setIsMobileOpen(false);
+  };
+
+  const activeNavLabel = navItems.find((item) => item.id === activeView)?.label ?? "Menu";
 
   return (
     <motion.div 
+      ref={sidebarRef}
       data-testid="sidebar"
       initial={{ x: -100, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
@@ -193,78 +233,73 @@ export function Sidebar({
             </h1>
             <p className="text-body text-zinc-500 dark:text-zinc-400">Data Visualization</p>
           </div>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-zinc-900"
-                onClick={() => onOpenAiCoPilot?.()}
-                aria-label="Ask AI Co-Pilot"
-                data-tour="header-copilot"
-              >
-                <Sparkles className="h-5 w-5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p className="text-xs">Ask AI Co-Pilot (settings available inside)</p>
-            </TooltipContent>
-          </Tooltip>
+          <Hint label="Ask the AI Co-Pilot about your data (settings inside)">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-zinc-900"
+              onClick={() => onOpenAiCoPilot?.()}
+              data-tour="header-copilot"
+            >
+              <Sparkles className="h-5 w-5" />
+            </Button>
+          </Hint>
 
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-zinc-900"
-                onClick={resetTour}
-                aria-label="Restart Onboarding Tour"
-                data-tour="header-tutorial"
-              >
-                <HelpCircle className="h-5 w-5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p className="text-xs">Restart Onboarding Tutorial</p>
-            </TooltipContent>
-          </Tooltip>
+          <Hint label="Restart the onboarding tour">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-zinc-900"
+              onClick={resetTour}
+              data-tour="header-tutorial"
+            >
+              <HelpCircle className="h-5 w-5" />
+            </Button>
+          </Hint>
 
           <ThemeToggle data-tour="header-theme" />
-          <Button
-            variant="ghost"
-            size="icon"
-            className="lg:hidden ml-2 h-9 w-9"
-            onClick={() => setIsMobileOpen(!isMobileOpen)}
-            title="Toggle Menu"
-            aria-label="Toggle navigation menu"
-            aria-expanded={isMobileOpen}
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
         </div>
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="outline"
-              data-tour="global-search"
-              className="w-full mt-4 justify-between h-9 px-3 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 text-xs bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800"
-              onClick={() => onOpenSearch?.()}
-            >
-              <div className="flex items-center gap-2">
-                <Search className="h-3.5 w-3.5 text-zinc-400" />
-                <span>Global Search...</span>
-              </div>
-              <kbd className="hidden sm:inline-block border border-gray-300 dark:border-zinc-700 bg-gray-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 text-[10px] rounded px-1.5 py-0.5 font-mono">⌘K</kbd>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p className="text-xs">Search charts, datasets, and views (Cmd+K)</p>
-          </TooltipContent>
-        </Tooltip>
+        {/* Mobile section menu toggle: visible text label (touch has no hover tooltips),
+            showing the current section so a selection is visibly confirmed. */}
+        <Button
+          variant="outline"
+          className="lg:hidden w-full mt-4 h-10 justify-between px-3"
+          onClick={() => setIsMobileOpen(!isMobileOpen)}
+          aria-expanded={isMobileOpen}
+          aria-controls="sidebar-mobile-menu"
+          data-testid="mobile-menu-toggle"
+        >
+          <span className="flex items-center gap-2 min-w-0">
+            {isMobileOpen ? <X className="h-4 w-4 shrink-0" /> : <Menu className="h-4 w-4 shrink-0" />}
+            <span className="font-medium">{isMobileOpen ? "Close menu" : "Menu"}</span>
+          </span>
+          <span className="text-xs text-muted-foreground truncate" data-testid="mobile-menu-current">
+            {activeNavLabel}
+          </span>
+        </Button>
+
+        <Hint label="Search charts, datasets and views" shortcut={[modKey, "K"]}>
+          <Button
+            variant="outline"
+            data-tour="global-search"
+            className="w-full mt-4 justify-between h-9 px-3 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 text-xs bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800"
+            onClick={() => onOpenSearch?.()}
+          >
+            <div className="flex items-center gap-2">
+              <Search className="h-3.5 w-3.5 text-zinc-400" />
+              <span>Global Search...</span>
+            </div>
+            <kbd className="hidden sm:inline-block border border-gray-300 dark:border-zinc-700 bg-gray-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 text-[10px] rounded px-1.5 py-0.5 font-mono">{formatShortcut([modKey, "K"])}</kbd>
+          </Button>
+        </Hint>
       </div>
 
-      <div className={cn("flex-col flex-1", isMobileOpen ? "flex" : "hidden lg:flex")}>
+      <div
+        id="sidebar-mobile-menu"
+        data-testid="sidebar-menu"
+        className={cn("flex-col flex-1", isMobileOpen ? "flex" : "hidden lg:flex")}
+      >
         <div className="p-4">
         <nav className="space-y-2">
           {navItems.map((item, index) => {
@@ -293,8 +328,15 @@ export function Sidebar({
                   data-testid={`sidebar-nav-${item.id}`}
                   data-tour={tourAttr}
                   variant={isActive ? "premium" : "ghost"}
-                  className="w-full justify-start h-auto p-4 transition-all duration-200"
-                  onClick={() => onViewChange(item.id)}
+                  className={cn(
+                    "w-full justify-start h-auto p-4 transition-all duration-200",
+                    isActive && "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                  )}
+                  aria-current={isActive ? "page" : undefined}
+                  onClick={() => {
+                    onViewChange(item.id);
+                    setIsMobileOpen(false);
+                  }}
                 >
                   <Icon className="w-5 h-5 mr-3 flex-shrink-0" />
                   <div className="text-left flex-1">
@@ -354,19 +396,20 @@ export function Sidebar({
                   </Button>
 
                   <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-8 w-8 opacity-0 group-hover:opacity-100 focus:opacity-100 data-[state=open]:opacity-100 transition-opacity"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                        }}
-                      >
-                        <MoreVertical className="h-4 w-4" />
-                        <span className="sr-only">Dataset options</span>
-                      </Button>
-                    </DropdownMenuTrigger>
+                    <Hint label="Dataset options (rename, delete)">
+                      <DropdownMenuTrigger asChild>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 focus:opacity-100 data-[state=open]:opacity-100 transition-opacity"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                          }}
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                    </Hint>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onClick={(e) => {
                         e.stopPropagation();
@@ -401,39 +444,27 @@ export function Sidebar({
           <Badge variant="secondary" className="ml-auto">
             {dashboards.length}
           </Badge>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-6 w-6 hover:bg-muted"
-                onClick={() => setIsInstantiateModalOpen(true)}
-                aria-label="Create dashboard from template"
-              >
-                <LayoutTemplate className="h-3.5 w-3.5 text-primary" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p className="text-xs">Create dashboard from pre-built templates</p>
-            </TooltipContent>
-          </Tooltip>
+          <Hint label="Create dashboard from template">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-6 w-6 hover:bg-muted"
+              onClick={() => setIsInstantiateModalOpen(true)}
+            >
+              <LayoutTemplate className="h-3.5 w-3.5 text-primary" />
+            </Button>
+          </Hint>
 
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-6 w-6 hover:bg-muted"
-                onClick={handleCreateDashboard}
-                aria-label="Create new blank dashboard"
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p className="text-xs">Create a new blank dashboard</p>
-            </TooltipContent>
-          </Tooltip>
+          <Hint label="Create new blank dashboard">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-6 w-6 hover:bg-muted"
+              onClick={handleCreateDashboard}
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </Hint>
 
           <InstantiateTemplateModal
             isOpen={isInstantiateModalOpen}
@@ -460,7 +491,7 @@ export function Sidebar({
                   <Button
                     variant="ghost"
                     className="flex-1 justify-start text-left h-auto p-3 bg-transparent hover:bg-transparent overflow-hidden"
-                    onClick={() => loadDashboard(dash.id)}
+                    onClick={() => handleDashboardSelect(dash.id)}
                   >
                     <div className="flex-1 min-w-0">
                       <div className="font-medium truncate">{dash.name}</div>
@@ -471,19 +502,20 @@ export function Sidebar({
                   </Button>
 
                   <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-8 w-8 opacity-0 group-hover:opacity-100 focus:opacity-100 data-[state=open]:opacity-100 transition-opacity"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                        }}
-                      >
-                        <MoreVertical className="h-4 w-4" />
-                        <span className="sr-only">Dashboard options</span>
-                      </Button>
-                    </DropdownMenuTrigger>
+                    <Hint label="Dashboard options (rename, delete)">
+                      <DropdownMenuTrigger asChild>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 focus:opacity-100 data-[state=open]:opacity-100 transition-opacity"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                          }}
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                    </Hint>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onClick={(e) => {
                         e.stopPropagation();

@@ -1,7 +1,9 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
-export type ViewType = 'overview' | 'upload' | 'charts' | 'data' | 'filters' | 'export' | 'pivot' | 'stats' | 'window-builder';
+import type { ViewType } from "./viewTypes";
+
+export type { ViewType };
 
 export type LlmProvider = 'gemini' | 'openai';
 

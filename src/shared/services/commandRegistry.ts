@@ -4,6 +4,7 @@ import { useUiStore } from "@/store/uiStore";
 import { useDashboardStore } from "@/features/dashboards/store/dashboardStore";
 import { useFilterStore } from "@/store/filterStore";
 import { toast } from "@/shared/hooks/use-toast";
+import { modKey } from "@/shared/lib/platform";
 
 interface CommandRegistryState {
   commands: Record<string, CommandDefinition>;
@@ -14,8 +15,6 @@ interface CommandRegistryState {
   executeCommand: (id: string) => boolean;
 }
 
-const isMac = typeof window !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
-const modKey = isMac ? "⌘" : "Ctrl";
 
 export const defaultCommands: CommandDefinition[] = [
   {

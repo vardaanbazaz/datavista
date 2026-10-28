@@ -22,6 +22,12 @@ import { ForecastPoint } from "@/shared/services/forecasting/types";
 
 interface ChartVisualizationProps {
   chart: ChartConfig;
+  /**
+   * Draw at the plot area's measured height instead of the fixed 300px design height.
+   * Only use inside a container with a definite height (a fixed-height card, a modal):
+   * in an auto-height parent the measured height would follow the SVG's own size.
+   */
+  fitHeight?: boolean;
 }
 
 interface PieSlice {
@@ -35,10 +41,15 @@ interface HeatmapCell {
   value: number;
 }
 
-function ChartVisualizationContent({ chart }: ChartVisualizationProps) {
+const DEFAULT_CHART_HEIGHT = 300;
+const MIN_FIT_HEIGHT = 250;
+
+function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizationProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const plotAreaRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(500);
+  const [plotHeight, setPlotHeight] = useState<number | null>(null);
   const [isDrillMode, setIsDrillMode] = useState(false);
 
   const pluginChartDef = pluginRegistry.getCustomChart(chart.type);
@@ -144,6 +155,20 @@ function ChartVisualizationContent({ chart }: ChartVisualizationProps) {
     return () => resizeObserver.disconnect();
   }, []);
 
+  // With fitHeight, track the plot area's height too so the chart is redrawn at its real
+  // size (axes, labels and hit areas recomputed) rather than scaled up by the viewBox.
+  useEffect(() => {
+    if (!fitHeight || !plotAreaRef.current) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setPlotHeight(Math.max(Math.floor(entry.contentRect.height), MIN_FIT_HEIGHT));
+      }
+    });
+    resizeObserver.observe(plotAreaRef.current);
+    return () => resizeObserver.disconnect();
+  }, [fitHeight]);
+
   const handleDrillUp = () => {
     if (!drillState) return;
     if (drillState.currentDepth <= 1) {
@@ -203,7 +228,7 @@ function ChartVisualizationContent({ chart }: ChartVisualizationProps) {
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove();
 
-    const height = 300;
+    const height = fitHeight && plotHeight ? plotHeight : DEFAULT_CHART_HEIGHT;
     const margin = { top: 20, right: 30, bottom: 75, left: 60 };
 
     svg
@@ -1314,6 +1339,8 @@ function ChartVisualizationContent({ chart }: ChartVisualizationProps) {
   }, [
     chart,
     width,
+    fitHeight,
+    plotHeight,
     chartData,
     activeCrossFilter,
     toggleCrossFilter,
@@ -1400,7 +1427,7 @@ function ChartVisualizationContent({ chart }: ChartVisualizationProps) {
       )}
 
       {/* SVG drawing area */}
-      <div className="flex-1 min-w-0 min-h-[250px] w-full relative overflow-hidden flex items-center justify-center">
+      <div ref={plotAreaRef} className="flex-1 min-w-0 min-h-[250px] w-full relative overflow-hidden flex items-center justify-center">
         {chartAnomalies.length > 0 && (
           <Badge
             variant="outline"
@@ -1442,10 +1469,10 @@ function ChartVisualizationContent({ chart }: ChartVisualizationProps) {
   );
 }
 
-export function ChartVisualization({ chart }: ChartVisualizationProps) {
+export function ChartVisualization({ chart, fitHeight }: ChartVisualizationProps) {
   return (
     <ErrorBoundary fallback={(props) => <WidgetError {...props} />}>
-      <ChartVisualizationContent chart={chart} />
+      <ChartVisualizationContent chart={chart} fitHeight={fitHeight} />
     </ErrorBoundary>
   );
 }

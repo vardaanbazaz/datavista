@@ -7,6 +7,7 @@ import { Badge } from "@/shared/components/ui/badge";
 import { ScrollArea } from "@/shared/components/ui/scroll-area";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
 import { Settings, Plus, Trash2, HelpCircle, AlertTriangle, Code, Sparkles, Loader2 } from "lucide-react";
+import { Hint } from "@/shared/components/Hint";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/components/ui/tooltip";
 import { useDatasetStore } from "@/store/datasetStore";
 import { useUiStore } from "@/store/uiStore";
@@ -256,21 +257,16 @@ export function CalculatedFieldsManager({ trigger }: CalculatedFieldsManagerProp
                           <span className="font-semibold text-primary">{field.name}</span>
                           <code className="block text-[10px] text-muted-foreground">{field.expression}</code>
                         </div>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                              onClick={() => deleteCalculatedField(field.name)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="text-xs">Delete this calculated field</p>
-                          </TooltipContent>
-                        </Tooltip>
+                        <Hint label={`Delete calculated field ${field.name}`}>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                            onClick={() => deleteCalculatedField(field.name)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </Hint>
                       </div>
                     ))}
                   </div>

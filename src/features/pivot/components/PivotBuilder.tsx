@@ -28,6 +28,7 @@ import {
   Sparkles,
   Settings2
 } from "lucide-react";
+import { Hint } from "@/shared/components/Hint";
 
 interface PivotBuilderProps {
   dataset: Dataset;
@@ -316,32 +317,38 @@ export const PivotBuilder: React.FC<PivotBuilderProps> = ({ dataset }) => {
                   {dim}
                 </span>
                 <div className="flex items-center gap-1">
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="w-5 h-5"
-                    disabled={idx === 0}
-                    onClick={() => moveRowDimension(idx, "up")}
-                  >
-                    <ArrowUp className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="w-5 h-5"
-                    disabled={idx === currentConfig.rowDimensions.length - 1}
-                    onClick={() => moveRowDimension(idx, "down")}
-                  >
-                    <ArrowDown className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="w-5 h-5 text-destructive hover:text-destructive hover:bg-destructive/10"
-                    onClick={() => removeRowDimension(idx)}
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </Button>
+                  <Hint label={`Move ${dim} up`}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="w-5 h-5"
+                      disabled={idx === 0}
+                      onClick={() => moveRowDimension(idx, "up")}
+                    >
+                      <ArrowUp className="w-3.5 h-3.5" />
+                    </Button>
+                  </Hint>
+                  <Hint label={`Move ${dim} down`}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="w-5 h-5"
+                      disabled={idx === currentConfig.rowDimensions.length - 1}
+                      onClick={() => moveRowDimension(idx, "down")}
+                    >
+                      <ArrowDown className="w-3.5 h-3.5" />
+                    </Button>
+                  </Hint>
+                  <Hint label={`Remove ${dim} from rows`}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="w-5 h-5 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => removeRowDimension(idx)}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </Button>
+                  </Hint>
                 </div>
               </div>
             ))}
@@ -371,32 +378,38 @@ export const PivotBuilder: React.FC<PivotBuilderProps> = ({ dataset }) => {
                   {dim}
                 </span>
                 <div className="flex items-center gap-1">
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="w-5 h-5"
-                    disabled={idx === 0}
-                    onClick={() => moveColumnDimension(idx, "up")}
-                  >
-                    <ArrowUp className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="w-5 h-5"
-                    disabled={idx === currentConfig.columnDimensions.length - 1}
-                    onClick={() => moveColumnDimension(idx, "down")}
-                  >
-                    <ArrowDown className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="w-5 h-5 text-destructive hover:text-destructive hover:bg-destructive/10"
-                    onClick={() => removeColumnDimension(idx)}
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </Button>
+                  <Hint label={`Move ${dim} up`}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="w-5 h-5"
+                      disabled={idx === 0}
+                      onClick={() => moveColumnDimension(idx, "up")}
+                    >
+                      <ArrowUp className="w-3.5 h-3.5" />
+                    </Button>
+                  </Hint>
+                  <Hint label={`Move ${dim} down`}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="w-5 h-5"
+                      disabled={idx === currentConfig.columnDimensions.length - 1}
+                      onClick={() => moveColumnDimension(idx, "down")}
+                    >
+                      <ArrowDown className="w-3.5 h-3.5" />
+                    </Button>
+                  </Hint>
+                  <Hint label={`Remove ${dim} from columns`}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="w-5 h-5 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => removeColumnDimension(idx)}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </Button>
+                  </Hint>
                 </div>
               </div>
             ))}
@@ -430,14 +443,16 @@ export const PivotBuilder: React.FC<PivotBuilderProps> = ({ dataset }) => {
                     <span className="text-xs font-semibold text-foreground truncate max-w-[170px]">
                       {vf.column}
                     </span>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="w-5 h-5 text-destructive hover:text-destructive hover:bg-destructive/10"
-                      onClick={() => removeValueField(idx)}
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </Button>
+                    <Hint label={`Remove value ${vf.column}`}>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="w-5 h-5 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => removeValueField(idx)}
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </Button>
+                    </Hint>
                   </div>
                   <div className="flex flex-col gap-1.5 w-full">
                     <Select
