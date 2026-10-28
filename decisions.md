@@ -2,6 +2,41 @@
 
 Newest first. Entries marked `Source: inferred` were reconstructed from existing code; their "Why" is a guess and should be corrected by the author.
 
+### 2026-10-28 — e2e suite runs in CI before the build
+- **Decision:** `deploy.yml` runs `npm run test:e2e` right after the unit tests. The Playwright Chromium install moved up to run before it; the production smoke gate still runs after the build.
+- **Why:** The e2e suite had rotted (3 of 5 failing) because nothing ran it. Running it before the build fails fast without building a deploy artifact.
+- **Alternatives considered:** A separate parallel job — rejected for now, it would repeat `npm ci` and the browser install, and the deploy job would need a `needs:` dependency anyway. Running it against `vite preview` (prod build) — rejected, the smoke gate already covers the prod bundle and the specs are written against the dev server config.
+- **Tradeoff accepted:** About 1.5–2 min more per push (17 tests in 106s locally with `CI=1`: 1 worker, dev server start included).
+- **Source:** `made-now`
+
+### 2026-10-28 — Golden numeric tests use a pandas oracle and a committed JSON file
+- **Decision:** `scripts/golden/generate_hr_golden.py` (pandas, pinned in `scripts/golden/requirements.txt`) computes expected values for `tests/fixtures/hr-attrition.csv` into `tests/fixtures/hr-attrition.golden.json`. `golden.hrAttrition.test.ts` loads the CSV through PapaParse + `processRawData` (the upload path) and checks queryEngine, pivotEngine, statsEngine and windowEngine against it. Floats use `|a−b| ≤ 1e-9·max(1,|a|,|b|)`; counts and ranks must match exactly. `npm run golden:regen` reruns the script.
+- **Why:** The oracle must not share code with the engines under test. Committing the JSON keeps Python out of CI.
+- **Alternatives considered:** Hand-computed expected values — rejected, they can't cover 1,470 rows. A JS reference implementation — rejected, not independent. Pure relative tolerance — rejected, it fails when the expected value is 0.
+- **Tradeoff accepted:** Regenerating needs Python with pandas. The oracle matches the app's conventions on purpose (population variance, linear quantiles, original-row-order ROW_NUMBER ties, peer-inclusive running total), so the suite catches regressions and arithmetic bugs but doesn't question those conventions.
+- **Source:** `made-now`
+
+### 2026-10-28 — Icon controls get an invisible 24px / 44px (touch) pointer target
+- **Decision:** `Hint` adds a `hit-area` class (in `src/index.css`, `@layer components`): an invisible `::before` centred on the control, at least 24×24px, or 44×44px under `@media (pointer: coarse)`. Where controls sit side by side (pivot up/down/remove, KPI edit/remove, chart card Expand/Delete in `ChartGrid` and `DashboardGrid`), the gap widens on touch screens so the 44px targets don't overlap. Pivot cards get extra right padding on touch so the scroll viewport doesn't clip the targets. The saved-view delete button (inside a `DropdownMenuItem`, and deleting immediately) becomes a real 44px button on touch, so its target can't spill over neighbouring views. `TooltipProvider` `delayDuration` stays at 200ms.
+- **Why:** Meets WCAG 2.5.8 without changing how anything looks. The control and its icon keep their size and layout. Putting it in `Hint` covers every icon-only control in one place.
+- **Alternatives considered:** Padding with negative margin, or a real `min-w-6 min-h-6` — rejected, either one grows the hover background and changes chip and row heights. Raising the delay to 300ms — rejected, the prompt asked for ~300ms only if the delay was higher, and it was already lower.
+- **Tradeoff accepted:** `boundingBox()` doesn't include `::before`, so the e2e test measures the target as element ∪ `::before` and hit-tests its corners. A clipping ancestor (overflow hidden, scroll viewport) can still cut the target short; the pivot cards needed padding for that reason.
+- **Source:** `made-now`
+
+### 2026-10-28 — Disabled icon controls use `aria-disabled` inside `Hint`
+- **Decision:** When `Hint`'s child has `disabled`, `Hint` renders it with `aria-disabled="true"` instead, blocks `onClick`, and dims it with `opacity-50 cursor-not-allowed`. A new `disabledReason` prop is appended to the tooltip, e.g. "Undo last change — nothing to undo yet".
+- **Why:** Every disabled control `Hint` wraps today is a plain `Button` (Undo/Redo, pivot move up/down), so blocking `onClick` is enough. Enter and Space on a button also fire `click`. With `aria-disabled` the control stays in the tab order, screen readers announce it as dimmed, and the tooltip opens on both hover and focus. There is no extra element to break flex layouts or `asChild` composition.
+- **Alternatives considered:** Wrapping the disabled child in a focusable `<span>` (the Radix-documented pattern) — rejected, it adds an unlabelled tab stop with no role, and a wrapper element can break the parent's flex/gap and hover-group styling.
+- **Tradeoff accepted:** If a disableable Radix trigger is ever wrapped in `Hint`, the pointerdown/keydown it opens on would also need blocking (today none is). Hover background styles still apply to an `aria-disabled` button.
+- **Source:** `made-now`
+
+### 2026-10-28 — Chart axis/tooltip labels name the aggregation; numeric/date X keys sorted
+- **Decision:** New `src/features/charts/lib/chartAggregation.ts`: `chartYValueLabel` / `aggregationLabel` ("Sum of Education", "Average of …", "Count of rows"), `aggregateValues` (moved out of `ChartVisualization`, same behaviour), and `sortAxisKeys` (numeric ascending, dates chronological, categorical unchanged). Bar, line and area Y axes, every chart's SVG `<title>` tooltip, and the screen-reader summary use them. The histogram's Y label "Frequency" became "Count of rows". The heatmap's x/y sort is numeric or chronological for those types and stays alphabetical for categories. The non-functional `title` attributes on SVG shapes were replaced with `<title>` children.
+- **Why:** A bar chart of Age × Education showed "Education" while plotting SUM per age, and bars came out in first-appearance order (41, 49, 37…). Pure helpers can be unit-tested under Vitest's node environment.
+- **Alternatives considered:** A sort option in ChartBuilder — not added. Neither `ChartConfig` nor the builder has one, and the request said to respect it only if one existed.
+- **Tradeoff accepted:** Line/area charts without an aggregation still plot raw rows under the plain column name, and their categorical order stays alphabetical. `sum_if`/`count_if`/`weighted_average`/`percentile` are labelled "Sum of …" because the chart computes a sum for them.
+- **Source:** `made-now`
+
 ### 2026-10-28 — Expanded chart view re-renders via `fitHeight`, using Radix Dialog
 - **Decision:** Add an opt-in `fitHeight` prop to `ChartVisualization` that measures the plot area's height (ResizeObserver) and draws at it, instead of the fixed 300px viewBox height. The full-screen viewer (`ChartExpandButton`) is a Radix `Dialog` that mounts a second `ChartVisualization chart={...} fitHeight`. The Charts view grid (`ChartGrid`) also uses `fitHeight` with a definite card height (`clamp(360px, 60vh, 600px)`) and one chart per row below `2xl`.
 - **Why:** With a fixed viewBox, a bigger container only scales the drawing up (fonts and strokes included). Redrawing at the real size keeps axes and labels legible and hit areas correct. Radix Dialog already provides the focus trap, Esc/backdrop/close dismissal and focus return to the trigger, so none of that is hand-rolled.
@@ -10,6 +45,7 @@ Newest first. Entries marked `Source: inferred` were reconstructed from existing
 - **Source:** `made-now`
 
 ### 2026-10-28 — Single shared tooltip wrapper `Hint` for icon-only controls
+- **Note:** Tradeoff "disabled buttons do not show a tooltip" superseded by "Disabled icon controls use `aria-disabled` inside `Hint`".
 - **Decision:** All icon-only controls use `src/shared/components/Hint.tsx`, which wraps the existing shadcn/Radix tooltip, sets the control's `aria-label` from the same text, and appends a platform-formatted shortcut (`src/shared/lib/platform.ts`, now also the source of `modKey` for `commandRegistry`). Hover-revealed controls (`opacity-0 group-hover:opacity-100`) are only hidden on devices that can hover (`[@media(hover:hover)]:`). The mobile section menu and the chart Expand button show visible text on small/touch screens.
 - **Why:** One place to restyle for the upcoming redesign. The label and aria-label can't drift apart. Radix opens tooltips on keyboard focus as well as hover. Touch users get the aria-label and visible text instead.
 - **Alternatives considered:** An `IconButton` component that owns the button too — rejected, many icon controls are Radix triggers (`DropdownMenuTrigger`, `DialogTrigger`) that need `asChild` composition; a wrapper composes with all of them. Native `title` attributes — rejected, they don't appear on keyboard focus and can't show shortcuts consistently.

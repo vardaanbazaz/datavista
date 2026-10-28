@@ -172,7 +172,7 @@ export function DashboardGrid({ charts, activeDashboardId, onEditKpi }: Dashboar
                       {widget.title}
                     </CardTitle>
                   </div>
-                  <div className="flex items-center gap-1 shrink-0">
+                  <div className="flex items-center gap-1 [@media(pointer:coarse)]:gap-3 shrink-0">
                     <ChartExpandButton chart={widget.data} className="h-6" />
                     <Hint label="Remove this chart from the dashboard">
                       <Button

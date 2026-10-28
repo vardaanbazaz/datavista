@@ -265,11 +265,13 @@ export function GlobalFilterBar() {
                   <Bookmark className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
                   <span className="truncate font-medium">{view.name}</span>
                 </div>
+                {/* On touch the button itself is 44px, so its target stays inside this menu
+                    row instead of spilling over the neighbouring views (delete is immediate). */}
                 <Hint label={`Delete saved view “${view.name}”`}>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-5 w-5 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 focus:opacity-100 transition-opacity p-0"
+                    className="h-5 w-5 [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 focus:opacity-100 transition-opacity p-0"
                     onClick={(e) => {
                       e.stopPropagation();
                       deleteSavedView(view.id);

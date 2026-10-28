@@ -311,13 +311,13 @@ export const PivotBuilder: React.FC<PivotBuilderProps> = ({ dataset }) => {
             {currentConfig.rowDimensions.map((dim, idx) => (
               <div
                 key={`row-dim-${dim}-${idx}`}
-                className="flex items-center justify-between p-2 rounded-lg bg-primary/5 border border-primary/20"
+                className="flex items-center justify-between p-2 [@media(pointer:coarse)]:pr-4 rounded-lg bg-primary/5 border border-primary/20"
               >
                 <span className="text-xs font-medium text-foreground truncate max-w-[160px]">
                   {dim}
                 </span>
-                <div className="flex items-center gap-1">
-                  <Hint label={`Move ${dim} up`}>
+                <div className="flex items-center gap-1 [@media(pointer:coarse)]:gap-6">
+                  <Hint label={`Move ${dim} up`} disabledReason="already first">
                     <Button
                       size="icon"
                       variant="ghost"
@@ -328,7 +328,7 @@ export const PivotBuilder: React.FC<PivotBuilderProps> = ({ dataset }) => {
                       <ArrowUp className="w-3.5 h-3.5" />
                     </Button>
                   </Hint>
-                  <Hint label={`Move ${dim} down`}>
+                  <Hint label={`Move ${dim} down`} disabledReason="already last">
                     <Button
                       size="icon"
                       variant="ghost"
@@ -372,13 +372,13 @@ export const PivotBuilder: React.FC<PivotBuilderProps> = ({ dataset }) => {
             {currentConfig.columnDimensions.map((dim, idx) => (
               <div
                 key={`col-dim-${dim}-${idx}`}
-                className="flex items-center justify-between p-2 rounded-lg bg-primary/5 border border-primary/20"
+                className="flex items-center justify-between p-2 [@media(pointer:coarse)]:pr-4 rounded-lg bg-primary/5 border border-primary/20"
               >
                 <span className="text-xs font-medium text-foreground truncate max-w-[160px]">
                   {dim}
                 </span>
-                <div className="flex items-center gap-1">
-                  <Hint label={`Move ${dim} up`}>
+                <div className="flex items-center gap-1 [@media(pointer:coarse)]:gap-6">
+                  <Hint label={`Move ${dim} up`} disabledReason="already first">
                     <Button
                       size="icon"
                       variant="ghost"
@@ -389,7 +389,7 @@ export const PivotBuilder: React.FC<PivotBuilderProps> = ({ dataset }) => {
                       <ArrowUp className="w-3.5 h-3.5" />
                     </Button>
                   </Hint>
-                  <Hint label={`Move ${dim} down`}>
+                  <Hint label={`Move ${dim} down`} disabledReason="already last">
                     <Button
                       size="icon"
                       variant="ghost"
@@ -437,7 +437,7 @@ export const PivotBuilder: React.FC<PivotBuilderProps> = ({ dataset }) => {
               return (
                 <div
                   key={`vf-${vf.column}-${idx}`}
-                  className="p-2 rounded-lg bg-primary/5 border border-primary/20 space-y-1.5"
+                  className="p-2 [@media(pointer:coarse)]:pr-4 rounded-lg bg-primary/5 border border-primary/20 space-y-1.5"
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-foreground truncate max-w-[170px]">

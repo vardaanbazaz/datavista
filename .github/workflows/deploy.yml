@@ -43,11 +43,15 @@ jobs:
       - name: Resilience Gate (Test)
         run: npm run test
 
-      - name: Build Artifact
-        run: npm run build
-
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
+
+      # Full e2e suite against the dev server (playwright.config.ts), so it can't rot again.
+      - name: End-to-End Gate (Playwright)
+        run: npm run test:e2e
+
+      - name: Build Artifact
+        run: npm run build
 
       - name: Production Smoke Gate
         run: npx playwright test --config playwright.prod.config.ts

@@ -1,0 +1,1187 @@
+{
+  "_meta": {
+    "conventions": {
+      "iqrOutliers": "strictly outside Q1-1.5*IQR .. Q3+1.5*IQR",
+      "quantile": "linear interpolation, idx=(n-1)*p (numpy 'linear', type 7)",
+      "rank": "SQL RANK (min), DENSE_RANK (dense)",
+      "rowNumberTies": "original CSV row order",
+      "runningTotal": "RANGE UNBOUNDED PRECEDING..CURRENT ROW (peer-inclusive)",
+      "variance": "population (ddof=0)",
+      "zscoreOutliers": "|z|>3 with population std"
+    },
+    "generator": "scripts/golden/generate_hr_golden.py",
+    "numpy": "2.5.4",
+    "pandas": "3.1.0",
+    "rowCount": 1470,
+    "source": "tests/fixtures/hr-attrition.csv"
+  },
+  "correlation": {
+    "Age": {
+      "Age": 1.0,
+      "MonthlyIncome": 0.4978545669265801,
+      "TotalWorkingYears": 0.6803805357911985,
+      "YearsAtCompany": 0.3113087697450989
+    },
+    "MonthlyIncome": {
+      "Age": 0.4978545669265801,
+      "MonthlyIncome": 1.0,
+      "TotalWorkingYears": 0.7728932462543574,
+      "YearsAtCompany": 0.5142848257331957
+    },
+    "TotalWorkingYears": {
+      "Age": 0.6803805357911985,
+      "MonthlyIncome": 0.7728932462543574,
+      "TotalWorkingYears": 1.0,
+      "YearsAtCompany": 0.6281331552682468
+    },
+    "YearsAtCompany": {
+      "Age": 0.3113087697450989,
+      "MonthlyIncome": 0.5142848257331957,
+      "TotalWorkingYears": 0.6281331552682468,
+      "YearsAtCompany": 1.0
+    }
+  },
+  "groupByAge": {
+    "18": {
+      "Education": {
+        "avg": 2.5,
+        "count": 8,
+        "max": 3.0,
+        "min": 1.0,
+        "sum": 20.0
+      },
+      "MonthlyIncome": {
+        "avg": 1518.375,
+        "count": 8,
+        "max": 1904.0,
+        "min": 1051.0,
+        "sum": 12147.0
+      }
+    },
+    "19": {
+      "Education": {
+        "avg": 2.111111111111111,
+        "count": 9,
+        "max": 3.0,
+        "min": 1.0,
+        "sum": 19.0
+      },
+      "MonthlyIncome": {
+        "avg": 2075.0,
+        "count": 9,
+        "max": 2994.0,
+        "min": 1102.0,
+        "sum": 18675.0
+      }
+    },
+    "20": {
+      "Education": {
+        "avg": 2.6363636363636362,
+        "count": 11,
+        "max": 3.0,
+        "min": 1.0,
+        "sum": 29.0
+      },
+      "MonthlyIncome": {
+        "avg": 2539.3636363636365,
+        "count": 11,
+        "max": 3033.0,
+        "min": 1009.0,
+        "sum": 27933.0
+      }
+    },
+    "21": {
+      "Education": {
+        "avg": 1.6153846153846154,
+        "count": 13,
+        "max": 3.0,
+        "min": 1.0,
+        "sum": 21.0
+      },
+      "MonthlyIncome": {
+        "avg": 2491.4615384615386,
+        "count": 13,
+        "max": 3447.0,
+        "min": 1232.0,
+        "sum": 32389.0
+      }
+    },
+    "22": {
+      "Education": {
+        "avg": 1.8125,
+        "count": 16,
+        "max": 4.0,
+        "min": 1.0,
+        "sum": 29.0
+      },
+      "MonthlyIncome": {
+        "avg": 2950.0,
+        "count": 16,
+        "max": 4775.0,
+        "min": 2244.0,
+        "sum": 47200.0
+      }
+    },
+    "23": {
+      "Education": {
+        "avg": 1.8571428571428572,
+        "count": 14,
+        "max": 3.0,
+        "min": 1.0,
+        "sum": 26.0
+      },
+      "MonthlyIncome": {
+        "avg": 2515.3571428571427,
+        "count": 14,
+        "max": 3989.0,
+        "min": 1223.0,
+        "sum": 35215.0
+      }
+    },
+    "24": {
+      "Education": {
+        "avg": 2.1153846153846154,
+        "count": 26,
+        "max": 4.0,
+        "min": 1.0,
+        "sum": 55.0
+      },
+      "MonthlyIncome": {
+        "avg": 3243.923076923077,
+        "count": 26,
+        "max": 4999.0,
+        "min": 1555.0,
+        "sum": 84342.0
+      }
+    },
+    "25": {
+      "Education": {
+        "avg": 1.9230769230769231,
+        "count": 26,
+        "max": 4.0,
+        "min": 1.0,
+        "sum": 50.0
+      },
+      "MonthlyIncome": {
+        "avg": 4144.7692307692305,
+        "count": 26,
+        "max": 8639.0,
+        "min": 1118.0,
+        "sum": 107764.0
+      }
+    },
+    "26": {
+      "Education": {
+        "avg": 2.641025641025641,
+        "count": 39,
+        "max": 4.0,
+        "min": 1.0,
+        "sum": 103.0
+      },
+      "MonthlyIncome": {
+        "avg": 3531.4871794871797,
+        "count": 39,
+        "max": 6397.0,
+        "min": 2007.0,
+        "sum": 137728.0
+      }
+    },
+    "27": {
+      "Education": {
+        "avg": 2.6666666666666665,
+        "count": 48,
+        "max": 5.0,
+        "min": 1.0,
+        "sum": 128.0
+      },
+      "MonthlyIncome": {
+        "avg": 4190.416666666667,
+        "count": 48,
+        "max": 12808.0,
+        "min": 1706.0,
+        "sum": 201140.0
+      }
+    },
+    "28": {
+      "Education": {
+        "avg": 2.7916666666666665,
+        "count": 48,
+        "max": 4.0,
+        "min": 1.0,
+        "sum": 134.0
+      },
+      "MonthlyIncome": {
+        "avg": 3904.8333333333335,
+        "count": 48,
+        "max": 9854.0,
+        "min": 1052.0,
+        "sum": 187432.0
+      }
+    },
+    "29": {
+      "Education": {
+        "avg": 2.573529411764706,
+        "count": 68,
+        "max": 5.0,
+        "min": 1.0,
+        "sum": 175.0
+      },
+      "MonthlyIncome": {
+        "avg": 4584.411764705882,
+        "count": 68,
+        "max": 16124.0,
+        "min": 1091.0,
+        "sum": 311740.0
+      }
+    },
+    "30": {
+      "Education": {
+        "avg": 2.7666666666666666,
+        "count": 60,
+        "max": 5.0,
+        "min": 1.0,
+        "sum": 166.0
+      },
+      "MonthlyIncome": {
+        "avg": 4814.85,
+        "count": 60,
+        "max": 11916.0,
+        "min": 1081.0,
+        "sum": 288891.0
+      }
+    },
+    "31": {
+      "Education": {
+        "avg": 3.0579710144927534,
+        "count": 69,
+        "max": 5.0,
+        "min": 1.0,
+        "sum": 211.0
+      },
+      "MonthlyIncome": {
+        "avg": 5525.391304347826,
+        "count": 69,
+        "max": 16422.0,
+        "min": 1129.0,
+        "sum": 381252.0
+      }
+    },
+    "32": {
+      "Education": {
+        "avg": 3.0491803278688523,
+        "count": 61,
+        "max": 5.0,
+        "min": 1.0,
+        "sum": 186.0
+      },
+      "MonthlyIncome": {
+        "avg": 5092.459016393443,
+        "count": 61,
+        "max": 11244.0,
+        "min": 1393.0,
+        "sum": 310640.0
+      }
+    },
+    "33": {
+      "Education": {
+        "avg": 3.086206896551724,
+        "count": 58,
+        "max": 5.0,
+        "min": 1.0,
+        "sum": 179.0
+      },
+      "MonthlyIncome": {
+        "avg": 5500.5,
+        "count": 58,
+        "max": 17444.0,
+        "min": 2008.0,
+        "sum": 319029.0
+      }
+    },
+    "34": {
+      "Education": {
+        "avg": 3.090909090909091,
+        "count": 77,
+        "max": 5.0,
+        "min": 1.0,
+        "sum": 238.0
+      },
+      "MonthlyIncome": {
+        "avg": 5269.220779220779,
+        "count": 77,
+        "max": 17007.0,
+        "min": 2008.0,
+        "sum": 405730.0
+      }
+    },
+    "35": {
+      "Education": {
+        "avg": 3.217948717948718,
+        "count": 78,
+        "max": 5.0,
+        "min": 1.0,
+        "sum": 251.0
+      },
+      "MonthlyIncome": {
+        "avg": 5425.282051282052,
+        "count": 78,
+        "max": 11996.0,
+        "min": 1281.0,
+        "sum": 423172.0
+      }
+    },
+    "36": {
+      "Education": {
+        "avg": 3.246376811594203,
+        "count": 69,
+        "max": 5.0,
+        "min": 1.0,
+        "sum": 224.0
+      },
+      "MonthlyIncome": {
+        "avg": 5590.913043478261,
+        "count": 69,
+        "max": 11713.0,
+        "min": 2013.0,
+        "sum": 385773.0
+      }
+    },
+    "37": {
+      "Education": {
+        "avg": 3.0,
+        "count": 50,
+        "max": 5.0,
+        "min": 1.0,
+        "sum": 150.0
+      },
+      "MonthlyIncome": {
+        "avg": 5853.86,
+        "count": 50,
+        "max": 13744.0,
+        "min": 2073.0,
+        "sum": 292693.0
+      }
+    },
+    "38": {
+      "Education": {
+        "avg": 2.9655172413793105,
+        "count": 58,
+        "max": 5.0,
+        "min": 1.0,
+        "sum": 172.0
+      },
+      "MonthlyIncome": {
+        "avg": 5721.586206896552,
+        "count": 58,
+        "max": 13582.0,
+        "min": 1702.0,
+        "sum": 331852.0
+      }
+    },
+    "39": {
+      "Education": {
+        "avg": 2.7857142857142856,
+        "count": 42,
+        "max": 5.0,
+        "min": 1.0,
+        "sum": 117.0
+      },
+      "MonthlyIncome": {
+        "avg": 8183.357142857143,
+        "count": 42,
+        "max": 19431.0,
+        "min": 2086.0,
+        "sum": 343701.0
+      }
+    },
+    "40": {
+      "Education": {
+        "avg": 2.9649122807017543,
+        "count": 57,
+        "max": 5.0,
+        "min": 1.0,
+        "sum": 169.0
+      },
+      "MonthlyIncome": {
+        "avg": 7700.9473684210525,
+        "count": 57,
+        "max": 19833.0,
+        "min": 2001.0,
+        "sum": 438954.0
+      }
+    },
+    "41": {
+      "Education": {
+        "avg": 2.925,
+        "count": 40,
+        "max": 5.0,
+        "min": 1.0,
+        "sum": 117.0
+      },
+      "MonthlyIncome": {
+        "avg": 8379.825,
+        "count": 40,
+        "max": 19973.0,
+        "min": 2107.0,
+        "sum": 335193.0
+      }
+    },
+    "42": {
+      "Education": {
+        "avg": 2.9130434782608696,
+        "count": 46,
+        "max": 5.0,
+        "min": 1.0,
+        "sum": 134.0
+      },
+      "MonthlyIncome": {
+        "avg": 8074.847826086957,
+        "count": 46,
+        "max": 19613.0,
+        "min": 2093.0,
+        "sum": 371443.0
+      }
+    },
+    "43": {
+      "Education": {
+        "avg": 3.125,
+        "count": 32,
+        "max": 5.0,
+        "min": 2.0,
+        "sum": 100.0
+      },
+      "MonthlyIncome": {
+        "avg": 8444.9375,
+        "count": 32,
+        "max": 19740.0,
+        "min": 2089.0,
+        "sum": 270238.0
+      }
+    },
+    "44": {
+      "Education": {
+        "avg": 3.1818181818181817,
+        "count": 33,
+        "max": 5.0,
+        "min": 1.0,
+        "sum": 105.0
+      },
+      "MonthlyIncome": {
+        "avg": 7114.333333333333,
+        "count": 33,
+        "max": 19513.0,
+        "min": 2011.0,
+        "sum": 234773.0
+      }
+    },
+    "45": {
+      "Education": {
+        "avg": 2.975609756097561,
+        "count": 41,
+        "max": 5.0,
+        "min": 1.0,
+        "sum": 122.0
+      },
+      "MonthlyIncome": {
+        "avg": 7811.219512195122,
+        "count": 41,
+        "max": 19202.0,
+        "min": 2132.0,
+        "sum": 320260.0
+      }
+    },
+    "46": {
+      "Education": {
+        "avg": 2.878787878787879,
+        "count": 33,
+        "max": 4.0,
+        "min": 1.0,
+        "sum": 95.0
+      },
+      "MonthlyIncome": {
+        "avg": 11457.969696969696,
+        "count": 33,
+        "max": 19627.0,
+        "min": 3423.0,
+        "sum": 378113.0
+      }
+    },
+    "47": {
+      "Education": {
+        "avg": 3.125,
+        "count": 24,
+        "max": 5.0,
+        "min": 1.0,
+        "sum": 75.0
+      },
+      "MonthlyIncome": {
+        "avg": 8931.416666666666,
+        "count": 24,
+        "max": 19658.0,
+        "min": 2105.0,
+        "sum": 214354.0
+      }
+    },
+    "48": {
+      "Education": {
+        "avg": 3.1578947368421053,
+        "count": 19,
+        "max": 5.0,
+        "min": 1.0,
+        "sum": 60.0
+      },
+      "MonthlyIncome": {
+        "avg": 9344.78947368421,
+        "count": 19,
+        "max": 19665.0,
+        "min": 2259.0,
+        "sum": 177551.0
+      }
+    },
+    "49": {
+      "Education": {
+        "avg": 2.9583333333333335,
+        "count": 24,
+        "max": 4.0,
+        "min": 1.0,
+        "sum": 71.0
+      },
+      "MonthlyIncome": {
+        "avg": 9952.875,
+        "count": 24,
+        "max": 19502.0,
+        "min": 2587.0,
+        "sum": 238869.0
+      }
+    },
+    "50": {
+      "Education": {
+        "avg": 3.1666666666666665,
+        "count": 30,
+        "max": 5.0,
+        "min": 1.0,
+        "sum": 95.0
+      },
+      "MonthlyIncome": {
+        "avg": 12697.166666666666,
+        "count": 30,
+        "max": 19926.0,
+        "min": 2380.0,
+        "sum": 380915.0
+      }
+    },
+    "51": {
+      "Education": {
+        "avg": 3.263157894736842,
+        "count": 19,
+        "max": 4.0,
+        "min": 2.0,
+        "sum": 62.0
+      },
+      "MonthlyIncome": {
+        "avg": 9632.473684210527,
+        "count": 19,
+        "max": 19847.0,
+        "min": 2075.0,
+        "sum": 183017.0
+      }
+    },
+    "52": {
+      "Education": {
+        "avg": 3.2222222222222223,
+        "count": 18,
+        "max": 4.0,
+        "min": 1.0,
+        "sum": 58.0
+      },
+      "MonthlyIncome": {
+        "avg": 10606.888888888889,
+        "count": 18,
+        "max": 19999.0,
+        "min": 2950.0,
+        "sum": 190924.0
+      }
+    },
+    "53": {
+      "Education": {
+        "avg": 3.0526315789473686,
+        "count": 19,
+        "max": 5.0,
+        "min": 1.0,
+        "sum": 58.0
+      },
+      "MonthlyIncome": {
+        "avg": 11564.157894736842,
+        "count": 19,
+        "max": 19094.0,
+        "min": 2306.0,
+        "sum": 219719.0
+      }
+    },
+    "54": {
+      "Education": {
+        "avg": 3.5,
+        "count": 18,
+        "max": 5.0,
+        "min": 2.0,
+        "sum": 63.0
+      },
+      "MonthlyIncome": {
+        "avg": 10875.833333333334,
+        "count": 18,
+        "max": 19406.0,
+        "min": 2897.0,
+        "sum": 195765.0
+      }
+    },
+    "55": {
+      "Education": {
+        "avg": 3.0,
+        "count": 22,
+        "max": 5.0,
+        "min": 1.0,
+        "sum": 66.0
+      },
+      "MonthlyIncome": {
+        "avg": 13204.181818181818,
+        "count": 22,
+        "max": 19859.0,
+        "min": 2662.0,
+        "sum": 290492.0
+      }
+    },
+    "56": {
+      "Education": {
+        "avg": 3.2142857142857144,
+        "count": 14,
+        "max": 5.0,
+        "min": 2.0,
+        "sum": 45.0
+      },
+      "MonthlyIncome": {
+        "avg": 8248.357142857143,
+        "count": 14,
+        "max": 19943.0,
+        "min": 2066.0,
+        "sum": 115477.0
+      }
+    },
+    "57": {
+      "Education": {
+        "avg": 2.75,
+        "count": 4,
+        "max": 4.0,
+        "min": 2.0,
+        "sum": 11.0
+      },
+      "MonthlyIncome": {
+        "avg": 8803.0,
+        "count": 4,
+        "max": 14118.0,
+        "min": 4900.0,
+        "sum": 35212.0
+      }
+    },
+    "58": {
+      "Education": {
+        "avg": 3.357142857142857,
+        "count": 14,
+        "max": 4.0,
+        "min": 1.0,
+        "sum": 47.0
+      },
+      "MonthlyIncome": {
+        "avg": 10705.785714285714,
+        "count": 14,
+        "max": 19701.0,
+        "min": 2372.0,
+        "sum": 149881.0
+      }
+    },
+    "59": {
+      "Education": {
+        "avg": 2.8,
+        "count": 10,
+        "max": 4.0,
+        "min": 1.0,
+        "sum": 28.0
+      },
+      "MonthlyIncome": {
+        "avg": 8038.1,
+        "count": 10,
+        "max": 18844.0,
+        "min": 2177.0,
+        "sum": 80381.0
+      }
+    },
+    "60": {
+      "Education": {
+        "avg": 3.6,
+        "count": 5,
+        "max": 4.0,
+        "min": 3.0,
+        "sum": 18.0
+      },
+      "MonthlyIncome": {
+        "avg": 10268.0,
+        "count": 5,
+        "max": 19566.0,
+        "min": 5220.0,
+        "sum": 51340.0
+      }
+    }
+  },
+  "groupByDepartment": {
+    "Human Resources": {
+      "attritionYesCount": 12,
+      "attritionYesRate": 0.19047619047619047,
+      "avgMonthlyIncome": 6654.507936507936,
+      "count": 63
+    },
+    "Research & Development": {
+      "attritionYesCount": 133,
+      "attritionYesRate": 0.1383975026014568,
+      "avgMonthlyIncome": 6281.252861602497,
+      "count": 961
+    },
+    "Sales": {
+      "attritionYesCount": 92,
+      "attritionYesRate": 0.2062780269058296,
+      "avgMonthlyIncome": 6959.17264573991,
+      "count": 446
+    }
+  },
+  "groupByDepartmentJobRole": {
+    "Human Resources\u0000Human Resources": {
+      "attritionYesCount": 12,
+      "attritionYesRate": 0.23076923076923078,
+      "avgMonthlyIncome": 4235.75,
+      "count": 52
+    },
+    "Human Resources\u0000Manager": {
+      "attritionYesCount": 0,
+      "attritionYesRate": 0.0,
+      "avgMonthlyIncome": 18088.636363636364,
+      "count": 11
+    },
+    "Research & Development\u0000Healthcare Representative": {
+      "attritionYesCount": 9,
+      "attritionYesRate": 0.06870229007633588,
+      "avgMonthlyIncome": 7528.763358778626,
+      "count": 131
+    },
+    "Research & Development\u0000Laboratory Technician": {
+      "attritionYesCount": 62,
+      "attritionYesRate": 0.23938223938223938,
+      "avgMonthlyIncome": 3237.169884169884,
+      "count": 259
+    },
+    "Research & Development\u0000Manager": {
+      "attritionYesCount": 3,
+      "attritionYesRate": 0.05555555555555555,
+      "avgMonthlyIncome": 17130.333333333332,
+      "count": 54
+    },
+    "Research & Development\u0000Manufacturing Director": {
+      "attritionYesCount": 10,
+      "attritionYesRate": 0.06896551724137931,
+      "avgMonthlyIncome": 7295.137931034483,
+      "count": 145
+    },
+    "Research & Development\u0000Research Director": {
+      "attritionYesCount": 2,
+      "attritionYesRate": 0.025,
+      "avgMonthlyIncome": 16033.55,
+      "count": 80
+    },
+    "Research & Development\u0000Research Scientist": {
+      "attritionYesCount": 47,
+      "attritionYesRate": 0.16095890410958905,
+      "avgMonthlyIncome": 3239.972602739726,
+      "count": 292
+    },
+    "Sales\u0000Manager": {
+      "attritionYesCount": 2,
+      "attritionYesRate": 0.05405405405405406,
+      "avgMonthlyIncome": 16986.972972972973,
+      "count": 37
+    },
+    "Sales\u0000Sales Executive": {
+      "attritionYesCount": 57,
+      "attritionYesRate": 0.17484662576687116,
+      "avgMonthlyIncome": 6924.2791411042945,
+      "count": 326
+    },
+    "Sales\u0000Sales Representative": {
+      "attritionYesCount": 33,
+      "attritionYesRate": 0.39759036144578314,
+      "avgMonthlyIncome": 2626.0,
+      "count": 83
+    }
+  },
+  "groupByJobRole": {
+    "Healthcare Representative": {
+      "attritionYesCount": 9,
+      "attritionYesRate": 0.06870229007633588,
+      "avgMonthlyIncome": 7528.763358778626,
+      "count": 131
+    },
+    "Human Resources": {
+      "attritionYesCount": 12,
+      "attritionYesRate": 0.23076923076923078,
+      "avgMonthlyIncome": 4235.75,
+      "count": 52
+    },
+    "Laboratory Technician": {
+      "attritionYesCount": 62,
+      "attritionYesRate": 0.23938223938223938,
+      "avgMonthlyIncome": 3237.169884169884,
+      "count": 259
+    },
+    "Manager": {
+      "attritionYesCount": 5,
+      "attritionYesRate": 0.049019607843137254,
+      "avgMonthlyIncome": 17181.676470588234,
+      "count": 102
+    },
+    "Manufacturing Director": {
+      "attritionYesCount": 10,
+      "attritionYesRate": 0.06896551724137931,
+      "avgMonthlyIncome": 7295.137931034483,
+      "count": 145
+    },
+    "Research Director": {
+      "attritionYesCount": 2,
+      "attritionYesRate": 0.025,
+      "avgMonthlyIncome": 16033.55,
+      "count": 80
+    },
+    "Research Scientist": {
+      "attritionYesCount": 47,
+      "attritionYesRate": 0.16095890410958905,
+      "avgMonthlyIncome": 3239.972602739726,
+      "count": 292
+    },
+    "Sales Executive": {
+      "attritionYesCount": 57,
+      "attritionYesRate": 0.17484662576687116,
+      "avgMonthlyIncome": 6924.2791411042945,
+      "count": 326
+    },
+    "Sales Representative": {
+      "attritionYesCount": 33,
+      "attritionYesRate": 0.39759036144578314,
+      "avgMonthlyIncome": 2626.0,
+      "count": 83
+    }
+  },
+  "pivotDepartmentGender": {
+    "Human Resources|Female": {
+      "count": 20,
+      "sumMonthlyIncome": 145280.0
+    },
+    "Human Resources|Male": {
+      "count": 43,
+      "sumMonthlyIncome": 273954.0
+    },
+    "Human Resources|__total__": {
+      "count": 63,
+      "sumMonthlyIncome": 419234.0
+    },
+    "Research & Development|Female": {
+      "count": 379,
+      "sumMonthlyIncome": 2468689.0
+    },
+    "Research & Development|Male": {
+      "count": 582,
+      "sumMonthlyIncome": 3567595.0
+    },
+    "Research & Development|__total__": {
+      "count": 961,
+      "sumMonthlyIncome": 6036284.0
+    },
+    "Sales|Female": {
+      "count": 189,
+      "sumMonthlyIncome": 1317732.0
+    },
+    "Sales|Male": {
+      "count": 257,
+      "sumMonthlyIncome": 1786059.0
+    },
+    "Sales|__total__": {
+      "count": 446,
+      "sumMonthlyIncome": 3103791.0
+    },
+    "__total__|Female": {
+      "count": 588,
+      "sumMonthlyIncome": 3931701.0
+    },
+    "__total__|Male": {
+      "count": 882,
+      "sumMonthlyIncome": 5627608.0
+    },
+    "__total__|__total__": {
+      "count": 1470,
+      "sumMonthlyIncome": 9559309.0
+    }
+  },
+  "stats": {
+    "Age": {
+      "count": 1470,
+      "iqrOutlierCount": 0,
+      "max": 60.0,
+      "mean": 36.923809523809524,
+      "median": 36.0,
+      "min": 18.0,
+      "q1": 30.0,
+      "q3": 43.0,
+      "stdDev": 9.132265690615387,
+      "variance": 83.39827664399093,
+      "zscoreOutlierCount": 0
+    },
+    "MonthlyIncome": {
+      "count": 1470,
+      "iqrOutlierCount": 114,
+      "max": 19999.0,
+      "mean": 6502.931292517007,
+      "median": 4919.0,
+      "min": 1009.0,
+      "q1": 2911.0,
+      "q3": 8379.0,
+      "stdDev": 4706.355164823003,
+      "variance": 22149778.937456153,
+      "zscoreOutlierCount": 0
+    },
+    "TotalWorkingYears": {
+      "count": 1470,
+      "iqrOutlierCount": 63,
+      "max": 40.0,
+      "mean": 11.279591836734694,
+      "median": 10.0,
+      "min": 0.0,
+      "q1": 6.0,
+      "q3": 15.0,
+      "stdDev": 7.778134700893234,
+      "variance": 60.499379425239475,
+      "zscoreOutlierCount": 16
+    }
+  },
+  "windowByDepartmentIncomeDesc": {
+    "1035": {
+      "denseRank": 2,
+      "department": "Research & Development",
+      "monthlyIncome": 19973,
+      "rank": 2,
+      "rowNumber": 2,
+      "runningTotal": 39972.0
+    },
+    "1038": {
+      "denseRank": 2,
+      "department": "Sales",
+      "monthlyIncome": 19845,
+      "rank": 2,
+      "rowNumber": 2,
+      "runningTotal": 39692.0
+    },
+    "1056": {
+      "denseRank": 436,
+      "department": "Sales",
+      "monthlyIncome": 1052,
+      "rank": 446,
+      "rowNumber": 446,
+      "runningTotal": 3103791.0
+    },
+    "1103": {
+      "denseRank": 236,
+      "department": "Research & Development",
+      "monthlyIncome": 7756,
+      "rank": 238,
+      "rowNumber": 238,
+      "runningTotal": 3289032.0
+    },
+    "1191": {
+      "denseRank": 3,
+      "department": "Research & Development",
+      "monthlyIncome": 19943,
+      "rank": 3,
+      "rowNumber": 3,
+      "runningTotal": 59915.0
+    },
+    "1282": {
+      "denseRank": 1,
+      "department": "Sales",
+      "monthlyIncome": 19847,
+      "rank": 1,
+      "rowNumber": 1,
+      "runningTotal": 19847.0
+    },
+    "1334": {
+      "denseRank": 51,
+      "department": "Research & Development",
+      "monthlyIncome": 17861,
+      "rank": 51,
+      "rowNumber": 52,
+      "runningTotal": 995353.0
+    },
+    "1338": {
+      "denseRank": 1,
+      "department": "Human Resources",
+      "monthlyIncome": 19717,
+      "rank": 1,
+      "rowNumber": 1,
+      "runningTotal": 19717.0
+    },
+    "142": {
+      "denseRank": 222,
+      "department": "Sales",
+      "monthlyIncome": 5744,
+      "rank": 224,
+      "rowNumber": 224,
+      "runningTotal": 2207775.0
+    },
+    "1625": {
+      "denseRank": 2,
+      "department": "Human Resources",
+      "monthlyIncome": 19658,
+      "rank": 2,
+      "rowNumber": 2,
+      "runningTotal": 39375.0
+    },
+    "1638": {
+      "denseRank": 236,
+      "department": "Research & Development",
+      "monthlyIncome": 7756,
+      "rank": 238,
+      "rowNumber": 239,
+      "runningTotal": 3289032.0
+    },
+    "1662": {
+      "denseRank": 467,
+      "department": "Research & Development",
+      "monthlyIncome": 4374,
+      "rank": 481,
+      "rowNumber": 481,
+      "runningTotal": 4653279.0
+    },
+    "1714": {
+      "denseRank": 63,
+      "department": "Human Resources",
+      "monthlyIncome": 1555,
+      "rank": 63,
+      "rowNumber": 63,
+      "runningTotal": 419234.0
+    },
+    "1740": {
+      "denseRank": 3,
+      "department": "Sales",
+      "monthlyIncome": 19833,
+      "rank": 3,
+      "rowNumber": 3,
+      "runningTotal": 59525.0
+    },
+    "1890": {
+      "denseRank": 32,
+      "department": "Human Resources",
+      "monthlyIncome": 3886,
+      "rank": 32,
+      "rowNumber": 32,
+      "runningTotal": 338297.0
+    },
+    "1898": {
+      "denseRank": 188,
+      "department": "Sales",
+      "monthlyIncome": 6500,
+      "rank": 189,
+      "rowNumber": 190,
+      "runningTotal": 1999691.0
+    },
+    "1945": {
+      "denseRank": 234,
+      "department": "Sales",
+      "monthlyIncome": 5561,
+      "rank": 236,
+      "rowNumber": 237,
+      "runningTotal": 2281215.0
+    },
+    "1973": {
+      "denseRank": 3,
+      "department": "Human Resources",
+      "monthlyIncome": 19636,
+      "rank": 3,
+      "rowNumber": 3,
+      "runningTotal": 59011.0
+    },
+    "259": {
+      "denseRank": 1,
+      "department": "Research & Development",
+      "monthlyIncome": 19999,
+      "rank": 1,
+      "rowNumber": 1,
+      "runningTotal": 19999.0
+    },
+    "307": {
+      "denseRank": 60,
+      "department": "Sales",
+      "monthlyIncome": 10609,
+      "rank": 60,
+      "rowNumber": 60,
+      "runningTotal": 921184.0
+    },
+    "575": {
+      "denseRank": 51,
+      "department": "Research & Development",
+      "monthlyIncome": 17861,
+      "rank": 51,
+      "rowNumber": 51,
+      "runningTotal": 995353.0
+    },
+    "587": {
+      "denseRank": 198,
+      "department": "Research & Development",
+      "monthlyIncome": 9824,
+      "rank": 199,
+      "rowNumber": 199,
+      "runningTotal": 2948752.0
+    },
+    "634": {
+      "denseRank": 198,
+      "department": "Research & Development",
+      "monthlyIncome": 9824,
+      "rank": 199,
+      "rowNumber": 200,
+      "runningTotal": 2948752.0
+    },
+    "690": {
+      "denseRank": 234,
+      "department": "Sales",
+      "monthlyIncome": 5561,
+      "rank": 236,
+      "rowNumber": 236,
+      "runningTotal": 2281215.0
+    },
+    "701": {
+      "denseRank": 894,
+      "department": "Research & Development",
+      "monthlyIncome": 1009,
+      "rank": 961,
+      "rowNumber": 961,
+      "runningTotal": 6036284.0
+    },
+    "808": {
+      "denseRank": 188,
+      "department": "Sales",
+      "monthlyIncome": 6500,
+      "rank": 189,
+      "rowNumber": 189,
+      "runningTotal": 1999691.0
+    },
+    "970": {
+      "denseRank": 60,
+      "department": "Sales",
+      "monthlyIncome": 10609,
+      "rank": 60,
+      "rowNumber": 61,
+      "runningTotal": 921184.0
+    }
+  }
+}

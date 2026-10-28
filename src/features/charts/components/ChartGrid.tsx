@@ -105,7 +105,7 @@ export function ChartGrid() {
                     {chart.title}
                   </h3>
                 </div>
-                <div className="flex items-center gap-1 shrink-0">
+                <div className="flex items-center gap-1 [@media(pointer:coarse)]:gap-3 shrink-0">
                   <ChartExpandButton chart={chart} />
                   <Hint label="Delete this chart">
                     <Button

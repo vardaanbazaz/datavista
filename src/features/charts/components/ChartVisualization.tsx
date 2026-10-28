@@ -14,6 +14,12 @@ import { Badge } from "@/shared/components/ui/badge";
 import { toast } from "@/shared/hooks/use-toast";
 import { ErrorBoundary, WidgetError } from "@/shared/components/ErrorBoundary";
 import { getEffectiveColumnType } from "@/shared/utils/columnType";
+import {
+  aggregateValues as aggregateRows,
+  chartYValueLabel,
+  formatChartValue,
+  sortAxisKeys,
+} from "@/features/charts/lib/chartAggregation";
 
 import { pluginRegistry } from "@/shared/services/pluginRegistry";
 import { anomalyDetector } from "@/features/ai/anomalyDetector";
@@ -85,6 +91,10 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
     }
     return chart.xAxis || "";
   }, [chart.xAxis, chart.drillPath, drillState]);
+
+  // Names the aggregation actually plotted ("Sum of Education"), for the Y axis, tooltips
+  // and the screen-reader summary.
+  const yValueLabel = chartYValueLabel(chart);
 
   // Dynamically calculate chart data using queryEngine, filterManager, and drillState
   const chartData = useMemo(() => {
@@ -269,30 +279,8 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
     };
 
     // Reduces rows sharing an x-axis (and groupBy) key into chart.yAxis's plotted value.
-    // 'sum_if' / 'count_if' / 'weighted_average' / 'percentile' need context (a condition
-    // expression, a weight column, a percentile) this chart config doesn't carry, so they
-    // fall back to 'sum' rather than silently miscomputing.
-    const aggregateValues = (rows: typeof chartData, column: string): number => {
-      const numeric = (d: (typeof rows)[number]) => Number(d[column]) || 0;
-      switch (chart.aggregation) {
-        case 'avg':
-          return d3.mean(rows, numeric) ?? 0;
-        case 'min':
-          return d3.min(rows, numeric) ?? 0;
-        case 'max':
-          return d3.max(rows, numeric) ?? 0;
-        case 'count':
-          return rows.length;
-        case 'count_distinct':
-          return new Set(rows.map(d => d[column])).size;
-        case 'median':
-          return d3.median(rows, numeric) ?? 0;
-        case 'stddev':
-          return d3.deviation(rows, numeric) ?? 0;
-        default:
-          return d3.sum(rows, numeric);
-      }
-    };
+    const aggregateValues = (rows: typeof chartData, column: string): number =>
+      aggregateRows(rows, column, chart.aggregation);
 
     const isCountAggregation = chart.aggregation === 'count' || chart.aggregation === 'count_distinct';
 
@@ -515,8 +503,11 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
         return;
       }
 
+      // rollup keys come in first-appearance order; numeric/date x values read in order.
+      const xKeys = sortAxisKeys(Array.from(new Set(data.map(d => d.key))), xType);
+
       const xScale = d3.scaleBand()
-        .domain(data.map(d => d.key))
+        .domain(xKeys)
         .range([0, chartWidth])
         .padding(0.1);
 
@@ -576,7 +567,9 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
           })
           .attr("opacity", d => getOpacity(d.key, 0.85))
           .style("cursor", "pointer")
-          .attr("title", "Left-click to filter/drill, Right-click to view raw rows")
+          .call(bars => bars.append("title").text(d =>
+            `${currentDimension}: ${d.key}\n${chart.groupBy}: ${d.group}\n${yValueLabel}: ${formatChartValue(d.value)}\nClick to filter or drill down, right-click for raw rows`
+          ))
           .on("click", (event, d) => handlePointClick(d.key))
           .on("contextmenu", (event, d) => {
             event.preventDefault();
@@ -617,7 +610,9 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
           })
           .attr("opacity", d => getOpacity(d.key, 0.85))
           .style("cursor", "pointer")
-          .attr("title", "Left-click to filter/drill, Right-click to view raw rows")
+          .call(bars => bars.append("title").text(d =>
+            `${currentDimension}: ${d.key}\n${yValueLabel}: ${formatChartValue(d.value)}\nClick to filter or drill down, right-click for raw rows`
+          ))
           .on("click", (event, d) => handlePointClick(d.key))
           .on("contextmenu", (event, d) => handlePointRightClick(event, d.key));
       }
@@ -631,7 +626,7 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
         .style("text-anchor", "middle")
         .style("font-size", "11px")
         .style("fill", "hsl(var(--muted-foreground))")
-        .text(chart.yAxis);
+        .text(yValueLabel);
 
       chartArea.append("text")
         .attr("transform", `translate(${chartWidth / 2}, ${chartHeight + margin.bottom - 5})`)
@@ -781,7 +776,9 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
           .attr("stroke-width", d => d.isForecast ? 2 : 0)
           .attr("opacity", d => getOpacity(String(d[currentDimension]), d.isForecast ? 0.9 : 0.75))
           .style("cursor", "pointer")
-          .attr("title", d => d.isForecast ? `Forecast (Projected): ${d[chart.yAxis!]}` : "Left-click to filter/drill, Right-click to view raw rows")
+          .call(dots => dots.append("title").text(d =>
+            `${currentDimension}: ${d[currentDimension]}\n${d.isForecast ? "Forecast (projected) " : ""}${yValueLabel}: ${formatChartValue(Number(d[chart.yAxis!]))}${d.isForecast ? "" : "\nClick to filter or drill down, right-click for raw rows"}`
+          ))
           .on("click", (event, d) => handlePointClick(String(d[currentDimension])))
           .on("contextmenu", (event, d) => handlePointRightClick(event, String(d[currentDimension])));
       }
@@ -795,7 +792,7 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
         .style("text-anchor", "middle")
         .style("font-size", "11px")
         .style("fill", "hsl(var(--muted-foreground))")
-        .text(chart.yAxis);
+        .text(yValueLabel);
 
       chartArea.append("text")
         .attr("transform", `translate(${chartWidth / 2}, ${chartHeight + margin.bottom - 5})`)
@@ -854,7 +851,9 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
         })
         .attr("opacity", d => getOpacity(d.data.key, 0.85))
         .style("cursor", "pointer")
-        .attr("title", "Left-click to filter/drill, Right-click to view raw rows")
+        .call(slices => slices.append("title").text(d =>
+          `${currentDimension}: ${d.data.key}\n${yValueLabel}: ${formatChartValue(d.data.value)}\nClick to filter or drill down, right-click for raw rows`
+        ))
         .on("click", (event, d) => handlePointClick(d.data.key))
         .on("contextmenu", (event, d) => handlePointRightClick(event, d.data.key));
 
@@ -914,7 +913,9 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
         })
         .attr("opacity", d => getOpacity(chart.groupBy ? String(d[chart.groupBy!]) : String(d[currentDimension]), 0.75))
         .style("cursor", "pointer")
-        .attr("title", "Left-click to filter/drill, Right-click to view raw rows")
+        .call(dots => dots.append("title").text(d =>
+          `${currentDimension}: ${d[currentDimension]}\n${chart.yAxis}: ${d[chart.yAxis!]}\nClick to filter or drill down, right-click for raw rows`
+        ))
         .on("click", (event, d) => handlePointClick(String(d[filterCol])))
         .on("contextmenu", (event, d) => handlePointRightClick(event, String(d[filterCol]), 'equals', filterCol));
 
@@ -981,7 +982,9 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
         })
         .attr("opacity", d => getOpacity({ start: d.x0, end: d.x1 }, 0.85))
         .style("cursor", "pointer")
-        .attr("title", "Left-click to filter/drill, Right-click to view raw rows")
+        .call(bins => bins.append("title").text(d =>
+          `${currentDimension}: ${d.x0}–${d.x1}\nCount of rows: ${d.length}\nClick to filter or drill down, right-click for raw rows`
+        ))
         .on("click", (event, d) => handlePointClick({ start: d.x0, end: d.x1 }, 'between'))
         .on("contextmenu", (event, d) => handlePointRightClick(event, { start: d.x0, end: d.x1 }, 'between'));
 
@@ -993,7 +996,7 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
         .style("text-anchor", "middle")
         .style("font-size", "11px")
         .style("fill", "hsl(var(--muted-foreground))")
-        .text("Frequency");
+        .text("Count of rows");
 
       chartArea.append("text")
         .attr("transform", `translate(${chartWidth / 2}, ${chartHeight + margin.bottom - 5})`)
@@ -1013,8 +1016,9 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
         d => String(d[chart.yAxis!])
       );
 
-      const xValues = Array.from(new Set(chartData.map(d => String(d[currentDimension])))).sort();
-      const yValues = Array.from(new Set(chartData.map(d => String(d[chart.yAxis!])))).sort();
+      // Alphabetical for categories (as before); numeric ascending / chronological otherwise.
+      const xValues = sortAxisKeys(Array.from(new Set(chartData.map(d => String(d[currentDimension])))).sort(), xType);
+      const yValues = sortAxisKeys(Array.from(new Set(chartData.map(d => String(d[chart.yAxis!])))).sort(), yType);
 
       const xScale = d3.scaleBand()
         .domain(xValues)
@@ -1053,9 +1057,10 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
         })
         .attr("opacity", d => getOpacity(d.x, 1.0))
         .style("cursor", "pointer")
-        .attr("title", "Left-click to filter/drill, Right-click to view raw rows")
-        .on("click", (event, d) => handlePointClick(d.x))
-        .text(d => `${d.x}, ${d.y}: ${d.value}`);
+        .call(cells => cells.append("title").text(d =>
+          `${currentDimension}: ${d.x}\n${chart.yAxis}: ${d.y}\nCount of rows: ${d.value}\nClick to filter or drill down`
+        ))
+        .on("click", (event, d) => handlePointClick(d.x));
 
       chartArea.append("g")
         .attr("transform", `translate(0,${chartHeight})`)
@@ -1236,7 +1241,9 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
           .attr("stroke-width", d => d.isForecast ? 2 : 0)
           .attr("opacity", d => getOpacity(String(d[currentDimension]), d.isForecast ? 0.9 : 0.75))
           .style("cursor", "pointer")
-          .attr("title", d => d.isForecast ? `Forecast (Projected): ${d[chart.yAxis!]}` : "Left-click to filter/drill, Right-click to view raw rows")
+          .call(dots => dots.append("title").text(d =>
+            `${currentDimension}: ${d[currentDimension]}\n${d.isForecast ? "Forecast (projected) " : ""}${yValueLabel}: ${formatChartValue(Number(d[chart.yAxis!]))}${d.isForecast ? "" : "\nClick to filter or drill down, right-click for raw rows"}`
+          ))
           .on("click", (event, d) => handlePointClick(String(d[currentDimension])))
           .on("contextmenu", (event, d) => handlePointRightClick(event, String(d[currentDimension])));
       }
@@ -1249,7 +1256,7 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
         .style("text-anchor", "middle")
         .style("font-size", "11px")
         .style("fill", "hsl(var(--muted-foreground))")
-        .text(chart.yAxis);
+        .text(yValueLabel);
 
       chartArea.append("text")
         .attr("transform", `translate(${chartWidth / 2}, ${chartHeight + margin.bottom - 5})`)
@@ -1311,7 +1318,6 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
         })
         .attr("opacity", d => getOpacity(chart.groupBy ? String(d[chart.groupBy!]) : String(d[currentDimension]), 0.7))
         .style("cursor", "pointer")
-        .attr("title", "Left-click to filter/drill, Right-click to view raw rows")
         .on("click", (event, d) => handlePointClick(String(d[filterCol])))
         .on("contextmenu", (event, d) => handlePointRightClick(event, String(d[filterCol]), 'equals', filterCol))
         .append("title")
@@ -1443,7 +1449,7 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
         {/* Screen Reader Accessible Fallback Table */}
         <div className="sr-only">
           <h4>{chart.title || `${chart.type.toUpperCase()} Chart Data Summary`}</h4>
-          <p>{`Visualization of ${chart.yAxis || "Values"} grouped by ${currentDimension || "Categories"} containing ${chartData.length} records.`}</p>
+          <p>{`Visualization of ${yValueLabel || "Values"} grouped by ${currentDimension || "Categories"} containing ${chartData.length} records.`}</p>
           {chartData.length > 0 && (
             <table>
               <caption>{`${chart.title || "Chart"} aggregated dataset view`}</caption>

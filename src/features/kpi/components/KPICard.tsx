@@ -177,7 +177,7 @@ export function KPICard({ config, onRemove, onEdit, isMobile = false }: KPICardP
             {config.title}
           </span>
         </div>
-        <div className="flex items-center gap-1 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+        <div className="flex items-center gap-1 [@media(pointer:coarse)]:gap-5 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
           <Hint label="Edit this KPI card">
             <Button
               variant="ghost"

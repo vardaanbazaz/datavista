@@ -13,7 +13,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "golden:regen": "python3 scripts/golden/generate_hr_golden.py"
   },
   "dependencies": {
     "@fontsource/inter": "^5.3.0",

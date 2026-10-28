@@ -229,7 +229,7 @@ export function DashboardSummary() {
         <div className="flex items-center gap-3 flex-wrap">
           {/* Undo/Redo & Snapshot Toolbar Controls */}
           <div className="flex items-center gap-1.5 border-r border-gray-200 dark:border-zinc-800 pr-3 mr-1">
-            <Hint label="Undo last change" shortcut={[modKey, "Z"]}>
+            <Hint label="Undo last change" disabledReason="nothing to undo yet" shortcut={[modKey, "Z"]}>
               <Button
                 variant="outline"
                 size="icon"
@@ -240,7 +240,7 @@ export function DashboardSummary() {
                 <RotateCcw className="h-4 w-4" />
               </Button>
             </Hint>
-            <Hint label="Redo last undone change" shortcut={[modKey, "⇧", "Z"]}>
+            <Hint label="Redo last undone change" disabledReason="nothing to redo" shortcut={[modKey, "⇧", "Z"]}>
               <Button
                 variant="outline"
                 size="icon"

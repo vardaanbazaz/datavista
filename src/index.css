@@ -212,6 +212,36 @@
   }
 }
 
+/*
+ * Pointer target for icon-only controls (applied by src/shared/components/Hint.tsx).
+ * An invisible ::before, centred on the control, extends what receives hover/clicks to at
+ * least 24x24px (WCAG 2.5.8) and 44x44px on touch screens, without changing how the
+ * control or its icon looks. In the components layer so a control's own `absolute`/`fixed`
+ * utility still wins over `position: relative`.
+ */
+@layer components {
+  .hit-area {
+    position: relative;
+  }
+
+  .hit-area::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 24px);
+    height: max(100%, 24px);
+    transform: translate(-50%, -50%);
+  }
+
+  @media (pointer: coarse) {
+    .hit-area::before {
+      width: max(100%, 44px);
+      height: max(100%, 44px);
+    }
+  }
+}
+
 /* Custom Utilities */
 @layer utilities {
   .glass {
