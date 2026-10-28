@@ -27,6 +27,14 @@ export default defineConfig(({ mode }) => ({
       output: {
         manualChunks(id) {
           const normalizedId = id.replace(/\\/g, "/");
+          // Rollup's shared CJS interop helper is needed by react/react-dom (vendor-react)
+          // and dexie (engine-core). Left unassigned it lands in engine-core, making
+          // vendor-react import engine-core while engine-core imports zustand from
+          // vendor-react - a chunk cycle that hits a TDZ error at startup. Pin it to
+          // vendor-react, which has no imports of its own.
+          if (normalizedId.includes("commonjsHelpers")) {
+            return "vendor-react";
+          }
           if (normalizedId.includes("/src/shared/services/")) {
             return "engine-core";
           }
