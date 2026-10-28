@@ -4,8 +4,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // IndexedDB (db.filters, db.uiState's `pivotConfig::<id>`) — they accumulated forever
 // and could leak into a reused dataset id.
 
-const deleteFilters = vi.fn(() => Promise.resolve());
-const deleteUiState = vi.fn(() => Promise.resolve());
+const deleteFilters = vi.fn((..._args: unknown[]) => Promise.resolve());
+const deleteUiState = vi.fn((..._args: unknown[]) => Promise.resolve());
 
 vi.mock("@/shared/lib/db", () => ({
   db: {

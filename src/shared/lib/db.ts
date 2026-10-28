@@ -1,16 +1,9 @@
 import Dexie, { type Table } from 'dexie';
-import { Dataset, ChartConfig, FilterState } from '@/shared/types';
+import { Dataset, ChartConfig, FilterState, Dashboard } from '@/shared/types';
 
 export interface UIPreference {
   key: string;
   value: unknown;
-}
-
-export interface DashboardConfig {
-  id: string;
-  name: string;
-  layout: unknown;
-  chartIds: string[];
 }
 
 export class DataVistaDatabase extends Dexie {
@@ -18,7 +11,7 @@ export class DataVistaDatabase extends Dexie {
   charts!: Table<ChartConfig, string>;
   filters!: Table<{ datasetId: string; state: FilterState }, string>;
   uiState!: Table<UIPreference, string>;
-  dashboards!: Table<DashboardConfig, string>;
+  dashboards!: Table<Dashboard, string>;
 
   constructor() {
     super('DataVistaDatabase');

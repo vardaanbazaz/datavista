@@ -35,6 +35,7 @@ function makeMetadataColumn(name: string, role: ColumnMetadata["role"]): ColumnM
     uniqueValueCount: 0,
     missingValueCount: 0,
     role,
+    allIntegerValues: false,
   };
 }
 
@@ -48,7 +49,8 @@ function makeBaseDataset(): Dataset {
     columnCount: 3,
     originalFileName: "employees.csv",
     originalFileType: "csv",
-    parsingStatistics: { processingTimeMs: 0 } as DatasetMetadata["parsingStatistics"],
+    parsingStatistics: { processingTimeMs: 0 },
+    version: 1,
     columns: [
       makeMetadataColumn("BusinessTravel", "dimension"),
       makeMetadataColumn("Attrition", "dimension"),

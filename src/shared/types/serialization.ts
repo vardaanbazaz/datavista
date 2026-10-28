@@ -21,7 +21,8 @@ export interface DashboardTemplate {
   description?: string;
   requiredSchema: RequiredColumnSchema[];
   layout?: DashboardLayoutItem[];
-  widgets: ChartConfig[];
+  /** Chart configs; `data` is optional because instantiateTemplate fills it from the target dataset. */
+  widgets: (Omit<ChartConfig, "data"> & Partial<Pick<ChartConfig, "data">>)[];
   kpis?: KPICardConfig[];
   createdAt: number;
 }

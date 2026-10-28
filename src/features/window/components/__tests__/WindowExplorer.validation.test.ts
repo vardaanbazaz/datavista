@@ -31,11 +31,12 @@ describe("WindowExplorer Order By validation", () => {
 
   it("covers every WindowFunctionType between the required and optional lists", () => {
     const all = [...REQUIRES_ORDER_BY, ...ORDER_BY_OPTIONAL].sort();
-    const expected: WindowFunctionType[] = [
+    const allTypes: WindowFunctionType[] = [
       "ROW_NUMBER", "RANK", "DENSE_RANK", "PERCENT_RANK", "NTILE",
       "LAG", "LEAD", "FIRST_VALUE", "LAST_VALUE", "MOVING_AVG",
       "RUNNING_TOTAL", "WINDOW_MIN", "WINDOW_MAX",
-    ].sort();
+    ];
+    const expected = [...allTypes].sort();
     expect(all).toEqual(expected);
   });
 

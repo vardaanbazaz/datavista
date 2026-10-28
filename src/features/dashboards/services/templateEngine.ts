@@ -33,8 +33,8 @@ export class TemplateEngine {
 
     const dashboardKpis = dashboard.kpis || [];
     dashboardKpis.forEach((kpi) => {
-      if (kpi.metricColumn) referencedColumnNames.add(kpi.metricColumn);
-      if (kpi.trendDateColumn) referencedColumnNames.add(kpi.trendDateColumn);
+      if (kpi.primaryMetric?.column) referencedColumnNames.add(kpi.primaryMetric.column);
+      if (kpi.trendConfiguration?.dateColumn) referencedColumnNames.add(kpi.trendConfiguration.dateColumn);
     });
 
     // 2. Build required schema with inferred data types

@@ -1,4 +1,5 @@
 import { Dataset, ChartConfig, FilterState, Dashboard } from "@/shared/types";
+import type { ViewType } from "@/store/uiStore";
 
 export function isValidDataset(obj: unknown): obj is Dataset {
   if (!obj || typeof obj !== "object") return false;
@@ -106,6 +107,18 @@ export function isValidFilterState(obj: unknown): obj is FilterState {
   }
 
   return true;
+}
+
+/**
+ * Value types guaranteed for the known uiState keys once isValidUIState has accepted them.
+ * Keys not listed here pass validation unchecked and stay `unknown`.
+ */
+export interface ValidatedUIState {
+  theme: "light" | "dark" | "system";
+  activeView: ViewType;
+  showWelcome: boolean;
+  activeDatasetId: string;
+  activeDashboardId: string | null;
 }
 
 export function isValidUIState(key: string, value: unknown): boolean {

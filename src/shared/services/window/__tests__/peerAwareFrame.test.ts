@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { windowEngine } from "../engine";
-import { Dataset, DatasetMetadata, ColumnMetadata } from "@/shared/types";
+import { Dataset, DatasetMetadata, ColumnMetadata, DataRow } from "@/shared/types";
 
 // Regression tests for AUDIT-COMPREHENSIVE-2026-09-14 §item-4: with no explicit frame,
 // SQL's actual default is RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW, which must
@@ -18,10 +18,11 @@ function makeMetadataColumn(name: string, role: ColumnMetadata["role"]): ColumnM
     uniqueValueCount: 0,
     missingValueCount: 0,
     role,
+    allIntegerValues: false,
   };
 }
 
-function makeDataset(rows: Record<string, unknown>[]): Dataset {
+function makeDataset(rows: DataRow[]): Dataset {
   const metadata: DatasetMetadata = {
     datasetId: "d1",
     name: "t",
@@ -31,7 +32,8 @@ function makeDataset(rows: Record<string, unknown>[]): Dataset {
     columnCount: 2,
     originalFileName: "t.csv",
     originalFileType: "csv",
-    parsingStatistics: { processingTimeMs: 0 } as DatasetMetadata["parsingStatistics"],
+    parsingStatistics: { processingTimeMs: 0 },
+    version: 1,
     columns: [makeMetadataColumn("score", "dimension"), makeMetadataColumn("amount", "measure")],
   };
 

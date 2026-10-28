@@ -1,4 +1,4 @@
-import { Dataset, DataRow, Query, QueryResult, QuerySort, QueryFilters, FilterCondition, QueryAggregation } from "../types";
+import { Dataset, DataRow, Query, QueryResult, QuerySort, QueryFilters, FilterCondition, QueryAggregation, QueryGroupBy } from "../types";
 import { windowEngine } from "./window";
 import { executionPlanner, filterCache, processCache, queryCache } from "./optimizer";
 import { aggregationsAdapter } from "./aggregations";
@@ -18,8 +18,10 @@ function getWeekString(date: Date): string {
 /**
  * Standard date parser helper
  */
-function parseDate(val: string | number | Date | null | undefined): Date | null {
-  if (val === null || val === undefined) return null;
+function parseDate(val: string | number | boolean | Date | null | undefined): Date | null {
+  // Booleans (e.g. a FALSE branch in a calculated date column) are not dates; new Date(false)
+  // would silently yield the 1970 epoch and create a bogus bucket when grouping by period.
+  if (val === null || val === undefined || typeof val === 'boolean') return null;
   const d = new Date(val);
   return isNaN(d.getTime()) ? null : d;
 }

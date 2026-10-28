@@ -61,7 +61,7 @@ describe('mightBeCategorical', () => {
   });
   it('does not flag when allIntegerValues is missing (fail closed)', () => {
     const col = makeCol({ uniqueValueCount: 5, minimumValue: 1, maximumValue: 5 });
-    // @ts-expect-error simulating a pre-migration persisted dataset missing the field
+    // Simulating a pre-migration persisted dataset missing the field.
     delete col.allIntegerValues;
     expect(mightBeCategorical(col)).toBe(false);
   });

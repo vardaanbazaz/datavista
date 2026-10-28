@@ -49,21 +49,39 @@ const DEFAULT_TEMPLATES: DashboardTemplate[] = [
       {
         id: "kpi-tpl-1",
         title: "Total Revenue",
-        metricColumn: "Sales",
-        aggregation: "sum",
+        datasetId: "",
+        primaryMetric: { column: "Sales", aggregation: "sum" },
+        sparkline: false,
         polarity: "positive"
       },
       {
         id: "kpi-tpl-2",
         title: "Average Profit Margin",
-        metricColumn: "Profit",
-        aggregation: "avg",
+        datasetId: "",
+        primaryMetric: { column: "Profit", aggregation: "avg" },
+        sparkline: false,
         polarity: "positive"
       }
     ],
     createdAt: 1700000000000,
   }
 ];
+
+/**
+ * v1 persisted the built-in templates with a malformed KPI shape (`metricColumn` instead
+ * of `primaryMetric`), which crashed every KPI card they produced. Replace any persisted
+ * copy of a built-in template with the current definition; user-made templates are kept.
+ */
+export const migrateTemplateState = (persistedState: unknown, version: number): TemplateStore => {
+  const state = persistedState as TemplateStore;
+  if (version < 2 && Array.isArray(state?.templates)) {
+    return {
+      ...state,
+      templates: state.templates.map((t) => DEFAULT_TEMPLATES.find((d) => d.id === t.id) ?? t),
+    };
+  }
+  return state;
+};
 
 export const useTemplateStore = create<TemplateStore>()(
   persist(
@@ -91,11 +109,8 @@ export const useTemplateStore = create<TemplateStore>()(
     }),
     {
       name: "datavista-dashboard-templates",
-      version: 1,
-      // No-op for now — bump `version` and replace this when the persisted shape
-      // changes, so old localStorage data from a prior version gets migrated instead
-      // of silently mismatching the new state shape.
-      migrate: (persistedState) => persistedState as TemplateStore,
+      version: 2,
+      migrate: migrateTemplateState,
     }
   )
 );

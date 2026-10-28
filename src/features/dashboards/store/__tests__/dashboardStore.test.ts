@@ -31,6 +31,20 @@ function makeDataset(id: string, overrides: Partial<Dataset> = {}): Dataset {
   };
 }
 
+function makeAnomaly(columnName: string): DetectedAnomaly {
+  return {
+    id: `anomaly-${columnName}`,
+    columnName,
+    value: 0,
+    score: 0,
+    type: "spike",
+    severity: "low",
+    description: "",
+  };
+}
+
+type SummaryResult = Awaited<ReturnType<typeof summaryEngine.generateExecutiveSummary>>;
+
 /** Creates a promise the test controls the resolution of, plus its resolver. */
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -109,7 +123,7 @@ describe("dashboardStore.generateExecutiveSummary - race on dataset switch (audi
   it("resets the summary panel when the active dataset changes (not just content)", () => {
     useDashboardStore.setState({
       executiveSummary: "stale summary for ds1",
-      detectedAnomalies: [{ metric: "revenue" } as DetectedAnomaly],
+      detectedAnomalies: [makeAnomaly("revenue")],
       executiveSummaryDismissed: true,
     });
 
@@ -131,7 +145,7 @@ describe("dashboardStore.generateExecutiveSummary - race on dataset switch (audi
   });
 
   it("discards a summary result that resolves after the user has switched datasets", async () => {
-    const { promise, resolve } = deferred<{ summary: string; anomalies: DetectedAnomaly[] }>();
+    const { promise, resolve } = deferred<SummaryResult>();
     vi.spyOn(summaryEngine, "generateExecutiveSummary").mockReturnValue(promise);
 
     const genPromise = useDashboardStore.getState().generateExecutiveSummary();
@@ -139,7 +153,7 @@ describe("dashboardStore.generateExecutiveSummary - race on dataset switch (audi
     // Switch datasets while the request for ds1 is still in flight.
     useDatasetStore.getState().setActiveDataset(makeDataset("ds2"));
 
-    resolve({ summary: "stale ds1 summary", anomalies: [{ metric: "stale" } as DetectedAnomaly] });
+    resolve({ summary: "stale ds1 summary", anomalies: [makeAnomaly("stale")], source: "offline" });
     await genPromise;
 
     const state = useDashboardStore.getState();
@@ -149,11 +163,11 @@ describe("dashboardStore.generateExecutiveSummary - race on dataset switch (audi
   });
 
   it("applies the summary result when the dataset has not changed while in flight", async () => {
-    const { promise, resolve } = deferred<{ summary: string; anomalies: DetectedAnomaly[] }>();
+    const { promise, resolve } = deferred<SummaryResult>();
     vi.spyOn(summaryEngine, "generateExecutiveSummary").mockReturnValue(promise);
 
     const genPromise = useDashboardStore.getState().generateExecutiveSummary();
-    resolve({ summary: "ds1 summary", anomalies: [] });
+    resolve({ summary: "ds1 summary", anomalies: [], source: "offline" });
     await genPromise;
 
     const state = useDashboardStore.getState();

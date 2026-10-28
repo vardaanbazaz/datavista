@@ -1,4 +1,4 @@
-import { AggregationOperator } from "../query";
+import { AggregationOperator } from "@/shared/types/query";
 
 export interface PivotValueField {
   column: string; // The data row property name (either imported or calculated)

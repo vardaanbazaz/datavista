@@ -47,8 +47,8 @@ const hasLeadingZero = (val: string): boolean => /^0\d+/.test(val);
 /**
  * Detects the type of a column based on its non-null values.
  */
-export const detectColumnType = (values: (string | number | null)[]): 'numeric' | 'categorical' | 'date' => {
-  const nonNullValues = values.filter((v): v is string | number => v !== null && v !== undefined && v !== '');
+export const detectColumnType = (values: DataRow[string][]): 'numeric' | 'categorical' | 'date' => {
+  const nonNullValues = values.filter((v): v is string | number | boolean => v !== null && v !== undefined && v !== '');
 
   if (nonNullValues.length === 0) return 'categorical';
 

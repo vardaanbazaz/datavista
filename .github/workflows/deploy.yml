@@ -37,6 +37,9 @@ jobs:
       - name: Code Quality Gate (Lint)
         run: npm run lint
 
+      - name: Type Check
+        run: npm run typecheck
+
       - name: Resilience Gate (Test)
         run: npm run test
 

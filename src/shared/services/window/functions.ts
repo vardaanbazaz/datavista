@@ -89,7 +89,7 @@ export function computeLag(
   targetColumn: string,
   offset = 1,
   defaultValue: string | number | null = null
-): string | number | null {
+): DataRow[string] {
   const targetIdx = idx - offset;
   if (targetIdx < 0 || targetIdx >= partition.length) return defaultValue;
   return partition[targetIdx].row[targetColumn] ?? defaultValue;
@@ -104,7 +104,7 @@ export function computeLead(
   targetColumn: string,
   offset = 1,
   defaultValue: string | number | null = null
-): string | number | null {
+): DataRow[string] {
   const targetIdx = idx + offset;
   if (targetIdx < 0 || targetIdx >= partition.length) return defaultValue;
   return partition[targetIdx].row[targetColumn] ?? defaultValue;
@@ -117,7 +117,7 @@ export function computeFirstValue(
   partition: PartitionItem[],
   targetColumn: string,
   frameStart: number
-): string | number | null {
+): DataRow[string] {
   if (frameStart < 0 || frameStart >= partition.length) return null;
   return partition[frameStart].row[targetColumn] ?? null;
 }
@@ -129,7 +129,7 @@ export function computeLastValue(
   partition: PartitionItem[],
   targetColumn: string,
   frameEnd: number
-): string | number | null {
+): DataRow[string] {
   if (frameEnd < 0 || frameEnd >= partition.length) return null;
   return partition[frameEnd].row[targetColumn] ?? null;
 }

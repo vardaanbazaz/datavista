@@ -164,7 +164,7 @@ Open `http://localhost:8080` in your browser to start using DataVista locally.
 npm run test
 
 # Run TypeScript type check
-npx tsc --noEmit
+npm run typecheck
 
 # Build production bundle
 npm run build

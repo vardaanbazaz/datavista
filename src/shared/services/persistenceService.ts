@@ -10,12 +10,14 @@ import {
   isValidChartConfig,
   isValidFilterState,
   isValidUIState,
-  isValidDashboard
+  isValidDashboard,
+  type ValidatedUIState
 } from "@/shared/utils/validators";
 import { Dataset, FilterState, Query } from "@/shared/types";
 import { queryEngine } from "@/shared/services/queryEngine";
 import { formulaEngine } from "@/shared/services/formulaEngine";
 import { windowEngine } from "@/shared/services/window";
+import type { PivotConfig } from "@/shared/services/pivot";
 import { toast } from "@/shared/hooks/use-toast";
 
 function createDebouncer(delay: number) {
@@ -33,7 +35,9 @@ async function restorePivotConfig(datasetId: string | null | undefined) {
   }
   try {
     const pref = await db.uiState.get(`pivotConfig::${datasetId}`);
-    usePivotStore.setState({ pivotConfig: (pref && pref.value) || null });
+    // uiState values are untyped storage; this key is only ever written by the pivot
+    // store's own persistence below, with a PivotConfig.
+    usePivotStore.setState({ pivotConfig: (pref && (pref.value as PivotConfig)) || null });
   } catch (e) {
     console.error("Failed to load pivot config:", e);
     usePivotStore.setState({ pivotConfig: null });
@@ -138,7 +142,9 @@ export const persistenceService = {
 
       // 4. Fetch UI preferences
       const preferences = await db.uiState.toArray();
-      const prefs: Record<string, unknown> = {};
+      // Only entries that passed isValidUIState are stored, so the known keys carry the
+      // types that validator enforces.
+      const prefs: Partial<ValidatedUIState> & Record<string, unknown> = {};
       preferences.forEach((p) => {
         if (isValidUIState(p.key, p.value)) {
           prefs[p.key] = p.value;

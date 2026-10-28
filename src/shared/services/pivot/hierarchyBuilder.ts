@@ -98,7 +98,7 @@ export function buildRowHierarchy(
     }
   }
 
-  sortHierarchy(root, sorts);
+  sortHierarchy<PivotRowNode>(root, sorts);
   return root;
 }
 
@@ -151,7 +151,7 @@ export function buildColumnHierarchy(
     }
   }
 
-  sortHierarchy(root, sorts);
+  sortHierarchy<PivotColumnNode>(root, sorts);
   return root;
 }
 

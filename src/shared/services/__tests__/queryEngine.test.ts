@@ -74,3 +74,24 @@ describe('queryEngine.applyGroupingAndAggregations - min/max on large groups', (
     expect(groupB?.maxValue).toBe(7);
   });
 });
+
+describe('queryEngine.applyGroupingAndAggregations - non-date values in a date column', () => {
+  // Regression: a boolean cell (e.g. the FALSE branch of IF() in a calculated date column)
+  // was passed to new Date(), which returns the 1970 epoch, so grouping by period produced
+  // a bogus "1970" bucket instead of skipping the row like any other unparseable value.
+  it('skips boolean cells instead of bucketing them under 1970', () => {
+    const data: DataRow[] = [
+      { D: '2024-03-01', V: 1 },
+      { D: '2024-05-01', V: 2 },
+      { D: false, V: 100 },
+    ];
+    const rows = queryEngine.applyGroupingAndAggregations(
+      data,
+      { column: 'D', period: 'year' },
+      [{ column: 'V', operator: 'sum', alias: 'V' }],
+      { D: 'date', V: 'numeric' },
+      ['D', 'V']
+    );
+    expect(rows).toEqual([{ D: '2024', V: 3 }]);
+  });
+});

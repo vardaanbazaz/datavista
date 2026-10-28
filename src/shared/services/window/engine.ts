@@ -170,7 +170,7 @@ function executeSingleQuery(data: DataRow[], query: WindowQuery): DataRow[] {
     // 2. Loop and apply values/aggregates row by row
     for (let j = 0; j < len; j++) {
       const item = items[j];
-      let val: string | number | null = null;
+      let val: DataRow[string] = null;
 
       switch (query.functionType) {
         case "ROW_NUMBER":
@@ -304,7 +304,8 @@ export const windowEngine = {
             nullableStatus: true,
             uniqueValueCount: 0,
             missingValueCount: 0,
-            role: "window"
+            role: "window",
+            allIntegerValues: false
           };
           metadataColumns.push(colMeta);
         }

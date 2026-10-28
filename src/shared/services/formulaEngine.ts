@@ -798,6 +798,7 @@ export const formulaEngine = {
       let max = -Infinity;
       let sum = 0;
       let validNumCount = 0;
+      let allIntegers = true;
 
       // Single pass row-by-row
       for (let i = 0; i < cleanData.length; i++) {
@@ -825,6 +826,7 @@ export const formulaEngine = {
             sum += num;
             if (num < min) min = num;
             if (num > max) max = num;
+            if (!Number.isInteger(num)) allIntegers = false;
           }
         }
       }
@@ -884,7 +886,8 @@ export const formulaEngine = {
         maximumValue: inferredType === 'numeric' && validNumCount > 0 ? max : undefined,
         average: inferredType === 'numeric' && validNumCount > 0 ? sum / validNumCount : undefined,
         categoryCardinality,
-        role
+        role,
+        allIntegerValues: inferredType === 'numeric' ? (validNumCount > 0 && allIntegers) : false
       };
 
       metadataColumnsMap.set(field.name, columnMetadata);
