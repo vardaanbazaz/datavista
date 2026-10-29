@@ -19,6 +19,13 @@ Current rule, not the "correct" answer: Glassdoor's -1 sentinels and Play Store'
 row 10473 are kept. The Vitest suite does not compare those three columns (Glassdoor
 Rating/Founded, Play Store Rating) with this file yet; later batches fix them (it.todo).
 
+Dates (DATE_COLUMNS below) are parsed with an explicit strptime format per column via
+pd.to_datetime(format=..., errors="coerce") after ASCII trimming; nothing about the app's
+format detection is mirrored. "Missing" uses the app's ingest null rule (cleanValue: "",
+"null", "undefined", "n/a", case-insensitive); every other value that doesn't match the
+format (or isn't a real calendar date) is "invalid". Per column: valid/invalid/missing
+counts, min, max (YYYY-MM-DD) and per-year counts of valid dates.
+
 Run:  npm run golden:regen-messy   (needs: pip install -r scripts/golden/requirements.txt)
 """
 
@@ -35,6 +42,12 @@ ROOT = Path(__file__).resolve().parents[2]
 DIR = ROOT / "tests" / "fixtures" / "messy"
 OUT = DIR / "messy.golden.json"
 FILES = ["cafe.csv", "playstore.csv", "netflix.csv", "glassdoor.csv"]
+DATE_COLUMNS = {
+    "netflix.csv": {"date_added": "%B %d, %Y"},
+    "playstore.csv": {"Last Updated": "%B %d, %Y"},
+    "cafe.csv": {"Transaction Date": "%Y-%m-%d"},
+}
+INGEST_NULLS = {"", "null", "undefined", "n/a"}
 
 NULL_TOKENS = {"", "n/a", "na", "nan", "null", "none", "#n/a", "-", "undefined"}
 NUMBER = re.compile(r"^[+-]?(?:[0-9]+\.?[0-9]*|\.[0-9]+)(?:[eE][+-]?[0-9]+)?$")
@@ -64,6 +77,24 @@ def column_stats(values: pd.Series) -> dict | None:
     }
 
 
+def date_stats(values: pd.Series, fmt: str) -> dict:
+    trimmed = values.map(lambda c: c.strip(ASCII_WS))
+    missing = trimmed.map(lambda c: c.lower() in INGEST_NULLS)
+    present = trimmed[~missing]
+    parsed = pd.to_datetime(present, format=fmt, errors="coerce")
+    valid = parsed.dropna()
+    years = valid.dt.year.value_counts().sort_index()
+    return {
+        "format": fmt,
+        "validCount": int(valid.count()),
+        "invalidCount": int(parsed.isna().sum()),
+        "missingCount": int(missing.sum()),
+        "min": valid.min().strftime("%Y-%m-%d") if len(valid) else None,
+        "max": valid.max().strftime("%Y-%m-%d") if len(valid) else None,
+        "yearCounts": {str(int(y)): int(n) for y, n in years.items()},
+    }
+
+
 def main() -> int:
     golden: dict = {
         "_meta": {
@@ -84,6 +115,10 @@ def main() -> int:
             "columns": list(df.columns),
             "numericStats": cols,
         }
+        if name in DATE_COLUMNS:
+            golden[name]["dateStats"] = {
+                col: date_stats(df[col], fmt) for col, fmt in DATE_COLUMNS[name].items()
+            }
     OUT.write_text(json.dumps(golden, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(f"wrote {OUT.relative_to(ROOT)}")
     return 0

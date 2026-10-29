@@ -10,10 +10,11 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/components/ui/
 import { Search, ArrowUpDown, Download, Palette, RefreshCw } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import * as XLSX from "xlsx";
+import { readWorkbookWithCalendarDates } from "@/features/upload/lib/xlsxDates";
 import { Dataset, Query, DataRow, ConditionalFormatRule, DatasetMetadata } from "@/shared/types";
 import { queryEngine } from "@/shared/services/queryEngine";
 import { formattingEngine } from "@/shared/services/formattingEngine";
-import { processRawData } from "@/shared/services/parsingService";
+import { needsDateReimportNotice, processRawData } from "@/shared/services/parsingService";
 import { useDatasetStore } from "@/store/datasetStore";
 import { useFilterStore } from "@/store/filterStore";
 import { toast } from "@/shared/hooks/use-toast";
@@ -48,6 +49,8 @@ export function DataTable({
   const storeFilteredData = useFilterStore((state) => state.filteredData);
   const updateDatasetData = useDatasetStore((state) => state.updateDatasetData);
   const setColumnTypeOverride = useDatasetStore((state) => state.setColumnTypeOverride);
+  const setDateDayFirst = useDatasetStore((state) => state.setDateDayFirst);
+  const dismissDateReimportNotice = useDatasetStore((state) => state.dismissDateReimportNotice);
 
   const activeDataset = customDataset !== undefined ? customDataset : activeDatasetStore;
   const storeData = customData !== undefined ? customData : storeFilteredData;
@@ -59,6 +62,7 @@ export function DataTable({
     columns: string[];
     columnTypes: Record<string, "numeric" | "categorical" | "date">;
     metadata?: DatasetMetadata;
+    dateSourceValues?: Dataset["dateSourceValues"];
   } | null>(null);
 
   const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -81,6 +85,7 @@ export function DataTable({
             columns: processed.columns,
             columnTypes: processed.columnTypes,
             metadata: processed.metadata,
+            dateSourceValues: processed.dateSourceValues,
           });
           setIsUpdateModalOpen(true);
         } catch (err: unknown) {
@@ -92,7 +97,8 @@ export function DataTable({
         }
       } else if (ext === "xlsx" || ext === "xls") {
         const buffer = await file.arrayBuffer();
-        const workbook = XLSX.read(buffer, { type: "array" });
+        // Date cells become calendar strings, not serial numbers (same reader as FileUpload).
+        const workbook = readWorkbookWithCalendarDates(buffer);
         const firstSheet = workbook.SheetNames[0];
         rawData = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheet]);
         const processed = processRawData(rawData, fileName);
@@ -101,6 +107,7 @@ export function DataTable({
           columns: processed.columns,
           columnTypes: processed.columnTypes,
           metadata: processed.metadata,
+          dateSourceValues: processed.dateSourceValues,
         });
         setIsUpdateModalOpen(true);
       } else {
@@ -128,7 +135,8 @@ export function DataTable({
       newParsedData.data,
       newParsedData.metadata,
       newParsedData.columnTypes,
-      newParsedData.columns
+      newParsedData.columns,
+      newParsedData.dateSourceValues
     );
     setNewParsedData(null);
   };
@@ -444,6 +452,27 @@ export function DataTable({
         </CardContent>
       </Card>
 
+      {/* One-time notice: imported before timezone-free dates, original text not kept */}
+      {activeDataset && customDataset === undefined && needsDateReimportNotice(activeDataset) && (
+        <div
+          role="status"
+          data-testid="date-reimport-notice"
+          className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-lg border border-tertiary/40 bg-tertiary/5 text-body"
+        >
+          <p className="flex-1">
+            This dataset was imported before date handling was fixed, so its dates may be one day early and day/month order may be swapped. Re-import the file with <span className="font-semibold">Update Data</span> to get correct dates.
+          </p>
+          <div className="flex gap-2">
+            <Button size="sm" variant="default" onClick={() => fileInputRef.current?.click()}>
+              Re-import file
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => dismissDateReimportNotice(activeDataset.id)}>
+              Dismiss
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Summary Statistics */}
       {Object.keys(summaryStats).length > 0 && (
         <Card className="glass">
@@ -485,6 +514,10 @@ export function DataTable({
                       ? mightBeCategorical(colMeta) && colMeta.userOverrideType == null
                       : false;
                     const overridden = colMeta?.userOverrideType != null;
+                    // Date columns (and text columns whose dates were ambiguous) get a details popover.
+                    const dateInfo = colMeta && !overridden && !flagged
+                      && (colMeta.inferredDataType === 'date' || colMeta.dateAmbiguity === 'ambiguous-mixed');
+                    const invalidDates = effectiveType === 'date' ? (colMeta?.invalidDateCount ?? 0) : 0;
 
                     const badge = (
                       <Badge
@@ -500,6 +533,7 @@ export function DataTable({
                       >
                         {effectiveType}
                         {overridden && " (override)"}
+                        {invalidDates > 0 && ` · ${invalidDates} invalid`}
                       </Badge>
                     );
 
@@ -519,7 +553,56 @@ export function DataTable({
                             <span className="truncate max-w-32">{column}</span>
                             <ArrowUpDown className="ml-2 h-3 w-3" />
                           </Button>
-                          {(flagged || overridden) && colMeta ? (
+                          {dateInfo && colMeta ? (
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                {badge}
+                              </PopoverTrigger>
+                              <PopoverContent className="w-72 text-xs normal-case tracking-normal" data-testid={`date-column-popover-${column}`}>
+                                {colMeta.dateAmbiguity === 'ambiguous-mixed' ? (
+                                  <>
+                                    <p className="font-semibold mb-1">Ambiguous dates, kept as text</p>
+                                    <p className="text-muted-foreground">
+                                      Some values only make sense day-first (e.g. 13/05/2024) and others only month-first (05/13/2024), so this column is left as text.
+                                    </p>
+                                  </>
+                                ) : (
+                                  <>
+                                    <p className="font-semibold mb-1">Date column</p>
+                                    <p className="text-muted-foreground">Format: {colMeta.detectedFormat}</p>
+                                    {colMeta.earliestDate && (
+                                      <p className="text-muted-foreground">Range: {colMeta.earliestDate} to {colMeta.latestDate}</p>
+                                    )}
+                                    <p className="text-muted-foreground mb-2">
+                                      {colMeta.invalidDateCount ?? 0} value(s) aren't valid dates (e.g. month 13, Feb 30, text). They're kept as text and left out of date grouping, filters and charts.
+                                    </p>
+                                    {colMeta.dayFirst !== undefined && (
+                                      <>
+                                        <p className="mb-2" data-testid="date-order">
+                                          Numeric dates read as <span className="font-semibold">{colMeta.dayFirst ? "day/month (DD/MM)" : "month/day (MM/DD)"}</span>
+                                          {colMeta.dayFirstSource === 'data' && ", decided by the values"}
+                                          {colMeta.dayFirstSource === 'locale' && ", from your browser's language settings"}
+                                          {colMeta.dayFirstSource === 'user' && ", chosen by you"}.
+                                        </p>
+                                        {activeDataset?.dateSourceValues?.[column] ? (
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="w-full"
+                                            onClick={() => setDateDayFirst(column, !colMeta.dayFirst)}
+                                          >
+                                            Read as {colMeta.dayFirst ? "month/day (MM/DD)" : "day/month (DD/MM)"}
+                                          </Button>
+                                        ) : (
+                                          <p className="text-muted-foreground">Re-import the file to switch the day/month order.</p>
+                                        )}
+                                      </>
+                                    )}
+                                  </>
+                                )}
+                              </PopoverContent>
+                            </Popover>
+                          ) : (flagged || overridden) && colMeta ? (
                             <Popover>
                               <PopoverTrigger asChild>
                                 {badge}

@@ -3,54 +3,32 @@ import { windowEngine } from "./window";
 import { executionPlanner, filterCache, processCache, queryCache } from "./optimizer";
 import { aggregationsAdapter } from "./aggregations";
 import { columnNumbers, mean, median, minMax, sampleStdDev, sum, toNumberOrNull } from "@/shared/utils/numeric";
-
-/**
- * Standard ISO week string helper: YYYY-Www
- */
-function getWeekString(date: Date): string {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-  return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
-}
-
-/**
- * Standard date parser helper
- */
-function parseDate(val: string | number | boolean | Date | null | undefined): Date | null {
-  // Booleans (e.g. a FALSE branch in a calculated date column) are not dates; new Date(false)
-  // would silently yield the 1970 epoch and create a bogus bucket when grouping by period.
-  if (val === null || val === undefined || typeof val === 'boolean') return null;
-  const d = new Date(val);
-  return isNaN(d.getTime()) ? null : d;
-}
+import { calendarDay, calendarFromPickerDate, compareCells, isStoredDate, parseStoredDate, partsToUtcMs, periodKey, rangeBoundDay } from "@/shared/utils/dates";
 
 /**
  * Resolves a filter operand (cell value or filter target) to a comparable number for
  * greaterThan/lessThan/between. Plain numbers and numeric strings use the shared numeric
- * rule (a blank cell is not 0); date strings/Date objects fall back to date parsing so
- * date-range filters don't silently match zero rows.
+ * rule (a blank cell is not 0). Dates compare on their calendar parts (utils/dates.ts): a
+ * stored date string or a date-picker Date (its local calendar day) becomes the parts'
+ * UTC-ms, so a picked "Jan 5" and a stored "2024-01-05" are the same number in every zone.
  */
 function toComparableNumber(v: unknown): number | null {
   if (v instanceof Date) {
-    const t = v.getTime();
-    return isNaN(t) ? null : t;
+    const day = calendarFromPickerDate(v);
+    const p = day ? parseStoredDate(day) : null;
+    return p ? partsToUtcMs(p) : null;
   }
   const n = toNumberOrNull(v);
   if (n !== null) return n;
-  // Only fall back to date parsing for strings that plausibly encode a date (contain a
-  // 4-digit year). JS's Date parser is permissive enough that ambiguous, non-date strings
-  // like "5/3" or "10-20" (a categorical code, a ratio, ...) silently resolve to a real but
-  // wrong date instead of failing, which would make greaterThan/lessThan/between misbehave
-  // on non-date columns that share this code path.
-  if (typeof v === 'string' && /\d{4}/.test(v)) {
-    const d = parseDate(v);
-    return d ? d.getTime() : null;
-  }
-  return null;
+  const p = parseStoredDate(v);
+  return p ? partsToUtcMs(p) : null;
 }
+
+/** A range end given as a whole day (picker Date or "YYYY-MM-DD") includes that day's times. */
+function isWholeDayBound(v: unknown): boolean {
+  return v instanceof Date || (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v.trim()));
+}
+
 
 /**
  * Columns whose `count` means "count of valid numbers" (effective type numeric, so a
@@ -272,23 +250,20 @@ export const queryEngine = {
       });
     }
 
-    // B. Date range filters
+    // B. Date range filters: inclusive calendar days ("YYYY-MM-DD" strings compare in date
+    // order). A datetime on the end day is inside the range. A cell that isn't a valid date
+    // (blank, "invalid", month 13) is outside any active range.
     if (filters.dateRangeFilters) {
       Object.entries(filters.dateRangeFilters).forEach(([column, range]) => {
         if (range && (range.start || range.end)) {
-          const parsedStart = range.start ? new Date(range.start).getTime() : null;
-          const parsedEnd = range.end ? new Date(range.end).getTime() : null;
-          
+          const startDay = range.start ? rangeBoundDay(range.start) : null;
+          const endDay = range.end ? rangeBoundDay(range.end) : null;
+
           result = result.filter(row => {
-            const val = row[column];
-            if (val === null || val === undefined) return false;
-            
-            const timestamp = new Date(val as string).getTime();
-            if (isNaN(timestamp)) return true; // skip invalid dates
-            
-            if (parsedStart !== null && timestamp < parsedStart) return false;
-            if (parsedEnd !== null && timestamp > parsedEnd) return false;
-            
+            const day = calendarDay(row[column]);
+            if (day === null) return false;
+            if (startDay !== null && day < startDay) return false;
+            if (endDay !== null && day > endDay) return false;
             return true;
           });
         }
@@ -328,6 +303,8 @@ export const queryEngine = {
 
       switch (operator) {
         case 'equals':
+          // A picked date (global filter "Date = Jan 5") matches that calendar day, times included.
+          if (value instanceof Date) return calendarDay(cellVal) !== null && calendarDay(cellVal) === rangeBoundDay(value);
           return String(cellVal) === String(value);
         case 'contains':
           return String(cellVal).toLowerCase().includes(String(value).toLowerCase());
@@ -360,7 +337,8 @@ export const queryEngine = {
               if (startNum !== null && cellNum < startNum) return false;
             }
             if (range.end !== undefined) {
-              const endNum = toComparableNumber(range.end);
+              let endNum = toComparableNumber(range.end);
+              if (endNum !== null && isWholeDayBound(range.end) && isStoredDate(cellVal)) endNum += 86_400_000 - 1;
               if (endNum !== null && cellNum > endNum) return false;
             }
             return true;
@@ -390,13 +368,7 @@ export const queryEngine = {
         if (aVal === null || aVal === undefined) return 1;
         if (bVal === null || bVal === undefined) return -1;
 
-        let comp = 0;
-        if (typeof aVal === 'number' && typeof bVal === 'number') {
-          comp = aVal - bVal;
-        } else {
-          comp = String(aVal).localeCompare(String(bVal));
-        }
-
+        const comp = compareCells(aVal, bVal);
         if (comp !== 0) {
           return direction === 'asc' ? comp : -comp;
         }
@@ -428,27 +400,10 @@ export const queryEngine = {
 
       let key = '';
       if (isDateCol && period) {
-        const date = parseDate(rawVal);
-        if (!date) return;
-        
-        switch (period) {
-          case 'year':
-            key = date.getFullYear().toString();
-            break;
-          case 'quarter':
-            key = `${date.getFullYear()}-Q${Math.floor(date.getMonth() / 3) + 1}`;
-            break;
-          case 'month':
-            key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-            break;
-          case 'week':
-            key = getWeekString(date);
-            break;
-          case 'day':
-          default:
-            key = date.toISOString().split('T')[0];
-            break;
-        }
+        // From the stored date's parts (utils/dates.ts); invalid dates join no bucket.
+        const periodValue = periodKey(rawVal, period);
+        if (periodValue === null) return;
+        key = periodValue;
       } else {
         key = String(rawVal);
       }

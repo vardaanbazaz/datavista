@@ -1,5 +1,6 @@
 import { DataRow } from "@/shared/types";
 import { WindowOrderBy } from "./types";
+import { compareCells } from "@/shared/utils/dates";
 
 export interface PartitionItem {
   row: DataRow;
@@ -20,13 +21,8 @@ export function sortPartitionItems(items: PartitionItem[], orderBy: WindowOrderB
       if (valA === null || valA === undefined) return 1;
       if (valB === null || valB === undefined) return -1;
 
-      let comp = 0;
-      if (typeof valA === "number" && typeof valB === "number") {
-        comp = valA - valB;
-      } else {
-        comp = String(valA).localeCompare(String(valB));
-      }
-
+      // Numbers by value, dates by their calendar parts, text otherwise.
+      const comp = compareCells(valA, valB);
       if (comp !== 0) {
         return direction === "asc" ? comp : -comp;
       }

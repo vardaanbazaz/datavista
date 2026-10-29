@@ -43,6 +43,10 @@ jobs:
       - name: Resilience Gate (Test)
         run: npm run test
 
+      # Date tests (*.tz.test.ts + golden.messy) under IST, New York and UTC; results must not move.
+      - name: Time Zone Gate (Dates)
+        run: npm run test:tz
+
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 

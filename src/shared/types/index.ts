@@ -21,6 +21,11 @@ export interface Dataset {
   windowQueries?: WindowQuery[];
   version?: number;
   lastUpdated?: number;
+  /**
+   * Original text of date columns that have numeric D/M values ("05/06/2024"), one entry per
+   * row of `data` (null for blanks), so the day/month order can be switched later.
+   */
+  dateSourceValues?: Record<string, (string | null)[]>;
 }
 
 export interface ChartConfig {

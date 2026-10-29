@@ -15,9 +15,13 @@ import { toast } from "@/shared/hooks/use-toast";
 import { ErrorBoundary, WidgetError } from "@/shared/components/ErrorBoundary";
 import { getEffectiveColumnType } from "@/shared/utils/columnType";
 import { numericValues, toNumberOrNull } from "@/shared/utils/numeric";
+import { dateKeyMs } from "@/shared/utils/dates";
 import {
   aggregateValues as aggregateRows,
+  aggregateValuesOrNull,
   chartYValueLabel,
+  lineSeries,
+  LinePoint,
   formatChartValue,
   sortAxisKeys,
 } from "@/features/charts/lib/chartAggregation";
@@ -269,10 +273,11 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
       const numericCount = nonNull.filter(v => !isNaN(Number(v))).length;
       if (numericCount / nonNull.length > 0.8) return 'numeric';
       
+      // Stored dates and period keys ("2024-Q1"), the forms the date module writes.
       const dateCount = nonNull.filter(v => {
         const str = String(v);
         if (/^\d+$/.test(str)) return false; // Ignore raw integers like index values
-        return !isNaN(Date.parse(str));
+        return dateKeyMs(str) !== null;
       }).length;
       
       if (dateCount / nonNull.length > 0.8) return 'date';
@@ -296,7 +301,8 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
     // of the aggregated one.
     const aggregateByDimension = (rows: typeof chartData, dimension: string, column: string): DataRow[] =>
       Array.from(
-        d3.rollup(rows, v => aggregateValues(v, column), d => String(d[dimension])),
+        // A group with no valid numbers is null (a gap), not the 0 an empty sum/avg gives.
+        d3.rollup(rows, v => aggregateValuesOrNull(v, column, chart.aggregation, numericColumns), d => String(d[dimension])),
         ([key, value]) => ({ [dimension]: key, [column]: value }) as DataRow
       );
 
@@ -645,25 +651,16 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
     function renderLineChart() {
       if (!currentDimension || !chart.yAxis) return;
 
-      const rows = chart.aggregation
+      const rows = (chart.aggregation
         ? aggregateByDimension(chartData, currentDimension, chart.yAxis)
-        : processedChartData;
+        : processedChartData) as ForecastPoint[];
 
-      const data = rows
-        .filter(d => d[currentDimension] !== null && d[chart.yAxis!] !== null)
-        .sort((a, b) => {
-          const aVal = a[currentDimension];
-          const bVal = b[currentDimension];
-          if (xType === 'numeric') {
-            return Number(aVal) - Number(bVal);
-          } else if (xType === 'date') {
-            return Date.parse(String(aVal)) - Date.parse(String(bVal));
-          } else {
-            return String(aVal).localeCompare(String(bVal));
-          }
-        });
+      // A blank or non-numeric y stays in the series as null and breaks the line there
+      // (.defined below) instead of dropping to 0 or being joined over.
+      const series = lineSeries(rows, currentDimension, chart.yAxis, xType);
+      const valued = series.filter(p => p.y !== null);
 
-      if (!data.length) {
+      if (!valued.length) {
         renderErrorMessage("No valid records found for line charting.");
         return;
       }
@@ -672,32 +669,31 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
       let xScale: any;
       if (xType === 'numeric') {
         xScale = d3.scaleLinear()
-          .domain(d3.extent(data, d => Number(d[currentDimension])) as [number, number])
+          .domain(d3.extent(series, p => p.x as number) as [number, number])
           .range([0, chartWidth]);
       } else if (xType === 'date') {
-        xScale = d3.scaleTime()
-          .domain(d3.extent(data, d => new Date(String(d[currentDimension]))) as [Date, Date])
+        // x is the date's parts as UTC-ms (utils/dates.ts), so the scale and ticks are UTC too.
+        xScale = d3.scaleUtc()
+          .domain(d3.extent(series, p => p.x as number) as [number, number])
           .range([0, chartWidth]);
       } else {
         xScale = d3.scalePoint()
-          .domain(data.map(d => String(d[currentDimension])))
+          .domain(series.map(p => String(p.x)))
           .range([0, chartWidth])
           .padding(0.1);
       }
+      const xPos = (p: LinePoint<ForecastPoint>) =>
+        xType === 'categorical' ? Number(xScale(String(p.x))) || 0 : Number(xScale(p.x));
 
       const yScale = d3.scaleLinear()
-        .domain(d3.extent(data, d => Number(d[chart.yAxis!])) as [number, number])
+        .domain(d3.extent(valued, p => p.y as number) as [number, number])
         .nice()
         .range([chartHeight, 0]);
 
-      const line = d3.line<ForecastPoint>()
-        .x(d => {
-          const val = d[currentDimension];
-          if (xType === 'numeric') return Number(xScale(Number(val)));
-          if (xType === 'date') return Number(xScale(new Date(String(val))));
-          return Number(xScale(String(val))) || 0;
-        })
-        .y(d => yScale(Number(d[chart.yAxis!])))
+      const line = d3.line<LinePoint<ForecastPoint>>()
+        .defined(p => p.y !== null)
+        .x(xPos)
+        .y(p => yScale(p.y as number))
         .curve(d3.curveMonotoneX);
 
       // Axes
@@ -705,7 +701,7 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
         .attr("transform", `translate(0,${chartHeight})`);
 
       if (xType === 'date') {
-        xAxisG.call(d3.axisBottom(xScale).ticks(Math.max(2, Math.floor(chartWidth / 85))).tickFormat(d3.timeFormat("%Y-%m-%d") as unknown as (dv: d3.NumberValue, i: number) => string));
+        xAxisG.call(d3.axisBottom(xScale).ticks(Math.max(2, Math.floor(chartWidth / 85))).tickFormat(d3.utcFormat("%Y-%m-%d") as unknown as (dv: d3.NumberValue, i: number) => string));
       } else {
         xAxisG.call(d3.axisBottom(xScale).ticks(Math.max(2, Math.floor(chartWidth / 85))));
       }
@@ -731,10 +727,10 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
         .call(d3.axisLeft(yScale));
 
       // Separate historical vs forecast data points
-      const historicalData = data.filter(d => !d.isForecast);
-      const forecastStartIndex = data.findIndex(d => d.isForecast);
+      const historicalData = series.filter(p => !p.row.isForecast);
+      const forecastStartIndex = series.findIndex(p => p.row.isForecast);
       const forecastData = forecastStartIndex !== -1
-        ? data.slice(Math.max(0, forecastStartIndex - 1))
+        ? series.slice(Math.max(0, forecastStartIndex - 1))
         : [];
 
       // Historical Path
@@ -760,33 +756,28 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
       }
 
       // Points (only draw if dataset is reasonably sized to avoid overlap crowding)
-      if (data.length <= 250) {
+      if (valued.length <= 250) {
         chartArea.selectAll(".dot")
-          .data(data)
+          .data(valued)
           .enter().append("circle")
           .attr("class", "dot")
-          .attr("cx", d => {
-            const val = d[currentDimension];
-            if (xType === 'numeric') return Number(xScale(Number(val)));
-            if (xType === 'date') return Number(xScale(new Date(String(val))));
-            return Number(xScale(String(val))) || 0;
-          })
-          .attr("cy", d => yScale(Number(d[chart.yAxis!])))
-          .attr("r", d => d.isForecast ? 6 : 5)
-          .attr("fill", d => {
+          .attr("cx", xPos)
+          .attr("cy", p => yScale(p.y as number))
+          .attr("r", ({ row: d }) => d.isForecast ? 6 : 5)
+          .attr("fill", ({ row: d }) => {
             if (d.isForecast) return "hsl(var(--primary))";
             const style = formattingEngine.evaluateCompiledRules(compiledFormattingRules, d, chart.yAxis || currentDimension);
             return style?.fill || style?.textColor || style?.backgroundColor || "hsl(var(--chart-1))";
           })
-          .attr("stroke", d => d.isForecast ? "hsl(var(--background))" : "none")
-          .attr("stroke-width", d => d.isForecast ? 2 : 0)
-          .attr("opacity", d => getOpacity(String(d[currentDimension]), d.isForecast ? 0.9 : 0.75))
+          .attr("stroke", ({ row: d }) => d.isForecast ? "hsl(var(--background))" : "none")
+          .attr("stroke-width", ({ row: d }) => d.isForecast ? 2 : 0)
+          .attr("opacity", ({ row: d }) => getOpacity(String(d[currentDimension]), d.isForecast ? 0.9 : 0.75))
           .style("cursor", "pointer")
-          .call(dots => dots.append("title").text(d =>
-            `${currentDimension}: ${d[currentDimension]}\n${d.isForecast ? "Forecast (projected) " : ""}${yValueLabel}: ${formatChartValue(Number(d[chart.yAxis!]))}${d.isForecast ? "" : "\nClick to filter or drill down, right-click for raw rows"}`
+          .call(dots => dots.append("title").text(({ row: d, y }) =>
+            `${currentDimension}: ${d[currentDimension]}\n${d.isForecast ? "Forecast (projected) " : ""}${yValueLabel}: ${formatChartValue(y as number)}${d.isForecast ? "" : "\nClick to filter or drill down, right-click for raw rows"}`
           ))
-          .on("click", (event, d) => handlePointClick(String(d[currentDimension])))
-          .on("contextmenu", (event, d) => handlePointRightClick(event, String(d[currentDimension])));
+          .on("click", (event, { row: d }) => handlePointClick(String(d[currentDimension])))
+          .on("contextmenu", (event, { row: d }) => handlePointRightClick(event, String(d[currentDimension])));
       }
 
       // Labels
@@ -1099,25 +1090,16 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
     function renderAreaChart() {
       if (!currentDimension || !chart.yAxis) return;
 
-      const rows = chart.aggregation
+      const rows = (chart.aggregation
         ? aggregateByDimension(chartData, currentDimension, chart.yAxis)
-        : processedChartData;
+        : processedChartData) as ForecastPoint[];
 
-      const data = rows
-        .filter(d => d[currentDimension] !== null && d[chart.yAxis!] !== null)
-        .sort((a, b) => {
-          const aVal = a[currentDimension];
-          const bVal = b[currentDimension];
-          if (xType === 'numeric') {
-            return Number(aVal) - Number(bVal);
-          } else if (xType === 'date') {
-            return Date.parse(String(aVal)) - Date.parse(String(bVal));
-          } else {
-            return String(aVal).localeCompare(String(bVal));
-          }
-        });
+      // A blank or non-numeric y stays in the series as null and breaks the area there
+      // (.defined below) instead of dropping to 0 or being joined over.
+      const series = lineSeries(rows, currentDimension, chart.yAxis, xType);
+      const valued = series.filter(p => p.y !== null);
 
-      if (!data.length) {
+      if (!valued.length) {
         renderErrorMessage("No valid records found for area charting.");
         return;
       }
@@ -1126,50 +1108,45 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
       let xScale: any;
       if (xType === 'numeric') {
         xScale = d3.scaleLinear()
-          .domain(d3.extent(data, d => Number(d[currentDimension])) as [number, number])
+          .domain(d3.extent(series, p => p.x as number) as [number, number])
           .range([0, chartWidth]);
       } else if (xType === 'date') {
-        xScale = d3.scaleTime()
-          .domain(d3.extent(data, d => new Date(String(d[currentDimension]))) as [Date, Date])
+        // x is the date's parts as UTC-ms (utils/dates.ts), so the scale and ticks are UTC too.
+        xScale = d3.scaleUtc()
+          .domain(d3.extent(series, p => p.x as number) as [number, number])
           .range([0, chartWidth]);
       } else {
         xScale = d3.scalePoint()
-          .domain(data.map(d => String(d[currentDimension])))
+          .domain(series.map(p => String(p.x)))
           .range([0, chartWidth])
           .padding(0.1);
       }
+      const xPos = (p: LinePoint<ForecastPoint>) =>
+        xType === 'categorical' ? Number(xScale(String(p.x))) || 0 : Number(xScale(p.x));
 
       const yScale = d3.scaleLinear()
-        .domain([0, d3.max(data, d => Number(d[chart.yAxis!])) || 0])
+        .domain([0, d3.max(valued, p => p.y as number) || 0])
         .nice()
         .range([chartHeight, 0]);
 
-      const area = d3.area<ForecastPoint>()
-        .x(d => {
-          const val = d[currentDimension];
-          if (xType === 'numeric') return Number(xScale(Number(val)));
-          if (xType === 'date') return Number(xScale(new Date(String(val))));
-          return Number(xScale(String(val))) || 0;
-        })
+      const area = d3.area<LinePoint<ForecastPoint>>()
+        .defined(p => p.y !== null)
+        .x(xPos)
         .y0(chartHeight)
-        .y1(d => yScale(Number(d[chart.yAxis!])))
+        .y1(p => yScale(p.y as number))
         .curve(d3.curveMonotoneX);
 
-      const line = d3.line<ForecastPoint>()
-        .x(d => {
-          const val = d[currentDimension];
-          if (xType === 'numeric') return Number(xScale(Number(val)));
-          if (xType === 'date') return Number(xScale(new Date(String(val))));
-          return Number(xScale(String(val))) || 0;
-        })
-        .y(d => yScale(Number(d[chart.yAxis!])))
+      const line = d3.line<LinePoint<ForecastPoint>>()
+        .defined(p => p.y !== null)
+        .x(xPos)
+        .y(p => yScale(p.y as number))
         .curve(d3.curveMonotoneX);
 
       const xAxisG = chartArea.append("g")
         .attr("transform", `translate(0,${chartHeight})`);
 
       if (xType === 'date') {
-        xAxisG.call(d3.axisBottom(xScale).ticks(Math.max(2, Math.floor(chartWidth / 85))).tickFormat(d3.timeFormat("%Y-%m-%d") as unknown as (dv: d3.NumberValue, i: number) => string));
+        xAxisG.call(d3.axisBottom(xScale).ticks(Math.max(2, Math.floor(chartWidth / 85))).tickFormat(d3.utcFormat("%Y-%m-%d") as unknown as (dv: d3.NumberValue, i: number) => string));
       } else {
         xAxisG.call(d3.axisBottom(xScale).ticks(Math.max(2, Math.floor(chartWidth / 85))));
       }
@@ -1185,10 +1162,10 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
       chartArea.append("g")
         .call(d3.axisLeft(yScale));
 
-      const historicalData = data.filter(d => !d.isForecast);
-      const forecastStartIndex = data.findIndex(d => d.isForecast);
+      const historicalData = series.filter(p => !p.row.isForecast);
+      const forecastStartIndex = series.findIndex(p => p.row.isForecast);
       const forecastData = forecastStartIndex !== -1
-        ? data.slice(Math.max(0, forecastStartIndex - 1))
+        ? series.slice(Math.max(0, forecastStartIndex - 1))
         : [];
 
       if (historicalData.length > 0) {
@@ -1223,33 +1200,28 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
       }
 
       // Points (only draw if dataset is reasonably sized to avoid overlap crowding)
-      if (data.length <= 250) {
+      if (valued.length <= 250) {
         chartArea.selectAll(".dot")
-          .data(data)
+          .data(valued)
           .enter().append("circle")
           .attr("class", "dot")
-          .attr("cx", d => {
-            const val = d[currentDimension];
-            if (xType === 'numeric') return Number(xScale(Number(val)));
-            if (xType === 'date') return Number(xScale(new Date(String(val))));
-            return Number(xScale(String(val))) || 0;
-          })
-          .attr("cy", d => yScale(Number(d[chart.yAxis!])))
-          .attr("r", d => d.isForecast ? 5 : 4)
-          .attr("fill", d => {
+          .attr("cx", xPos)
+          .attr("cy", p => yScale(p.y as number))
+          .attr("r", ({ row: d }) => d.isForecast ? 5 : 4)
+          .attr("fill", ({ row: d }) => {
             if (d.isForecast) return "hsl(var(--primary))";
             const style = formattingEngine.evaluateCompiledRules(compiledFormattingRules, d, chart.yAxis || currentDimension);
             return style?.fill || style?.textColor || style?.backgroundColor || "hsl(var(--chart-1))";
           })
-          .attr("stroke", d => d.isForecast ? "hsl(var(--background))" : "none")
-          .attr("stroke-width", d => d.isForecast ? 2 : 0)
-          .attr("opacity", d => getOpacity(String(d[currentDimension]), d.isForecast ? 0.9 : 0.75))
+          .attr("stroke", ({ row: d }) => d.isForecast ? "hsl(var(--background))" : "none")
+          .attr("stroke-width", ({ row: d }) => d.isForecast ? 2 : 0)
+          .attr("opacity", ({ row: d }) => getOpacity(String(d[currentDimension]), d.isForecast ? 0.9 : 0.75))
           .style("cursor", "pointer")
-          .call(dots => dots.append("title").text(d =>
-            `${currentDimension}: ${d[currentDimension]}\n${d.isForecast ? "Forecast (projected) " : ""}${yValueLabel}: ${formatChartValue(Number(d[chart.yAxis!]))}${d.isForecast ? "" : "\nClick to filter or drill down, right-click for raw rows"}`
+          .call(dots => dots.append("title").text(({ row: d, y }) =>
+            `${currentDimension}: ${d[currentDimension]}\n${d.isForecast ? "Forecast (projected) " : ""}${yValueLabel}: ${formatChartValue(y as number)}${d.isForecast ? "" : "\nClick to filter or drill down, right-click for raw rows"}`
           ))
-          .on("click", (event, d) => handlePointClick(String(d[currentDimension])))
-          .on("contextmenu", (event, d) => handlePointRightClick(event, String(d[currentDimension])));
+          .on("click", (event, { row: d }) => handlePointClick(String(d[currentDimension])))
+          .on("contextmenu", (event, { row: d }) => handlePointRightClick(event, String(d[currentDimension])));
       }
 
       chartArea.append("text")

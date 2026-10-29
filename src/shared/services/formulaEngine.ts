@@ -1,3 +1,4 @@
+import { isStoredDate } from "@/shared/utils/dates";
 import { Dataset, DataRow, ColumnMetadata, DatasetMetadata, CalculatedField, FormulaValidationError } from "../types";
 
 // Token interfaces
@@ -844,7 +845,7 @@ export const formulaEngine = {
             if (v !== null) {
               const str = String(v);
               if (/^\d+$/.test(str)) return;
-              if (!isNaN(Date.parse(str))) dateCount++;
+              if (isStoredDate(str)) dateCount++;
             }
           });
           if (dateCount / nonNullCount > 0.8) {

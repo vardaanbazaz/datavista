@@ -8,6 +8,7 @@ import { db } from "@/shared/lib/db";
 import { formulaEngine } from "@/shared/services/formulaEngine";
 import { windowEngine } from "@/shared/services/window";
 import { queryCache } from "@/shared/services/optimizer";
+import { reparseDateColumn } from "@/shared/services/parsingService";
 
 interface DatasetState {
   datasets: Dataset[];
@@ -20,7 +21,8 @@ interface DatasetState {
     newRawData: DataRow[],
     newMetadata?: DatasetMetadata,
     newColumnTypes?: Record<string, "numeric" | "categorical" | "date">,
-    newColumns?: string[]
+    newColumns?: string[],
+    newDateSourceValues?: Dataset["dateSourceValues"]
   ) => void;
   selectDataset: (dataset: Dataset) => void;
   renameDataset: (id: string, newName: string) => void;
@@ -30,6 +32,10 @@ interface DatasetState {
   addWindowQuery: (query: WindowQuery) => void;
   deleteWindowQuery: (alias: string) => void;
   setColumnTypeOverride: (columnName: string, overrideType: 'numeric' | 'categorical' | 'date' | null) => void;
+  /** Re-reads a date column's numeric D/M values day-first or month-first (parsingService.reparseDateColumn). */
+  setDateDayFirst: (columnName: string, dayFirst: boolean) => void;
+  /** Hides the "re-import for correct dates" notice for this dataset, for good. */
+  dismissDateReimportNotice: (datasetId: string) => void;
 }
 
 export const useDatasetStore = create<DatasetState>((set, get) => {
@@ -111,7 +117,7 @@ export const useDatasetStore = create<DatasetState>((set, get) => {
     });
   },
 
-  updateDatasetData: (datasetId, newRawData, newMetadata, newColumnTypes, newColumns) => {
+  updateDatasetData: (datasetId, newRawData, newMetadata, newColumnTypes, newColumns, newDateSourceValues) => {
     const { datasets, activeDataset } = get();
     const targetDataset = datasets.find((d) => d.id === datasetId);
     if (!targetDataset) return;
@@ -154,6 +160,8 @@ export const useDatasetStore = create<DatasetState>((set, get) => {
       lastUpdated: Date.now(),
       calculatedFields: targetDataset.calculatedFields || [],
       windowQueries: targetDataset.windowQueries || [],
+      // Original date text belongs to the rows it came with; old text would misalign.
+      dateSourceValues: newDateSourceValues,
     };
 
     const evaluated = windowEngine.evaluate(formulaEngine.evaluateCalculatedFields(updatedDataset));
@@ -331,6 +339,22 @@ export const useDatasetStore = create<DatasetState>((set, get) => {
           ),
         },
       };
+    });
+  },
+
+  setDateDayFirst: (columnName, dayFirst) => {
+    applyActiveDatasetUpdate((dataset) => reparseDateColumn(dataset, columnName, dayFirst));
+  },
+
+  dismissDateReimportNotice: (datasetId) => {
+    const dismiss = (d: Dataset): Dataset =>
+      d.id === datasetId && d.metadata
+        ? { ...d, metadata: { ...d.metadata, dateReimportNoticeDismissed: true } }
+        : d;
+    const { datasets, activeDataset } = get();
+    set({
+      datasets: datasets.map(dismiss),
+      activeDataset: activeDataset ? dismiss(activeDataset) : null,
     });
   }
   };

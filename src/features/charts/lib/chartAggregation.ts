@@ -1,5 +1,7 @@
 import { AggregationOperator, ChartConfig, DataRow } from "@/shared/types";
 import { aggregateRows } from "@/shared/services/queryEngine";
+import { columnNumbers, toNumberOrNull } from "@/shared/utils/numeric";
+import { dateKeyMs } from "@/shared/utils/dates";
 
 export type AxisValueType = "numeric" | "categorical" | "date";
 
@@ -87,13 +89,63 @@ export function aggregateValues(
 }
 
 /**
+ * aggregateValues for one line/area point: null (a gap) when the rows hold no valid number
+ * and the reduction isn't a count, instead of the 0 that sum/avg/min/max give an empty slice.
+ */
+export function aggregateValuesOrNull(
+  rows: DataRow[],
+  column: string,
+  aggregation?: AggregationOperator,
+  numericColumns?: ReadonlySet<string>
+): number | null {
+  const reduction = chartReduction(aggregation);
+  const isCount = reduction === "count" || reduction === "count_rows" || reduction === "count_distinct";
+  if (!isCount && columnNumbers(rows, column).length === 0) return null;
+  return aggregateValues(rows, column, aggregation, numericColumns);
+}
+
+/** Position of an x value along a line/area axis: a number, a date's UTC-ms (utils/dates.ts), or a category. */
+export function axisPosition(value: unknown, type: AxisValueType): number | string | null {
+  if (value === null || value === undefined) return null;
+  if (type === "numeric") return toNumberOrNull(value);
+  if (type === "date") return dateKeyMs(value);
+  return String(value);
+}
+
+export interface LinePoint<T> {
+  row: T;
+  /** Number for numeric axes, UTC-ms for date axes (use d3.scaleUtc), string for categories. */
+  x: number | string;
+  /** null where the cell is blank or not a number: the line/area breaks there. */
+  y: number | null;
+}
+
+/**
+ * Rows of a line or area chart in x order. A row whose y isn't a valid number (blank,
+ * "NaN", junk) stays in the series with y = null, so the chart draws a gap there (d3
+ * `.defined`) instead of plotting 0 or joining its neighbours. Rows with no plottable x
+ * are dropped.
+ */
+export function lineSeries<T extends DataRow>(rows: T[], xColumn: string, yColumn: string, xType: AxisValueType): LinePoint<T>[] {
+  const points: LinePoint<T>[] = [];
+  for (const row of rows) {
+    const x = axisPosition(row[xColumn], xType);
+    if (x === null) continue;
+    points.push({ row, x, y: toNumberOrNull(row[yColumn]) });
+  }
+  return points.sort((a, b) =>
+    typeof a.x === "number" && typeof b.x === "number" ? a.x - b.x : String(a.x).localeCompare(String(b.x))
+  );
+}
+
+/**
  * Default order of category keys (stringified x values) on a band/point axis: numeric
  * ascending, dates chronological. Categorical keys keep the order they were given in.
  * Keys that don't parse (e.g. a stray "(Blank)") go last, in their original order.
  */
 export function sortAxisKeys(keys: string[], type: AxisValueType): string[] {
   if (type === "categorical") return [...keys];
-  const toNumber = type === "numeric" ? (k: string) => Number(k) : (k: string) => Date.parse(k);
+  const toNumber = type === "numeric" ? (k: string) => Number(k) : (k: string) => dateKeyMs(k) ?? NaN;
   return keys
     .map((key, index) => ({ key, index, n: key.trim() === "" ? NaN : toNumber(key) }))
     .sort((a, b) => {

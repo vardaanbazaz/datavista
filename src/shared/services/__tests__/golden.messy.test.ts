@@ -142,6 +142,31 @@ describe('golden: messy-data fixtures', () => {
     });
   }
 
+  // Dates: pandas with an explicit format per column is the oracle. This file also runs
+  // under several TZ values (npm run test:tz), so the counts must not move between zones.
+  for (const file of ['netflix.csv', 'playstore.csv', 'cafe.csv']) {
+    for (const [column, expected] of Object.entries(golden[file].dateStats as Record<string, {
+      validCount: number; invalidCount: number; missingCount: number; min: string; max: string; yearCounts: Record<string, number>;
+    }>)) {
+      it(`${file} ${column}: date type, valid/invalid/missing counts, min, max and per-year buckets match pandas`, () => {
+        const ds = load(file);
+        expect(ds.columnTypes[column]).toBe('date');
+        const meta = ds.metadata!.columns.find(c => c.name === column)!;
+        expect(meta.invalidDateCount).toBe(expected.invalidCount);
+        expect(meta.missingValueCount).toBe(expected.missingCount);
+        expect([meta.earliestDate, meta.latestDate]).toEqual([expected.min, expected.max]);
+        const res = queryEngine.execute(ds, {
+          groupBy: { column, period: 'year' },
+          aggregations: [{ column, operator: 'count_rows', alias: 'n' }],
+          pagination: { pageSize: 'all' },
+          options: { bypassCache: true },
+        });
+        expect(Object.fromEntries(res.rows.map(r => [String(r[column]), r.n]))).toEqual(expected.yearCounts);
+        expect(res.rows.reduce((a, r) => a + (r.n as number), 0)).toBe(expected.validCount);
+      });
+    }
+  }
+
   it('netflix: a trailing non-breaking space in a title is kept (s6530)', () => {
     const ds = load('netflix.csv');
     const row = ds.data.find(r => r.show_id === 's6530')!;
@@ -151,5 +176,4 @@ describe('golden: messy-data fixtures', () => {
   it.todo('glassdoor: Rating/Founded match the oracle with the -1 sentinel excluded (later batch: sentinel handling)');
   it.todo('playstore: Rating matches the oracle with shifted row 10473 (Rating 19) excluded (later batch: malformed-row handling)');
   it.todo('playstore: Price "$x.xx" values parse as numbers (later batch: currency parsing)');
-  it.todo('dates: Netflix date_added, Play Store Last Updated, Cafe Transaction Date keep the calendar day in every time zone (later batch: date handling)');
 });

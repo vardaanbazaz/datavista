@@ -41,6 +41,19 @@
         "max": 25.0,
         "std": 6.966904076732979
       }
+    },
+    "dateStats": {
+      "Transaction Date": {
+        "format": "%Y-%m-%d",
+        "validCount": 69,
+        "invalidCount": 8,
+        "missingCount": 4,
+        "min": "2023-01-08",
+        "max": "2023-12-31",
+        "yearCounts": {
+          "2023": 69
+        }
+      }
     }
   },
   "playstore.csv": {
@@ -117,6 +130,24 @@
         "max": 8.0,
         "std": 1.6535923821499505
       }
+    },
+    "dateStats": {
+      "Last Updated": {
+        "format": "%B %d, %Y",
+        "validCount": 79,
+        "invalidCount": 1,
+        "missingCount": 0,
+        "min": "2012-04-09",
+        "max": "2018-08-05",
+        "yearCounts": {
+          "2012": 1,
+          "2014": 1,
+          "2015": 2,
+          "2016": 3,
+          "2017": 9,
+          "2018": 63
+        }
+      }
     }
   },
   "netflix.csv": {
@@ -151,6 +182,25 @@
         "min": 1925.0,
         "max": 2021.0,
         "std": 15.54517705791429
+      }
+    },
+    "dateStats": {
+      "date_added": {
+        "format": "%B %d, %Y",
+        "validCount": 60,
+        "invalidCount": 0,
+        "missingCount": 4,
+        "min": "2014-11-07",
+        "max": "2021-09-25",
+        "yearCounts": {
+          "2014": 1,
+          "2016": 3,
+          "2017": 7,
+          "2018": 9,
+          "2019": 3,
+          "2020": 11,
+          "2021": 26
+        }
       }
     }
   },

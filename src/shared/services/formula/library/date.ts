@@ -1,4 +1,25 @@
 import { FunctionDefinition } from "./types";
+import {
+  addMonths,
+  CalendarParts,
+  formatCalendar,
+  localeDayFirst,
+  parseDateValue,
+  parseStoredDate,
+  partsToUtcMs,
+} from "@/shared/utils/dates";
+
+/**
+ * Calendar parts of a formula argument: a stored date ("2008-01-01", "2008-01-01T10:00"),
+ * or any source format the importer accepts ("January 1, 2008"; numeric D/M in the browser
+ * locale's order). No time zone is involved (utils/dates.ts).
+ */
+function toParts(v: unknown): CalendarParts | null {
+  if (v === null || v === undefined || typeof v === "boolean") return null;
+  return parseStoredDate(v) ?? parseStoredDate(parseDateValue(String(v), localeDayFirst()));
+}
+
+const DAY_MS = 86_400_000;
 
 export const dateFunctions: FunctionDefinition[] = [
   {
@@ -8,8 +29,8 @@ export const dateFunctions: FunctionDefinition[] = [
     returnType: "number",
     apply: (args) => {
       if (args.length < 1 || args[0] === null || args[0] === undefined) return null;
-      const d = new Date(String(args[0]));
-      return isNaN(d.getTime()) ? null : d.getFullYear();
+      const p = toParts(args[0]);
+      return p ? p.year : null;
     }
   },
   {
@@ -19,8 +40,8 @@ export const dateFunctions: FunctionDefinition[] = [
     returnType: "number",
     apply: (args) => {
       if (args.length < 1 || args[0] === null || args[0] === undefined) return null;
-      const d = new Date(String(args[0]));
-      return isNaN(d.getTime()) ? null : d.getMonth() + 1;
+      const p = toParts(args[0]);
+      return p ? p.month : null;
     }
   },
   {
@@ -30,8 +51,8 @@ export const dateFunctions: FunctionDefinition[] = [
     returnType: "number",
     apply: (args) => {
       if (args.length < 1 || args[0] === null || args[0] === undefined) return null;
-      const d = new Date(String(args[0]));
-      return isNaN(d.getTime()) ? null : d.getDate();
+      const p = toParts(args[0]);
+      return p ? p.day : null;
     }
   },
   {
@@ -50,29 +71,28 @@ export const dateFunctions: FunctionDefinition[] = [
       const unit = String(args[2]).toLowerCase();
       if (!dateVal || isNaN(amount)) return null;
 
-      const d = new Date(String(dateVal));
-      if (isNaN(d.getTime())) return null;
+      const p = toParts(dateVal);
+      if (!p) return null;
 
       switch (unit) {
         case "year":
         case "years":
         case "y":
-          d.setFullYear(d.getFullYear() + amount);
-          break;
+          return formatCalendar(addMonths(p, amount * 12));
         case "month":
         case "months":
         case "m":
-          d.setMonth(d.getMonth() + amount);
-          break;
+          return formatCalendar(addMonths(p, amount));
         case "day":
         case "days":
-        case "d":
-          d.setDate(d.getDate() + amount);
-          break;
+        case "d": {
+          // UTC arithmetic on the parts: no DST days, no zone.
+          const d = new Date(partsToUtcMs(p) + amount * DAY_MS);
+          return formatCalendar({ ...p, year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate() });
+        }
         default:
           return null;
       }
-      return d.toISOString();
     }
   },
   {
@@ -91,25 +111,25 @@ export const dateFunctions: FunctionDefinition[] = [
       const unit = String(args[2]).toLowerCase();
       if (!d1Val || !d2Val) return null;
 
-      const d1 = new Date(String(d1Val));
-      const d2 = new Date(String(d2Val));
-      if (isNaN(d1.getTime()) || isNaN(d2.getTime())) return null;
+      const p1 = toParts(d1Val);
+      const p2 = toParts(d2Val);
+      if (!p1 || !p2) return null;
 
-      const diffMs = d2.getTime() - d1.getTime();
+      const diffMs = partsToUtcMs(p2) - partsToUtcMs(p1);
 
       switch (unit) {
         case "year":
         case "years":
         case "y":
-          return d2.getFullYear() - d1.getFullYear();
+          return p2.year - p1.year;
         case "month":
         case "months":
         case "m":
-          return (d2.getFullYear() - d1.getFullYear()) * 12 + (d2.getMonth() - d1.getMonth());
+          return (p2.year - p1.year) * 12 + (p2.month - p1.month);
         case "day":
         case "days":
         case "d":
-          return Math.floor(diffMs / (1000 * 60 * 60 * 24));
+          return Math.floor(diffMs / DAY_MS);
         default:
           return null;
       }
@@ -117,11 +137,16 @@ export const dateFunctions: FunctionDefinition[] = [
   },
   {
     name: "NOW",
-    description: "Returns the current date and time as an ISO string.",
+    description: "Returns the current local date and time as YYYY-MM-DDTHH:mm:ss.",
     args: [],
     returnType: "string",
     apply: () => {
-      return new Date().toISOString();
+      // The user's wall clock, in the same form as stored dates, so YEAR(NOW()) etc. work.
+      const d = new Date();
+      return formatCalendar({
+        year: d.getFullYear(), month: d.getMonth() + 1, day: d.getDate(),
+        hour: d.getHours(), minute: d.getMinutes(), second: d.getSeconds(),
+      });
     }
   }
 ];

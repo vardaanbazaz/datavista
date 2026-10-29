@@ -1,4 +1,5 @@
 import { DataRow } from "@/shared/types";
+import { stepDateKey } from "@/shared/utils/dates";
 import { ForecastConfig, ForecastPoint } from "./types";
 import { toNumberOrNull } from "@/shared/utils/numeric";
 
@@ -92,15 +93,9 @@ export const forecastingEngine = {
         if (!isNaN(lastNum) && /^\d+$/.test(lastStr)) {
           futureXLabel = String(lastNum + k);
         } else {
-          // Try date parsing
-          const date = new Date(lastStr);
-          if (!isNaN(date.getTime())) {
-            const nextDate = new Date(date);
-            nextDate.setMonth(nextDate.getMonth() + k);
-            futureXLabel = nextDate.toISOString().split('T')[0];
-          } else {
-            futureXLabel = `${lastStr} +${k}`;
-          }
+          // A stored date steps by month (day clamped); a period key ("2024-Q1", "2024-03",
+          // "2024-W05") by its own unit. Calendar parts only, no time zone (utils/dates.ts).
+          futureXLabel = stepDateKey(lastStr, k) ?? `${lastStr} +${k}`;
         }
       }
 

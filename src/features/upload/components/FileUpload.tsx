@@ -6,6 +6,7 @@ import { useToast } from "@/shared/hooks/use-toast";
 import { Upload, FileText, AlertCircle, CheckCircle } from "lucide-react";
 import { parseCsvFile } from "@/shared/services/csvParse";
 import * as XLSX from "xlsx";
+import { readWorkbookWithCalendarDates } from "@/features/upload/lib/xlsxDates";
 import { useDatasetStore } from "@/store/datasetStore";
 import { processRawData } from "@/shared/services/parsingService";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/components/ui/tooltip";
@@ -91,7 +92,8 @@ export function FileUpload() {
         const arrayBuffer = await file.arrayBuffer();
         setUploadProgress(25);
         
-        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+        // Date cells become calendar strings, not serial numbers (lib/xlsxDates.ts).
+        const workbook = readWorkbookWithCalendarDates(arrayBuffer);
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         
