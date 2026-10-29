@@ -2,11 +2,110 @@
 
 Newest first. Entries marked `Source: inferred` were reconstructed from existing code; their "Why" is a guess and should be corrected by the author.
 
+### 2026-10-29 — CI: e2e in its own parallel job; deploy waits for both
+- **Decision:** `deploy.yml` has three jobs. `checks` (lint, typecheck, unit tests, time zone gate) and `e2e` (checkout, `npm ci`, Playwright Chromium, `test:e2e`) run in parallel; `deploy` (`needs: [checks, e2e]`) builds, installs Chromium, runs the production smoke gate on that build, uploads it and deploys.
+- **Why:** The last 5 runs took 3m33s–5m46s with e2e 197 s of the last one, and this batch adds 4 e2e tests (~40 s), so the single job would pass 6 min. In parallel, the run is about the e2e job plus the deploy job instead of the sum of everything.
+- **Alternatives considered:** Build and smoke in the `checks` job with `deploy` only deploying — rejected: the smoke gate is meant to sit with the deploy, checking the exact bundle that goes out.
+- **Tradeoff accepted:** `npm ci` runs three times and Chromium is installed twice (~35 s of runner time each, not wall time). The build no longer starts until e2e has passed.
+- **Source:** `made-now`
+
+### 2026-10-29 — Netflix fixture gets the full file's two 2008 rows
+- **Decision:** `tests/fixtures/messy/netflix.csv` gains s5958 ("January 1, 2008") and s6612 ("February 4, 2008"), copied byte-for-byte from `netflix_titles.csv` and kept in `show_id` order (64 → 66 rows; list in `tests/fixtures/README.md`); `messy.golden.json` regenerated with the pinned pandas (`golden:regen-messy`). `tests/e2e/chart-density.spec.ts` asserts Year 2008 = 2.
+- **Why:** The year-bucket e2e should check the reported case; the fixture had no 2008 row.
+- **Alternatives considered:** Running the e2e against the git-ignored full file — rejected: CI doesn't have it.
+- **Tradeoff accepted:** Netflix golden numbers moved (release_year count 66, mean 2012.48, earliest date_added 2008-01-01, validCount 62).
+- **Source:** `made-now`
+
+### 2026-10-29 — ID-like columns are flagged by name only
+- **Decision:** `columnRoles.ts` drops the "more than 95% distinct integers" rule. `id` = a name word in id, code, no, number, zip, pin, phone, index, or pandas' unnamed index column ("Unnamed: N", words `unnamed` + digits). The year rule is unchanged.
+- **Why:** The distinct rule flagged HR `MonthlyRate` (97% distinct), an amount; DailyRate, HourlyRate and MonthlyIncome were one threshold away. Keeping "index" and "Unnamed: N" covers the row-number columns it was catching (DS jobs `index`).
+- **Alternatives considered:** Raising the threshold or requiring consecutive values — rejected: still guesses from values; names are what people read.
+- **Tradeoff accepted:** A numeric ID column with an unusual name (e.g. "Ref", "Key") isn't flagged; the user can still pick Count. Flags now: Netflix `release_year` (year); HR `EmployeeNumber`; DS jobs `index`; retail `StockCode`, `Customer ID`. Nothing in cafe, Play Store, cancer lab.
+- **Source:** `made-now`
+
+### 2026-10-29 — Date X axes are bucketed by a period; "auto" = finest period with ≤ 60 buckets
+- **Decision:** New `ChartConfig.dateGranularity` (`auto | year | quarter | month | week | day`), chosen in `ChartBuilder` ("Group dates by", shown for a date X on bar/pie and on line/area with an aggregation). `ChartVisualization` keys rows by `chartAggregation.ts:dateBucketKey` (= `utils/dates.ts:periodKey`, no new date logic); "auto", an absent field (saved charts) and unknown values resolve with `resolveDateGranularity`: the finest of day → week → month → quarter → year with at most `AUTO_MAX_BUCKETS` (60) distinct keys, else year. Axis label and tooltips say `date_added (Year)`. Rows with no valid date go to a "(No date)" bar. A click/right-click on a bucket filters `between` its first and last day (`dateBucketRange` → `utils/dates.ts:periodKeyRange`, tested under the time-zone gate); "(No date)" does nothing. Each distinct cell value is bucketed once per render (`dateBucketer`; the auto pass also skips repeated values): at 1M rows / 5,000 distinct days, 1.57 s → 0.18 s per render in Node. Line/area without an aggregation still plot raw rows (no bucket).
+- **Why:** The reported Netflix chart drew one bar per distinct day (1,715 bars). Full file: 2008–2021 → auto picks Quarter (44 bars); Year gives 2008 = 2.
+- **Alternatives considered:** Bucketing in the query engine's group-by (`FilterState.groupByPeriod`) — rejected: that changes every view's rows, not one chart. Fixed default (Month) — rejected: 168 bars for Netflix, 1 bar for a one-month file.
+- **Tradeoff accepted:** Only buckets that have rows get a bar (2009 Q1–Q3 with no titles are not shown as empty slots), since the X axis is still a band scale. Week buckets are ISO weeks.
+- **Source:** `made-now`
+
+### 2026-10-29 — Bottom-axis labels: thin, cut, turn only when it fits more; muted colour via CSS
+- **Decision:** Every bottom axis (bar, heatmap, line/area) runs `src/features/charts/lib/axisLabels.ts:layoutBottomAxisLabels` after d3 draws it: labels over 16 characters are cut with "…" and get a `<title>` with the full text; `tickLayout(spacing, widestLabel, height)` picks the smallest step N so every Nth label fits, flat or turned -45°, comparing upright (axis-aligned) boxes — turned only when that shows more labels. Hidden labels keep their tick. The old unconditional -45° rotation is gone. `svg.dv-chart` + `src/index.css`: tick text `fill: hsl(var(--muted-foreground))`, axis lines `hsl(var(--border))`.
+- **Why:** The dark-mode "white block" was 1,715 rotated labels drawn in d3's `fill="currentColor"`, which inherits the body's near-white text (`rgb(244,244,245)` measured in the before screenshot), all on top of each other. Upright boxes make the e2e check (no visible label boxes intersect) and the visual result agree.
+- **Alternatives considered:** Exact glyph-overlap test for turned labels — rejected: denser, but `getBoundingClientRect` boxes would overlap and the check could not be automated. Wrapping labels onto two lines — rejected: SVG text has no wrapping; more code for little gain.
+- **Tradeoff accepted:** Short-label charts that used to show every label turned (e.g. 10 products on a narrow card) may now show every 2nd label flat; the bar tooltips still name every key.
+- **Source:** `made-now`
+
+### 2026-10-29 — "Top N + Other" for categorical bars, and a hint past 200 bars
+- **Decision:** New `ChartConfig.topN` (bar charts with a categorical X): the N keys with the largest value are kept, every other row is re-aggregated into one "Other" bar (aggregating its rows, so avg/median/distinct count are right), largest first, "Other" last, and clicking "Other" does nothing. `ChartBuilder` offers All / Top 10 / Top 20. A chart with more than `MANY_BARS` (200) bars shows an HTML hint above the plot: coarser date buckets (buttons) for a date X, "Show Top 20 + Other" for a categorical X. New `chartStore.updateChart(id, changes)` applies the hint's choice; persistence already writes changed chart objects.
+- **Why:** Spec item 2. Summing the folded bars' values would be wrong for any reduction but sum and count.
+- **Alternatives considered:** Rejecting unknown `dateGranularity`/`topN` values in `isValidChartConfig` — rejected: that would drop a whole saved chart for a cosmetic field; `ChartVisualization` treats unknown values as auto / no Top N instead.
+- **Tradeoff accepted:** Numeric X bars with > 200 keys only get the text hint (no Top N: an "Other" bucket on a numeric axis would misread as a value).
+- **Source:** `made-now`
+
+### 2026-10-29 — ChartBuilder gets an aggregation picker
+- **Decision:** `ChartBuilder` shows "Aggregation" for bar/pie/line/area once Y is picked: Sum, Average, Median, Minimum, Maximum, Count, Distinct count, Count of rows, plus "None (plot each row)" for line/area. It follows the Y column (Count for year/ID-like, else Sum for bar/pie, None for line/area) until the user picks one; the choice is stored in `ChartConfig.aggregation` (unchanged type).
+- **Why:** There was no aggregation control at all, so every bar chart was a Sum; the Count default and the inline note need a picker to exist.
+- **Alternatives considered:** Only changing the hidden default — rejected: the user couldn't then pick Sum back, which the spec requires ("don't block").
+- **Tradeoff accepted:** New charts now store `aggregation: "sum"` explicitly where they used to leave it unset; labels and results are the same.
+- **Source:** `made-now`
+
+### 2026-10-29 — Year- and ID-like numeric columns default to Count, with a note on Sum/Avg
+- **Superseded by** "ID-like columns are flagged by name only" (the distinct-integer rule and its 100-row floor).
+- **Decision:** `src/shared/utils/columnRoles.ts:aggregationFlag(dataset, column)` reads only import metadata (exact `allIntegerValues`, min/max, `uniqueValueCount`, `missingValueCount`, `rowCount`), cached per metadata object, for columns whose effective type is numeric. `year`: name has the word "year"/"yr" AND every value is a whole number 1800–2100. `id`: name has one of the words id, code, no, number, zip, pin, phone, OR > 95% of at least 100 non-blank cells are distinct integers. Words come from `nameWords` (split on non-alphanumerics, camelCase and letter↔digit steps). `ChartBuilder`, `KPIBuilder`, `PivotBuilder.addValueField` and `PivotExplorer`'s default pivot (first unflagged numeric column, else Count of a flagged one) default flagged columns to Count; Sum/Avg (and Sum If / Weighted average) show `aggregationNote` inline and stay selectable. Column types are not changed (next batch's data-quality UI).
+- **Why:** "Sum of release_year" (values to 220,000) is meaningless. Regex `\b` can't be used for the words: `_` is a word character, so `\byear\b` misses `release_year` and `\bid\b` misses `customer_id`; camelCase (`CustomerID`, `StockCode`) has no boundary at all. Whole-word matching keeps `paid`, `valid`, `width` out. The 100-row floor: every column of the 10-row sample (Sales, Profit) is 100% distinct.
+- **Alternatives considered:** Year rule on name OR values — rejected: any column of plausible integers in 1800–2100 (prices, counts) would flip. Scanning rows for distinctness — rejected: metadata already has exact counts.
+- **Tradeoff accepted:** Flagged across the 6 local CSVs + HR fixture: Netflix `release_year` (year); HR `EmployeeNumber` (id, name) and `MonthlyRate` (id, 97% distinct — a false positive: it is an amount); DS jobs `index` (id, 100% distinct); retail `StockCode`, `Customer ID` (id, name). Not flagged: DS jobs `Founded` (years, but no "year" word and -1 sentinels), retail `Invoice` (5% distinct, no listed word). The "number" word will also catch "Number of employees"-style counts.
+- **Source:** `made-now`
+
+### 2026-10-29 — No outlier badge on a sum or count of a year/ID-like column
+- **Decision:** `anomalyDetector.detectChartAnomalies(chart, rows, dataset?)` returns nothing when the Y column is flagged and the chart's reduction is sum (also the default), count, count of rows or distinct count. `ChartVisualization` passes the active dataset; `summaryEngine` passes it through `detectDashboardAnomalies`.
+- **Why:** The "719 Outliers" badge was IQR over raw `release_year` values: old titles, not anomalies.
+- **Alternatives considered:** Running outlier detection on the plotted aggregates — out of scope for this batch (changes every chart's badge).
+- **Tradeoff accepted:** The badge still looks at raw row values for every other chart.
+- **Source:** `made-now`
+
+### 2026-10-29 — Startup reads only the reopened dataset's rows; others load when selected
+- **Decision:** `hydrate` reads filters, prefs and dashboards first, then rows only for the dataset the session reopens on (active dashboard's dataset, else `activeDatasetId`). Every other dataset enters the store as a placeholder: `data: []` plus `Dataset.rowsPending = { rowCount, chunkCount, dateSourceColumns }` (`db.ts:toPendingDataset`). `toStoredDataset` writes a placeholder's stored counts (never `data.length`), `saveRows` skips placeholders, and replacing a placeholder with its loaded rows at the same `rowsRevision` writes nothing. `datasetStore.loadRows(id)` (one read per id, progress in `rowsLoading`, keeps a rename made meanwhile) is used by `selectDataset` (activates only if still the last selection), `deleteDataset`'s next pick, `dashboardStore.loadDashboard`, undo/redo context restore and `snapshotStore.restoreSnapshot` (load, then re-run). The startup spinner is now text (`uiStore.startupStatus`: step, dataset name, rows read / total); a dataset loading after selection shows the same component in `MainContent`. Loader code moved to `src/shared/services/datasetRows.ts` (with `backfillAllIntegerValues`).
+- **Why:** A stored 1M-row dataset delayed every reload by ~1.4 s even when another dataset was open. Measured (prod build, real Chromium IndexedDB, `scripts/bench/startup`, 3 reloads each): only small datasets 139–176 ms → 165–403 ms ready (noise; no change expected); 1M stored, not active: 1,525–1,560 ms → 167–265 ms, longest block 63 ms → 60 ms; 1M active: 2,484–2,563 ms → 2,360–2,507 ms (after throttling progress reports to every 5%; 2,816–3,227 ms before that), longest block 919–1,111 ms → 885–1,003 ms. Selecting the unloaded 1M dataset afterwards: progress view with "of 1,000,000 rows", click → usable 3.2 s, longest block 1.43 s.
+- **Alternatives considered:** A separate "loaded rows" map outside the dataset objects — rejected: persistence writes from `datasets[]`, so the stored counts must travel with the object to make an unloaded save safe. Loading every dataset in the background after first render — rejected: memory (1M rows ≈ 250 MB) for data the user may never open.
+- **Tradeoff accepted:** Selecting a big inactive dataset now waits for its rows (1M: 3.2 s click → usable) with a loading view. The 1M-active case did not improve: the rows read (~1.4 s) and a ~1 s block when the Overview first computes stats over 1M rows remain (not addressed; candidate for a worker); the same block plus re-evaluation is most of the 1.43 s after selecting.
+- **Source:** `made-now`
+
+### 2026-10-29 — User Timing marks on slow paths; a local real-browser bench
+- **Decision:** `src/shared/lib/perfMarks.ts` (`perfMark`/`perfMeasure`, `dv:` prefix) marks startup steps, each row save (`dv:rows-save`) and the day/month toggle (`dv:date-toggle`). `scripts/bench/playwright.startup.config.ts` + `scripts/bench/startup/startup.spec.ts` run them on `vite preview` in Chromium, seeding big datasets by cloning a real stored record with generated chunks; results to the git-ignored `bench-results/`. Excluded from vitest and CI.
+- **Why:** The 4c.1 numbers came from Node + fake-indexeddb, which keeps the database in the same heap; the 147–258 s date-toggle save there does not happen in a browser.
+- **Alternatives considered:** Timing from outside only (Playwright timestamps) — rejected: can't split the read, evaluate and render steps.
+- **Tradeoff accepted:** Marks stay in production code (a few `performance.mark` calls, no cost worth measuring).
+- **Source:** `made-now`
+
+### 2026-10-29 — Day/month toggle parses each distinct date text once
+- **Decision:** `utils/dates.ts:analyzeDateColumn` matches each distinct string once and resolves/labels each distinct match once; `parsingService.ts:reparseDateColumn` parses each distinct source text once. Same results (date tests and messy golden unchanged).
+- **Why:** In a real browser the toggle was not the 147–258 s seen under fake-indexeddb but still one long block: 300k rows + a calculated column: block 1,147 ms, save 596 ms, click→saved 2.4 s; 600k: block 2,893 ms, save 1,160 ms, click→saved 4.5 s. Split in Node at 600k: `analyzeDateColumn` 1.7 s of the 2.0 s reparse (a regex match, a label string and a resolve per row), then the calculated-column re-evaluation 1.2 s. After: 300k block 873 ms, click→saved 2.1 s; 600k block 2,077 ms, click→saved 4.1 s.
+- **Alternatives considered:** Moving reparse + formula evaluation into a worker — rejected for this batch (needs the dataset cloned to the worker and back; bigger change).
+- **Tradeoff accepted:** The toggle still blocks ~3.5 µs per row (row copies and the calculated-column re-evaluation); 1M rows was not measured (memory).
+- **Source:** `made-now`
+
+### 2026-10-29 — Flaky Undo tooltip e2e: blur before testing keyboard focus
+- **Decision:** `tests/e2e/hit-areas.spec.ts` blurs the Undo button and waits for no tooltip before `focus()`.
+- **Why:** The forced click left the button focused (12/12 runs), so `focus()` fired no focus event; the check passed only while the hover tooltip from the previous step was still closing, and failed 3/30 when it closed first. Now 20/20.
+- **Alternatives considered:** Retries or longer timeouts — rejected (they hide the race).
+- **Tradeoff accepted:** None.
+- **Source:** `made-now`
+
+### 2026-10-29 — GitHub Actions on Node 24 majors
+- **Decision:** `actions/checkout@v7`, `actions/setup-node@v7`, `actions/upload-pages-artifact@v5`, `actions/deploy-pages@v5` (all `runs.using: node24`, or composite over `upload-artifact@v7`). The app's own `node-version: '20.x'` is unchanged.
+- **Why:** Clears the Node 20 deprecation warning. upload-pages-artifact v4+ skips dotfiles; `dist/` has none.
+- **Alternatives considered:** Bumping the app's Node to 22/24 in the same change — rejected: not asked, separate risk.
+- **Tradeoff accepted:** None here. (The parallel e2e job proposed with this change was applied: see "CI: e2e in its own parallel job; deploy waits for both".)
+- **Source:** `made-now`
+
 ### 2026-10-29 — Dataset rows stored in chunks apart from metadata; writes only what changed (Dexie v2)
 - **Decision:** `datasets` now holds a `StoredDataset` (everything except `data` and `dateSourceValues`, plus `rowCount`, `chunkCount`, `dateSourceColumns`). Rows live in a new `datasetRows` table, key `[datasetId+index]`, `ROW_CHUNK_SIZE` (20,000) rows per record with the same slice of `dateSourceValues`. A new `Dataset.rowsRevision` is bumped (`datasetStore.ts:withNewRows`) only by actions that change cell values: replace data, calculated/window add/delete, day/month toggle. `persistenceService` diffs `(state, prev)` synchronously: removed dataset → delete metadata + chunk range in one transaction; `rowsRevision` differs from what is on disk or queued → row save after 500 ms (debounced, flushed on `pagehide` / `visibilitychange` hidden); otherwise → one metadata `put`. A row save is one rw transaction: each chunk `put` awaited in turn (one structured clone each, so the main thread is free between them), chunks past the new end deleted, then the metadata `put`. A reload mid-save aborts the transaction, so the old version loads whole. While a row save is waiting, the dataset's metadata is only written by that save. All dataset writes run on one queue. Hydrate reads chunks one `get` at a time in one read transaction. Charts and dashboards use the same diff: `bulkPut` of changed objects + `bulkDelete` of removed ids, no `clear()`. `setColumnTypeOverride` passes `changesRows: false` (formula/window evaluation don't read `userOverrideType`), so it writes no rows even when calculated columns are re-materialized in memory.
 - **Why:** Batch 4c.1: every rename/override/notice dismiss/import did `clear()` + `bulkAdd` of all datasets with all rows (3.9–5.6 s block at 1M rows); charts stored full row copies (12.5 s for 3 charts).
 - **Alternatives considered:** Detecting row changes by `data` reference — rejected: formula/window evaluation rebuilds `data` on a type override. Writing chunks in separate transactions behind a generation pointer (shadow write + garbage collection) — rejected: one transaction with sequential puts gives the same atomicity with no orphan cleanup. `bulkPut` of all chunks — rejected: one clone of everything in one task.
-- **Tradeoff accepted:** A new upload is on disk only after the 500 ms debounce and its save; closing the tab inside that window loses it (the flush on `pagehide` is best effort). The `upgrade()` to v2 runs in the versionchange transaction and blocks once, on first open, for as long as the old full-row records take to split. Datasets that fail validation on load stay in the database untouched (before, the next save's `clear()` dropped them). Bench numbers at 1M rows are incomplete — see the 4c.1 report; the date-toggle save after a calculated column was pathological in Node + fake-indexeddb on a 7.6 GB machine and was not diagnosed.
+- **Tradeoff accepted:** A new upload is on disk only after the 500 ms debounce and its save; closing the tab inside that window loses it (the flush on `pagehide` is best effort). The `upgrade()` to v2 runs in the versionchange transaction and blocks once, on first open, for as long as the old full-row records take to split. Datasets that fail validation on load stay in the database untouched (before, the next save's `clear()` dropped them). Bench numbers at 1M rows are incomplete — see the 4c.1 report; the date-toggle save after a calculated column was pathological in Node + fake-indexeddb on a 7.6 GB machine and was not diagnosed (diagnosed later: see "Day/month toggle parses each distinct date text once").
 - **Source:** `made-now`
 
 ### 2026-10-29 — Charts keep no row copy (`ChartConfig.data` removed)
@@ -179,6 +278,7 @@ Newest first. Entries marked `Source: inferred` were reconstructed from existing
 - **Source:** `made-now`
 
 ### 2026-10-28 — e2e suite runs in CI before the build
+- **Superseded by** "CI: e2e in its own parallel job; deploy waits for both" (2026-10-29).
 - **Decision:** `deploy.yml` runs `npm run test:e2e` right after the unit tests. The Playwright Chromium install moved up to run before it; the production smoke gate still runs after the build.
 - **Why:** The e2e suite had rotted (3 of 5 failing) because nothing ran it. Running it before the build fails fast without building a deploy artifact.
 - **Alternatives considered:** A separate parallel job — rejected for now, it would repeat `npm ci` and the browser install, and the deploy job would need a `needs:` dependency anyway. Running it against `vite preview` (prod build) — rejected, the smoke gate already covers the prod bundle and the specs are written against the dev server config.

@@ -37,7 +37,9 @@ export interface DatasetRowChunk {
 export const ROW_CHUNK_SIZE = 20_000;
 
 export function toStoredDataset(dataset: Dataset): StoredDataset {
-  const { data, dateSourceValues, ...rest } = dataset;
+  const { data, dateSourceValues, rowsPending, ...rest } = dataset;
+  // Rows not loaded: keep what is on disk (data is [] here, not the real rows).
+  if (rowsPending) return { ...rest, ...rowsPending };
   return {
     ...rest,
     rowCount: data.length,
@@ -57,6 +59,16 @@ export function toRowChunk(dataset: Dataset, index: number): DatasetRowChunk {
     }
   }
   return chunk;
+}
+
+/** A dataset whose rows stay on disk until it is selected (see Dataset.rowsPending). */
+export function toPendingDataset(stored: StoredDataset): Dataset {
+  const { rowCount, chunkCount, dateSourceColumns, ...rest } = stored;
+  return {
+    ...rest,
+    data: [],
+    rowsPending: { rowCount, chunkCount, ...(dateSourceColumns ? { dateSourceColumns } : {}) },
+  } as Dataset;
 }
 
 /** Rebuilds the in-memory Dataset; null if the chunks don't add up to the stored row count. */

@@ -1,5 +1,7 @@
 import { ReactNode, useEffect, useRef } from "react";
 import { useUiStore } from "@/store/uiStore";
+import { useDatasetStore } from "@/store/datasetStore";
+import { LoadingProgress } from "@/shared/components/LoadingSpinner";
 
 interface MainContentProps {
   children: ReactNode;
@@ -7,6 +9,8 @@ interface MainContentProps {
 
 export function MainContent({ children }: MainContentProps) {
   const activeView = useUiStore((state) => state.activeView);
+  // A dataset left on disk at startup is being read after being selected (datasetStore.loadRows).
+  const rowsLoading = useDatasetStore((state) => state.rowsLoading);
   const mainRef = useRef<HTMLElement>(null);
   const isFirstRender = useRef(true);
 
@@ -25,7 +29,16 @@ export function MainContent({ children }: MainContentProps) {
   return (
     <div className="flex-1 flex flex-col min-h-screen">
       <main ref={mainRef} id="main-content" className="flex-1 p-8 overflow-auto">
-        {children}
+        {rowsLoading ? (
+          <LoadingProgress
+            title={`Loading “${rowsLoading.name}”`}
+            step="Reading its rows from this browser's storage"
+            loaded={rowsLoading.loadedRows}
+            total={rowsLoading.totalRows}
+          />
+        ) : (
+          children
+        )}
       </main>
     </div>
   );

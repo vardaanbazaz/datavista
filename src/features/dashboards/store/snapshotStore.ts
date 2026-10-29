@@ -110,6 +110,13 @@ export const useSnapshotStore = create<SnapshotState>((set, get) => ({
       const dataset = useDatasetStore
         .getState()
         .datasets.find((d) => d.id === snapshot.datasetState?.activeDatasetId);
+      // Rows still on disk (left there at startup): load them, then restore.
+      if (dataset?.rowsPending) {
+        void useDatasetStore.getState().loadRows(dataset.id).then((loaded) => {
+          if (loaded) get().restoreSnapshot(id);
+        });
+        return;
+      }
       if (dataset) {
         useDatasetStore.setState({ activeDataset: dataset });
       }

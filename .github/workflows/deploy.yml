@@ -16,17 +16,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-and-deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  # Fast gates; runs in parallel with e2e.
+  checks:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '20.x'
           cache: 'npm'
@@ -47,24 +45,63 @@ jobs:
       - name: Time Zone Gate (Dates)
         run: npm run test:tz
 
+  # Full e2e suite against the dev server (playwright.config.ts), so it can't rot again.
+  # Its own job: it is most of the run time, so the other gates no longer wait behind it.
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
-      # Full e2e suite against the dev server (playwright.config.ts), so it can't rot again.
       - name: End-to-End Gate (Playwright)
         run: npm run test:e2e
 
+  # Builds, smoke-tests the exact bundle it deploys, and deploys, once both gate jobs pass.
+  deploy:
+    needs: [checks, e2e]
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
       - name: Build Artifact
         run: npm run build
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
 
       - name: Production Smoke Gate
         run: npx playwright test --config playwright.prod.config.ts
 
       - name: Upload Artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: './dist'
 
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

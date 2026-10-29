@@ -1,6 +1,8 @@
 import { ChartConfig, DataRow, Dataset } from "@/shared/types";
 import { computeOutliers } from "@/shared/services/stats/outliers";
 import { mean as meanOf, numericValues } from "@/shared/utils/numeric";
+import { aggregationFlag } from "@/shared/utils/columnRoles";
+import { chartReduction } from "@/features/charts/lib/chartAggregation";
 
 export interface DetectedAnomaly {
   id: string;
@@ -20,14 +22,25 @@ export const anomalyDetector = {
    * Detects statistical outliers in the rows a chart plots. Charts keep no row copy, so the
    * caller passes them: ChartVisualization its live query rows, the executive summary the
    * active dataset's filtered rows.
+   *
+   * With `dataset`, a sum or count (the chart default is sum) of a year- or ID-like column
+   * (utils/columnRoles.ts) reports nothing: "outlier" years or IDs are just old titles or
+   * high numbers, not anomalies.
    */
-  detectChartAnomalies(chart: ChartConfig, rows: DataRow[]): DetectedAnomaly[] {
+  detectChartAnomalies(chart: ChartConfig, rows: DataRow[], dataset?: Dataset | null): DetectedAnomaly[] {
     if (!rows || rows.length < 3) return [];
 
     const valueCol = chart.yAxis || Object.keys(rows[0] || {}).find(
       (k) => k !== chart.xAxis && typeof rows[0][k] === "number"
     );
     if (!valueCol) return [];
+    const reduction = chartReduction(chart.aggregation);
+    if (
+      aggregationFlag(dataset, valueCol) &&
+      (reduction === "sum" || reduction === "count" || reduction === "count_rows" || reduction === "count_distinct")
+    ) {
+      return [];
+    }
 
     const dimCol = chart.xAxis || chart.groupBy;
     const rawValues = rows.map((r) => r[valueCol]);
@@ -64,10 +77,10 @@ export const anomalyDetector = {
   /**
    * Detects anomalies across all active charts in a dashboard, over the same rows
    */
-  detectDashboardAnomalies(charts: ChartConfig[], rows: DataRow[]): DetectedAnomaly[] {
+  detectDashboardAnomalies(charts: ChartConfig[], rows: DataRow[], dataset?: Dataset | null): DetectedAnomaly[] {
     const allAnomalies: DetectedAnomaly[] = [];
     for (const chart of charts) {
-      const chartAnomalies = this.detectChartAnomalies(chart, rows);
+      const chartAnomalies = this.detectChartAnomalies(chart, rows, dataset);
       allAnomalies.push(...chartAnomalies);
     }
     return allAnomalies;

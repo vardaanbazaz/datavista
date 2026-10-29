@@ -8,6 +8,7 @@ import { PivotTable } from "./PivotTable";
 import { AlertCircle, Grid3X3, RefreshCw } from "lucide-react";
 import { Dataset } from "@/shared/types";
 import { getEffectiveColumnType } from "@/shared/utils/columnType";
+import { aggregationFlag } from "@/shared/utils/columnRoles";
 
 export const PivotExplorer: React.FC = () => {
   const activeDataset = useDatasetStore((state) => state.activeDataset);
@@ -32,7 +33,10 @@ export const PivotExplorer: React.FC = () => {
       const t = effectiveTypeOf(name);
       return t === 'categorical' || t === 'date';
     });
-    const defaultVal = columnNames.find(name => effectiveTypeOf(name) === 'numeric');
+    // Prefer a numeric column whose sum means something; a year/ID-like one is counted.
+    const numericCols = columnNames.filter(name => effectiveTypeOf(name) === 'numeric');
+    const defaultVal = numericCols.find(name => !aggregationFlag(activeDataset, name)) ?? numericCols[0];
+    const defaultOp = defaultVal && aggregationFlag(activeDataset, defaultVal) ? 'count' : 'sum';
 
     if (defaultRow && defaultVal) {
       return {
@@ -41,8 +45,8 @@ export const PivotExplorer: React.FC = () => {
         valueFields: [
           {
             column: defaultVal,
-            operator: 'sum',
-            displayName: `SUM of ${defaultVal}`
+            operator: defaultOp,
+            displayName: `${defaultOp.toUpperCase()} of ${defaultVal}`
           }
         ],
         displayOptions: {

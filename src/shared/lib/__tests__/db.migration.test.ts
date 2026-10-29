@@ -89,9 +89,12 @@ describe("Dexie v1 → v2 upgrade", () => {
     expect(await db.datasetRows.where("datasetId").equals("ds2").count()).toBe(1);
     for (const record of await db.charts.toArray()) expect(record).not.toHaveProperty("data");
 
-    // Loaded: equal to what was saved (charts minus their rows).
-    const loaded = useDatasetStore.getState().datasets;
-    expect(loaded).toEqual([ds1, ds2]);
+    // Loaded: equal to what was saved (charts minus their rows). Only the active dataset's
+    // rows are read at startup; ds2's come when it is loaded.
+    const [loaded1, pending2] = useDatasetStore.getState().datasets;
+    expect(loaded1).toEqual(ds1);
+    expect(pending2.rowsPending).toEqual({ rowCount: ds2.data.length, chunkCount: 1 });
+    expect(await useDatasetStore.getState().loadRows("ds2")).toEqual(ds2);
     expect(useDatasetStore.getState().activeDataset?.id).toBe("ds1");
     expect([...useChartStore.getState().charts].sort((a, b) => a.id.localeCompare(b.id))).toEqual(charts);
     expect(useDashboardStore.getState().dashboards).toEqual(dashboards);

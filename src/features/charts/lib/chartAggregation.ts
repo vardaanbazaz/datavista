@@ -1,7 +1,7 @@
 import { AggregationOperator, ChartConfig, DataRow } from "@/shared/types";
 import { aggregateRows } from "@/shared/services/queryEngine";
 import { columnNumbers, toNumberOrNull } from "@/shared/utils/numeric";
-import { dateKeyMs } from "@/shared/utils/dates";
+import { DatePeriod, dateKeyMs, periodKey, periodKeyRange } from "@/shared/utils/dates";
 
 export type AxisValueType = "numeric" | "categorical" | "date";
 
@@ -161,3 +161,108 @@ export function sortAxisKeys(keys: string[], type: AxisValueType): string[] {
 export function formatChartValue(value: number): string {
   return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
+
+/** Date X-axis bucket: a fixed period, or "auto" (see resolveDateGranularity). */
+export type DateGranularity = "auto" | DatePeriod;
+
+export const DATE_GRANULARITIES: DateGranularity[] = ["auto", "year", "quarter", "month", "week", "day"];
+
+const PERIOD_NAME: Record<DatePeriod, string> = {
+  year: "Year",
+  quarter: "Quarter",
+  month: "Month",
+  week: "Week",
+  day: "Day",
+};
+
+export function granularityName(g: DateGranularity): string {
+  return g === "auto" ? "Auto" : PERIOD_NAME[g];
+}
+
+/** Most buckets "auto" will choose; past this a bar chart is too dense to read. */
+export const AUTO_MAX_BUCKETS = 60;
+const FINEST_FIRST: DatePeriod[] = ["day", "week", "month", "quarter", "year"];
+
+/**
+ * The period a date axis is bucketed by. A fixed choice is returned as is; "auto" (also a
+ * saved chart with no setting) is the finest period giving at most AUTO_MAX_BUCKETS
+ * buckets, and "year" when even years are more. One pass over the distinct values, with
+ * each period's key set capped just past the limit.
+ */
+export function resolveDateGranularity(values: Iterable<unknown>, requested: DateGranularity | undefined): DatePeriod {
+  if (requested && requested !== "auto") return requested;
+  const sets = FINEST_FIRST.map(() => new Set<string>());
+  // Rows repeat their dates a lot: look at each distinct value once.
+  const seen = new Set<unknown>();
+  for (const v of values) {
+    if (seen.has(v)) continue;
+    seen.add(v);
+    for (let i = 0; i < FINEST_FIRST.length; i++) {
+      const set = sets[i];
+      if (set.size > AUTO_MAX_BUCKETS) continue;
+      const key = periodKey(v, FINEST_FIRST[i]);
+      if (key !== null) set.add(key);
+    }
+    if (sets[sets.length - 1].size > AUTO_MAX_BUCKETS) break; // even years are too many
+  }
+  const i = sets.findIndex(s => s.size <= AUTO_MAX_BUCKETS);
+  return i === -1 ? "year" : FINEST_FIRST[i];
+}
+
+/** Bar/axis key of rows whose date is blank or not a valid date. */
+export const NO_DATE_KEY = "(No date)";
+
+/** The bucket key of one cell ("2008", "2008-Q3", "2008-07", "2008-W27", "2008-07-04"), or NO_DATE_KEY. */
+export function dateBucketKey(value: unknown, period: DatePeriod): string {
+  return periodKey(value, period) ?? NO_DATE_KEY;
+}
+
+/** dateBucketKey for many rows: each distinct cell value is parsed once. */
+export function dateBucketer(period: DatePeriod): (value: unknown) => string {
+  const keys = new Map<unknown, string>();
+  return (value) => {
+    let key = keys.get(value);
+    if (key === undefined) {
+      key = dateBucketKey(value, period);
+      keys.set(value, key);
+    }
+    return key;
+  };
+}
+
+/** "date_added (Year)": the axis label of a bucketed date column. */
+export function dateBucketLabel(column: string, period: DatePeriod): string {
+  return `${column} (${PERIOD_NAME[period]})`;
+}
+
+/**
+ * First and last calendar day of a bucket key, as a `between` filter value, so a click on
+ * the "2008" bar filters the rows dated in 2008. Null for NO_DATE_KEY or a non-date key.
+ */
+export function dateBucketRange(key: string): { start: string; end: string } | null {
+  return periodKeyRange(key);
+}
+
+/** d3 time format for a date axis bucketed by `period`. */
+export function dateTickFormat(period: DatePeriod | null): string {
+  if (period === "year") return "%Y";
+  if (period === "quarter" || period === "month") return "%Y-%m";
+  return "%Y-%m-%d";
+}
+
+/** Key of the bar that collects every category outside the top N. */
+export const OTHER_KEY = "Other";
+
+/**
+ * Keys of the `n` largest values (ties: first seen), for a "Top N + Other" bar chart.
+ * Null when there are no more than n keys (nothing to fold).
+ */
+export function topKeys(values: Map<string, number>, n: number): Set<string> | null {
+  if (values.size <= n) return null;
+  const ranked = Array.from(values).sort((a, b) => b[1] - a[1]);
+  return new Set(ranked.slice(0, n).map(([k]) => k));
+}
+
+/** A bar chart with more bars than this gets a hint to bucket coarser or show the top N. */
+export const MANY_BARS = 200;
+export const TOP_N_DEFAULT = 20;

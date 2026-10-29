@@ -278,3 +278,18 @@
   .chart-4 { color: hsl(var(--chart-4)); }
   .chart-5 { color: hsl(var(--chart-5)); }
 }
+/*
+ * Chart axes (ChartVisualization's svg.dv-chart). d3 draws tick text and lines in
+ * `currentColor`, which in dark mode is the body's near-white text: on a dense axis the
+ * labels merged into a white block. Muted text and border-coloured lines in both themes.
+ * The dashed grid (.grid-horizontal) keeps its own stroke.
+ */
+.dv-chart .tick text {
+  fill: hsl(var(--muted-foreground));
+  font-size: 10px;
+}
+
+.dv-chart g:not(.grid-horizontal) > .domain,
+.dv-chart g:not(.grid-horizontal) > .tick line {
+  stroke: hsl(var(--border));
+}

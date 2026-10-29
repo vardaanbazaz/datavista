@@ -13,6 +13,7 @@ import {
   parseDateValue,
   parseStoredDate,
   periodKey,
+  periodKeyRange,
   rangeBoundDay,
   stepDateKey,
 } from '../dates';
@@ -192,6 +193,19 @@ describe('stored dates', () => {
     expect(stepDateKey('2024', 2)).toBe('2026');
     expect(stepDateKey('2020-W53', 1)).toBe('2021-W01');
     expect(stepDateKey('abc', 1)).toBeNull();
+  });
+});
+
+describe('periodKeyRange', () => {
+  it('first and last day of a period key or stored date', () => {
+    expect(periodKeyRange('2008')).toEqual({ start: '2008-01-01', end: '2008-12-31' });
+    expect(periodKeyRange('2024-Q1')).toEqual({ start: '2024-01-01', end: '2024-03-31' });
+    expect(periodKeyRange('2024-02')).toEqual({ start: '2024-02-01', end: '2024-02-29' });
+    expect(periodKeyRange('2023-12')).toEqual({ start: '2023-12-01', end: '2023-12-31' });
+    expect(periodKeyRange('2024-W01')).toEqual({ start: '2024-01-01', end: '2024-01-07' });
+    expect(periodKeyRange('2024-02-29T10:30')).toEqual({ start: '2024-02-29', end: '2024-02-29' });
+    expect(periodKeyRange('(No date)')).toBeNull();
+    expect(periodKeyRange(2024)).toBeNull();
   });
 });
 

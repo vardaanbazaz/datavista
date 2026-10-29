@@ -32,6 +32,13 @@ export interface Dataset {
    * differs from the revision on disk; metadata-only actions leave it alone.
    */
   rowsRevision?: number;
+  /**
+   * Set while the rows are still on disk only: startup reads the active dataset's rows and
+   * leaves the others as metadata (`data` is []), loading them when selected
+   * (datasetStore.loadRows). Carries the stored counts so saving the metadata of an
+   * unloaded dataset never records it as empty.
+   */
+  rowsPending?: { rowCount: number; chunkCount: number; dateSourceColumns?: string[] };
 }
 
 export interface ChartConfig {
@@ -49,6 +56,13 @@ export interface ChartConfig {
   drillPath?: string[]; // Dimension hierarchy for drill-down
   formattingRules?: ConditionalFormatRule[];
   forecast?: ForecastConfig;
+  /**
+   * Bucket of a date X axis (bar, pie, and line/area with an aggregation). Absent (charts
+   * saved before it existed) or unknown values mean "auto". See chartAggregation.ts.
+   */
+  dateGranularity?: 'auto' | 'year' | 'quarter' | 'month' | 'week' | 'day';
+  /** Bar charts with a categorical X: keep the N largest bars and fold the rest into "Other". */
+  topN?: number;
 }
 
 export interface FilterState {

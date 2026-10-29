@@ -13,7 +13,8 @@ import { ChartGrid } from "@/features/charts/components/ChartGrid";
 import { DashboardSummary } from "./DashboardSummary";
 import { WelcomeOverlay } from "./WelcomeOverlay";
 import { OnboardingTour } from "@/features/ui/components/OnboardingTour";
-import { LoadingState } from "@/shared/components/LoadingSpinner";
+import { LoadingProgress, LoadingState } from "@/shared/components/LoadingSpinner";
+import { perfMark, perfMeasure } from "@/shared/lib/perfMarks";
 import { ErrorBoundary, FullPageError } from "@/shared/components/ErrorBoundary";
 
 const PivotExplorer = lazy(() => import("@/features/pivot/components/PivotExplorer").then(m => ({ default: m.PivotExplorer })));
@@ -45,6 +46,7 @@ export function Dashboard() {
   // (see uiStore.ts) - gating on that one let the dashboard render before actual data
   // had loaded.
   const isDataHydrated = useUiStore((state) => state.isDataHydrated);
+  const startupStatus = useUiStore((state) => state.startupStatus);
   const setIsSnapshotManagerOpen = useUiStore((state) => state.setIsSnapshotManagerOpen);
 
   const activeDataset = useDatasetStore((state) => state.activeDataset);
@@ -87,6 +89,15 @@ export function Dashboard() {
     persistenceService.init();
   }, []);
 
+  // Startup timing (src/shared/lib/perfMarks.ts): hydrated → the workspace's first paint.
+  useEffect(() => {
+    if (!isDataHydrated) return;
+    requestAnimationFrame(() => setTimeout(() => {
+      perfMark("startup:first-render");
+      perfMeasure("startup:render", "startup:hydrated");
+    }, 0));
+  }, [isDataHydrated]);
+
   // Show welcome overlay on first visit
   useEffect(() => {
     if (!isDataHydrated) return;
@@ -100,9 +111,11 @@ export function Dashboard() {
   if (!isDataHydrated) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center w-full">
-        <LoadingState 
-          title="Loading Workspace..." 
-          description="Restoring your offline-first dashboard..."
+        <LoadingProgress
+          title="Opening your workspace"
+          step={startupStatus?.step ?? "Starting up"}
+          loaded={startupStatus?.loadedRows}
+          total={startupStatus?.totalRows}
         />
       </div>
     );

@@ -7,7 +7,10 @@ import { Label } from "@/shared/components/ui/label";
 import { Badge } from "@/shared/components/ui/badge";
 import { Plus, BarChart, LineChart, PieChart, ScatterChart, X, Palette, Gauge, TrendingUp } from "lucide-react";
 import { useMemo } from "react";
-import { ChartConfig, ConditionalFormatRule } from "@/shared/types";
+import { AggregationOperator, ChartConfig, ConditionalFormatRule } from "@/shared/types";
+import { aggregationFlag, aggregationNote } from "@/shared/utils/columnRoles";
+import { getEffectiveColumnType } from "@/shared/utils/columnType";
+import { DATE_GRANULARITIES, DateGranularity, granularityName, TOP_N_DEFAULT } from "@/features/charts/lib/chartAggregation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/components/ui/dialog";
 import { useDatasetStore } from "@/store/datasetStore";
 import { useChartStore } from "@/store/chartStore";
@@ -38,6 +41,12 @@ export function ChartBuilder() {
   const [yAxis, setYAxis] = useState('');
   const [groupBy, setGroupBy] = useState('none');
   const [sizeBy, setSizeBy] = useState('');
+  // 'none' = line/area plot each row's value. Follows the Y column (Count for year/ID-like
+  // columns) until the user picks one.
+  const [aggregation, setAggregation] = useState<AggregationOperator | 'none'>('sum');
+  const [aggregationTouched, setAggregationTouched] = useState(false);
+  const [dateGranularity, setDateGranularity] = useState<DateGranularity>('auto');
+  const [topN, setTopN] = useState(0);
   const [formattingRules, setFormattingRules] = useState<ConditionalFormatRule[]>([]);
   const [isFormattingModalOpen, setIsFormattingModalOpen] = useState(false);
 
@@ -104,6 +113,28 @@ export function ChartBuilder() {
     return dataset.columnTypes[col] || 'categorical';
   };
 
+  const reducesPerKey = (type: string, agg: AggregationOperator | 'none') =>
+    type === 'bar' || type === 'pie' || ((type === 'line' || type === 'area') && agg !== 'none');
+  const defaultAggregation = (type: string, y: string): AggregationOperator | 'none' => {
+    if (aggregationFlag(dataset, y)) return 'count';
+    return type === 'line' || type === 'area' ? 'none' : 'sum';
+  };
+  const chooseChartType = (type: string) => {
+    setChartType(type);
+    if (!aggregationTouched) setAggregation(defaultAggregation(type, yAxis));
+  };
+  const chooseYAxis = (y: string) => {
+    setYAxis(y);
+    if (!aggregationTouched) setAggregation(defaultAggregation(chartType, y));
+  };
+  const showsAggregation = ['bar', 'pie', 'line', 'area'].includes(chartType) && !!yAxis;
+  const yFlag = aggregationFlag(dataset, yAxis);
+  const note = showsAggregation && aggregation !== 'none' ? aggregationNote(yFlag, aggregation) : null;
+  const xIsDate = !!dataset && !!xAxis && getEffectiveColumnType(dataset, xAxis) === 'date';
+  const xIsCategorical = !!dataset && !!xAxis && getEffectiveColumnType(dataset, xAxis) === 'categorical';
+  const showsGranularity = xIsDate && reducesPerKey(chartType, aggregation);
+  const showsTopN = chartType === 'bar' && xIsCategorical;
+
   if (!dataset) {
     return (
       <div className="text-center py-12">
@@ -127,6 +158,9 @@ export function ChartBuilder() {
       yAxis: yAxis || undefined,
       groupBy: groupBy && groupBy !== 'none' ? groupBy : undefined,
       sizeBy: sizeBy || undefined,
+      aggregation: showsAggregation && aggregation !== 'none' ? aggregation : undefined,
+      dateGranularity: showsGranularity && dateGranularity !== 'auto' ? dateGranularity : undefined,
+      topN: showsTopN && topN > 0 ? topN : undefined,
       datasetId: activeDataset?.id || "",
       drillPath: xAxis ? [xAxis, ...drillPath] : undefined,
       formattingRules: formattingRules.length > 0 ? formattingRules : undefined,
@@ -152,6 +186,10 @@ export function ChartBuilder() {
     setGroupBy('none');
     setSizeBy('');
     setFormattingRules([]);
+    setAggregation(defaultAggregation(chartType, ''));
+    setAggregationTouched(false);
+    setDateGranularity('auto');
+    setTopN(0);
   };
 
   const isFormValid = () => {
@@ -222,7 +260,7 @@ export function ChartBuilder() {
                     >
                       <Button
                         variant={chartType === type.value ? "premium" : "outline"}
-                        onClick={() => setChartType(type.value)}
+                        onClick={() => chooseChartType(type.value)}
                         className="transition-all duration-200"
                       >
                         <Icon className="w-4 h-4 mr-2" />
@@ -353,7 +391,7 @@ export function ChartBuilder() {
             {chartType !== 'histogram' && (
               <div className="space-y-2">
                 <Label>Y Axis</Label>
-                <Select value={yAxis} onValueChange={setYAxis}>
+                <Select value={yAxis} onValueChange={chooseYAxis}>
                   <SelectTrigger aria-label="Y axis column">
                     <SelectValue placeholder="Select column" />
                   </SelectTrigger>
@@ -368,6 +406,75 @@ export function ChartBuilder() {
                         </div>
                       </SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {showsAggregation && (
+              <div className="space-y-2">
+                <Label>Aggregation</Label>
+                <Select
+                  value={aggregation}
+                  onValueChange={(val: AggregationOperator | 'none') => {
+                    setAggregation(val);
+                    setAggregationTouched(true);
+                  }}
+                >
+                  <SelectTrigger aria-label="Aggregation">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(chartType === 'line' || chartType === 'area') && (
+                      <SelectItem value="none">None (plot each row)</SelectItem>
+                    )}
+                    <SelectItem value="sum">Sum</SelectItem>
+                    <SelectItem value="avg">Average</SelectItem>
+                    <SelectItem value="median">Median</SelectItem>
+                    <SelectItem value="min">Minimum</SelectItem>
+                    <SelectItem value="max">Maximum</SelectItem>
+                    <SelectItem value="count">Count</SelectItem>
+                    <SelectItem value="count_distinct">Distinct count</SelectItem>
+                    <SelectItem value="count_rows">Count of rows</SelectItem>
+                  </SelectContent>
+                </Select>
+                {note && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400" role="note" data-testid="aggregation-note">
+                    {note}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {showsGranularity && (
+              <div className="space-y-2">
+                <Label>Group dates by</Label>
+                <Select value={dateGranularity} onValueChange={(val: DateGranularity) => setDateGranularity(val)}>
+                  <SelectTrigger aria-label="Group dates by">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DATE_GRANULARITIES.map((g) => (
+                      <SelectItem key={g} value={g}>
+                        {g === 'auto' ? 'Auto (at most 60 groups)' : granularityName(g)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {showsTopN && (
+              <div className="space-y-2">
+                <Label>Bars</Label>
+                <Select value={String(topN)} onValueChange={(val) => setTopN(Number(val))}>
+                  <SelectTrigger aria-label="Bars to show">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">All categories</SelectItem>
+                    <SelectItem value="10">Top 10 + Other</SelectItem>
+                    <SelectItem value={String(TOP_N_DEFAULT)}>Top {TOP_N_DEFAULT} + Other</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

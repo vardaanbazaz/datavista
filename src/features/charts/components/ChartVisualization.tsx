@@ -15,7 +15,9 @@ import { toast } from "@/shared/hooks/use-toast";
 import { ErrorBoundary, WidgetError } from "@/shared/components/ErrorBoundary";
 import { getEffectiveColumnType } from "@/shared/utils/columnType";
 import { numericValues, toNumberOrNull } from "@/shared/utils/numeric";
-import { dateKeyMs } from "@/shared/utils/dates";
+import { dateKeyMs, type DatePeriod } from "@/shared/utils/dates";
+import { useChartStore } from "@/store/chartStore";
+import { layoutBottomAxisLabels } from "@/features/charts/lib/axisLabels";
 import {
   aggregateValues as aggregateRows,
   aggregateValuesOrNull,
@@ -24,6 +26,17 @@ import {
   LinePoint,
   formatChartValue,
   sortAxisKeys,
+  DATE_GRANULARITIES,
+  resolveDateGranularity,
+  dateBucketer,
+  dateBucketLabel,
+  dateBucketRange,
+  dateTickFormat,
+  granularityName,
+  topKeys,
+  OTHER_KEY,
+  MANY_BARS,
+  TOP_N_DEFAULT,
 } from "@/features/charts/lib/chartAggregation";
 
 import { pluginRegistry } from "@/shared/services/pluginRegistry";
@@ -52,6 +65,17 @@ interface HeatmapCell {
   value: number;
 }
 
+/** Shown above a bar chart with more than MANY_BARS bars. */
+interface BarHint {
+  bars: number;
+  /** The date bucket in use, when the X axis is a date column. */
+  period: DatePeriod | null;
+}
+
+function* columnValues(rows: DataRow[], column: string) {
+  for (const row of rows) yield row[column];
+}
+
 const DEFAULT_CHART_HEIGHT = 300;
 const MIN_FIT_HEIGHT = 250;
 
@@ -62,6 +86,8 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
   const [width, setWidth] = useState(500);
   const [plotHeight, setPlotHeight] = useState<number | null>(null);
   const [isDrillMode, setIsDrillMode] = useState(false);
+  const [barHint, setBarHint] = useState<BarHint | null>(null);
+  const updateChart = useChartStore((state) => state.updateChart);
 
   const pluginChartDef = pluginRegistry.getCustomChart(chart.type);
 
@@ -130,10 +156,11 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
     return result.rows;
   }, [dataset, activeFilters, activeGlobalFilters, chart.id, drillState]);
 
-  // Detect statistical anomalies in the rows this chart plots
+  // Detect statistical anomalies in the rows this chart plots (none for sums/counts of
+  // year- or ID-like columns: see anomalyDetector).
   const chartAnomalies = useMemo(() => {
-    return anomalyDetector.detectChartAnomalies(chart, chartData);
-  }, [chart, chartData]);
+    return anomalyDetector.detectChartAnomalies(chart, chartData, dataset);
+  }, [chart, chartData, dataset]);
 
   // Apply forecasting engine if configured for line or area charts
   const processedChartData = useMemo(() => {
@@ -302,13 +329,50 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
     const aggregateByDimension = (rows: typeof chartData, dimension: string, column: string): DataRow[] =>
       Array.from(
         // A group with no valid numbers is null (a gap), not the 0 an empty sum/avg gives.
-        d3.rollup(rows, v => aggregateValuesOrNull(v, column, chart.aggregation, numericColumns), d => String(d[dimension])),
+        d3.rollup(rows, v => aggregateValuesOrNull(v, column, chart.aggregation, numericColumns), d => xKeyOf(d, dimension)),
         ([key, value]) => ({ [dimension]: key, [column]: value }) as DataRow
       );
 
     const xType = currentDimension ? getColumnType(currentDimension) : 'categorical';
     const yType = chart.yAxis ? getColumnType(chart.yAxis) : 'categorical';
     const sizeType = chart.sizeBy ? getColumnType(chart.sizeBy) : null;
+
+    // Date X axes of charts that reduce rows per x key are bucketed by a period (year,
+    // quarter, ...): chosen in the builder, "auto" for saved charts without the setting.
+    const reducesPerKey =
+      chart.type === 'bar' || chart.type === 'pie' || ((chart.type === 'line' || chart.type === 'area') && !!chart.aggregation);
+    const granularity = DATE_GRANULARITIES.includes(chart.dateGranularity as never) ? chart.dateGranularity : 'auto';
+    const datePeriod: DatePeriod | null =
+      xType === 'date' && reducesPerKey && currentDimension
+        ? resolveDateGranularity(columnValues(chartData, currentDimension), granularity)
+        : null;
+    // Axis label and tooltips name the bucket: "date_added (Year)".
+    const xLabel = datePeriod ? dateBucketLabel(currentDimension, datePeriod) : currentDimension;
+    const bucketOf = datePeriod ? dateBucketer(datePeriod) : null;
+    function xKeyOf(row: DataRow, column: string = currentDimension): string {
+      return bucketOf && column === currentDimension ? bucketOf(row[column]) : String(row[column]);
+    }
+    // Bar charts: the kept keys when Top N folded the rest into "Other".
+    let topNKeys: Set<string> | null = null;
+    let nextBarHint: BarHint | null = null;
+    // What a click on an x key filters: the bucket's day range for a bucketed date, the
+    // value itself otherwise; nothing for "Other" or "(No date)".
+    function clickTarget(key: string): { value: unknown; operator: FilterOperator } | null {
+      if (key === OTHER_KEY && topNKeys) return null;
+      if (!datePeriod) return { value: key, operator: 'equals' };
+      const range = dateBucketRange(key);
+      return range ? { value: range, operator: 'between' } : null;
+    }
+    const opacityOf = (key: string, defaultOpacity: number) => getOpacity(clickTarget(key)?.value ?? key, defaultOpacity);
+    const pick = (key: string) => {
+      const target = clickTarget(key);
+      if (target) handlePointClick(target.value, target.operator);
+    };
+    const rightPick = (event: MouseEvent, key: string) => {
+      const target = clickTarget(key);
+      if (target) handlePointRightClick(event, target.value, target.operator);
+      else event.preventDefault();
+    };
 
     // Validate configuration safety
     let validationError = "";
@@ -465,6 +529,9 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
       console.error(`Error rendering D3 ${chart.type} chart:`, error);
       renderErrorMessage("An error occurred during D3 drawing compilation.");
     }
+    setBarHint(prev =>
+      prev?.bars === nextBarHint?.bars && prev?.period === nextBarHint?.period ? prev : nextBarHint
+    );
 
     function renderErrorMessage(message: string) {
       svg.selectAll("*").remove();
@@ -483,18 +550,26 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
     function renderBarChart() {
       if (!currentDimension || !chart.yAxis) return;
 
+      // One value per x key first: the bar count (hint) and the Top N ranking.
+      const perKey = d3.rollup(chartData, v => aggregateValues(v, chart.yAxis!), d => xKeyOf(d));
+      const topN = xType === 'categorical' && chart.topN && chart.topN > 0 ? Math.floor(chart.topN) : 0;
+      topNKeys = topN ? topKeys(perKey, topN) : null;
+      if (!topNKeys && perKey.size > MANY_BARS) nextBarHint = { bars: perKey.size, period: datePeriod };
+      // "Other" is the aggregate of its rows (right for avg/median/distinct), not a sum of bars.
+      const barKey = topNKeys
+        ? (d: DataRow) => { const k = xKeyOf(d); return topNKeys!.has(k) ? k : OTHER_KEY; }
+        : (d: DataRow) => xKeyOf(d);
+
       const aggregatedData = chart.groupBy
         ? d3.rollup(
             chartData,
             v => aggregateValues(v, chart.yAxis!),
-            d => String(d[currentDimension]),
+            barKey,
             d => String(d[chart.groupBy!])
           )
-        : d3.rollup(
-            chartData,
-            v => aggregateValues(v, chart.yAxis!),
-            d => String(d[currentDimension])
-          );
+        : topNKeys
+          ? d3.rollup(chartData, v => aggregateValues(v, chart.yAxis!), barKey)
+          : perKey;
 
       let data: Array<{ key: string; value: number; group?: string }> = [];
 
@@ -516,7 +591,10 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
       }
 
       // rollup keys come in first-appearance order; numeric/date x values read in order.
-      const xKeys = sortAxisKeys(Array.from(new Set(data.map(d => d.key))), xType);
+      // Top N: largest first, "Other" last.
+      const xKeys = topNKeys
+        ? [...Array.from(topNKeys).sort((a, b) => (perKey.get(b) ?? 0) - (perKey.get(a) ?? 0)), OTHER_KEY]
+        : sortAxisKeys(Array.from(new Set(data.map(d => d.key))), xType);
 
       const xScale = d3.scaleBand()
         .domain(xKeys)
@@ -528,15 +606,11 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
         .nice()
         .range([chartHeight, 0]);
 
-      // X axis
-      chartArea.append("g")
+      // X axis: every Nth label when they don't all fit, long ones cut (full text in <title>).
+      const xAxisG = chartArea.append("g")
         .attr("transform", `translate(0,${chartHeight})`)
-        .call(d3.axisBottom(xScale))
-        .selectAll("text")
-        .style("text-anchor", "end")
-        .attr("dx", "-.8em")
-        .attr("dy", ".15em")
-        .attr("transform", "rotate(-45)");
+        .call(d3.axisBottom(xScale));
+      layoutBottomAxisLabels(xAxisG);
 
       // Horizontal grid lines - faint and dashed (no vertical grid lines)
       chartArea.append("g")
@@ -577,15 +651,16 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
             const style = formattingEngine.evaluateCompiledRules(compiledFormattingRules, evalRow, chart.yAxis || currentDimension);
             return style?.fill || style?.textColor || style?.backgroundColor || (colorScale(d.group!) as string);
           })
-          .attr("opacity", d => getOpacity(d.key, 0.85))
+          .attr("opacity", d => opacityOf(d.key, 0.85))
           .style("cursor", "pointer")
           .call(bars => bars.append("title").text(d =>
-            `${currentDimension}: ${d.key}\n${chart.groupBy}: ${d.group}\n${yValueLabel}: ${formatChartValue(d.value)}\nClick to filter or drill down, right-click for raw rows`
+            `${xLabel}: ${d.key}\n${chart.groupBy}: ${d.group}\n${yValueLabel}: ${formatChartValue(d.value)}\nClick to filter or drill down, right-click for raw rows`
           ))
-          .on("click", (event, d) => handlePointClick(d.key))
+          .on("click", (event, d) => pick(d.key))
           .on("contextmenu", (event, d) => {
             event.preventDefault();
-            if (!dataset) return;
+            const target = clickTarget(d.key);
+            if (!dataset || !target) return;
             const baseQuery: Query = {
               filters: {
                 categoricalFilters: activeFilters.categoricalFilters,
@@ -600,7 +675,7 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
                 mergedQuery.filters!.conditions!.push({ column: f.column, operator: f.operator, value: f.value });
               });
             }
-            mergedQuery.filters!.conditions!.push({ column: currentDimension, operator: 'equals', value: d.key });
+            mergedQuery.filters!.conditions!.push({ column: currentDimension, operator: target.operator, value: target.value });
             mergedQuery.filters!.conditions!.push({ column: chart.groupBy!, operator: 'equals', value: d.group! });
             openDrillThrough(chart.datasetId, mergedQuery, `Raw Data (${currentDimension} = ${d.key}, ${chart.groupBy} = ${d.group})`);
           });
@@ -620,13 +695,13 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
             const style = formattingEngine.evaluateCompiledRules(compiledFormattingRules, evalRow, chart.yAxis || currentDimension);
             return style?.fill || style?.textColor || style?.backgroundColor || "hsl(var(--chart-1))";
           })
-          .attr("opacity", d => getOpacity(d.key, 0.85))
+          .attr("opacity", d => opacityOf(d.key, 0.85))
           .style("cursor", "pointer")
           .call(bars => bars.append("title").text(d =>
-            `${currentDimension}: ${d.key}\n${yValueLabel}: ${formatChartValue(d.value)}\nClick to filter or drill down, right-click for raw rows`
+            `${xLabel}: ${d.key}\n${yValueLabel}: ${formatChartValue(d.value)}\nClick to filter or drill down, right-click for raw rows`
           ))
-          .on("click", (event, d) => handlePointClick(d.key))
-          .on("contextmenu", (event, d) => handlePointRightClick(event, d.key));
+          .on("click", (event, d) => pick(d.key))
+          .on("contextmenu", (event, d) => rightPick(event, d.key));
       }
 
       // Axis labels
@@ -645,7 +720,7 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
         .style("text-anchor", "middle")
         .style("font-size", "11px")
         .style("fill", "hsl(var(--muted-foreground))")
-        .text(currentDimension);
+        .text(xLabel);
     }
 
     function renderLineChart() {
@@ -701,18 +776,12 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
         .attr("transform", `translate(0,${chartHeight})`);
 
       if (xType === 'date') {
-        xAxisG.call(d3.axisBottom(xScale).ticks(Math.max(2, Math.floor(chartWidth / 85))).tickFormat(d3.utcFormat("%Y-%m-%d") as unknown as (dv: d3.NumberValue, i: number) => string));
+        xAxisG.call(d3.axisBottom(xScale).ticks(Math.max(2, Math.floor(chartWidth / 85))).tickFormat(d3.utcFormat(dateTickFormat(datePeriod)) as unknown as (dv: d3.NumberValue, i: number) => string));
       } else {
         xAxisG.call(d3.axisBottom(xScale).ticks(Math.max(2, Math.floor(chartWidth / 85))));
       }
 
-      if (xType === 'categorical' || xType === 'date') {
-        xAxisG.selectAll("text")
-          .style("text-anchor", "end")
-          .attr("dx", "-.8em")
-          .attr("dy", ".15em")
-          .attr("transform", "rotate(-45)");
-      }
+      layoutBottomAxisLabels(xAxisG);
 
       // Horizontal grid lines - faint and dashed
       chartArea.append("g")
@@ -771,13 +840,13 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
           })
           .attr("stroke", ({ row: d }) => d.isForecast ? "hsl(var(--background))" : "none")
           .attr("stroke-width", ({ row: d }) => d.isForecast ? 2 : 0)
-          .attr("opacity", ({ row: d }) => getOpacity(String(d[currentDimension]), d.isForecast ? 0.9 : 0.75))
+          .attr("opacity", ({ row: d }) => opacityOf(String(d[currentDimension]), d.isForecast ? 0.9 : 0.75))
           .style("cursor", "pointer")
           .call(dots => dots.append("title").text(({ row: d, y }) =>
-            `${currentDimension}: ${d[currentDimension]}\n${d.isForecast ? "Forecast (projected) " : ""}${yValueLabel}: ${formatChartValue(y as number)}${d.isForecast ? "" : "\nClick to filter or drill down, right-click for raw rows"}`
+            `${xLabel}: ${d[currentDimension]}\n${d.isForecast ? "Forecast (projected) " : ""}${yValueLabel}: ${formatChartValue(y as number)}${d.isForecast ? "" : "\nClick to filter or drill down, right-click for raw rows"}`
           ))
-          .on("click", (event, { row: d }) => handlePointClick(String(d[currentDimension])))
-          .on("contextmenu", (event, { row: d }) => handlePointRightClick(event, String(d[currentDimension])));
+          .on("click", (event, { row: d }) => pick(String(d[currentDimension])))
+          .on("contextmenu", (event, { row: d }) => rightPick(event, String(d[currentDimension])));
       }
 
       // Labels
@@ -796,7 +865,7 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
         .style("text-anchor", "middle")
         .style("font-size", "11px")
         .style("fill", "hsl(var(--muted-foreground))")
-        .text(currentDimension);
+        .text(xLabel);
     }
 
     function renderPieChart() {
@@ -805,7 +874,7 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
       const aggregatedData = d3.rollup(
         chartData,
         v => aggregateValues(v, chart.yAxis!),
-        d => String(d[currentDimension])
+        d => xKeyOf(d)
       );
 
       const data = Array.from(aggregatedData, ([key, value]) => ({ key, value }))
@@ -846,13 +915,13 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
           const style = formattingEngine.evaluateCompiledRules(compiledFormattingRules, evalRow, chart.yAxis || currentDimension);
           return style?.fill || style?.textColor || style?.backgroundColor || (colorScale(d.data.key) as string);
         })
-        .attr("opacity", d => getOpacity(d.data.key, 0.85))
+        .attr("opacity", d => opacityOf(d.data.key, 0.85))
         .style("cursor", "pointer")
         .call(slices => slices.append("title").text(d =>
-          `${currentDimension}: ${d.data.key}\n${yValueLabel}: ${formatChartValue(d.data.value)}\nClick to filter or drill down, right-click for raw rows`
+          `${xLabel}: ${d.data.key}\n${yValueLabel}: ${formatChartValue(d.data.value)}\nClick to filter or drill down, right-click for raw rows`
         ))
-        .on("click", (event, d) => handlePointClick(d.data.key))
-        .on("contextmenu", (event, d) => handlePointRightClick(event, d.data.key));
+        .on("click", (event, d) => pick(d.data.key))
+        .on("contextmenu", (event, d) => rightPick(event, d.data.key));
 
       arcs.append("text")
         .attr("transform", d => `translate(${arc.centroid(d)})`)
@@ -931,7 +1000,7 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
         .style("text-anchor", "middle")
         .style("font-size", "11px")
         .style("fill", "hsl(var(--muted-foreground))")
-        .text(currentDimension);
+        .text(xLabel);
     }
 
     function renderHistogram() {
@@ -998,7 +1067,7 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
         .style("text-anchor", "middle")
         .style("font-size", "11px")
         .style("fill", "hsl(var(--muted-foreground))")
-        .text(currentDimension);
+        .text(xLabel);
     }
 
     function renderHeatmap() {
@@ -1057,14 +1126,11 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
         ))
         .on("click", (event, d) => handlePointClick(d.x));
 
-      chartArea.append("g")
-        .attr("transform", `translate(0,${chartHeight})`)
-        .call(d3.axisBottom(xScale))
-        .selectAll("text")
-        .style("text-anchor", "end")
-        .attr("dx", "-.8em")
-        .attr("dy", ".15em")
-        .attr("transform", "rotate(-45)");
+      layoutBottomAxisLabels(
+        chartArea.append("g")
+          .attr("transform", `translate(0,${chartHeight})`)
+          .call(d3.axisBottom(xScale))
+      );
 
       chartArea.append("g")
         .call(d3.axisLeft(yScale));
@@ -1084,7 +1150,7 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
         .style("text-anchor", "middle")
         .style("font-size", "11px")
         .style("fill", "hsl(var(--muted-foreground))")
-        .text(currentDimension);
+        .text(xLabel);
     }
 
     function renderAreaChart() {
@@ -1146,18 +1212,12 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
         .attr("transform", `translate(0,${chartHeight})`);
 
       if (xType === 'date') {
-        xAxisG.call(d3.axisBottom(xScale).ticks(Math.max(2, Math.floor(chartWidth / 85))).tickFormat(d3.utcFormat("%Y-%m-%d") as unknown as (dv: d3.NumberValue, i: number) => string));
+        xAxisG.call(d3.axisBottom(xScale).ticks(Math.max(2, Math.floor(chartWidth / 85))).tickFormat(d3.utcFormat(dateTickFormat(datePeriod)) as unknown as (dv: d3.NumberValue, i: number) => string));
       } else {
         xAxisG.call(d3.axisBottom(xScale).ticks(Math.max(2, Math.floor(chartWidth / 85))));
       }
 
-      if (xType === 'categorical' || xType === 'date') {
-        xAxisG.selectAll("text")
-          .style("text-anchor", "end")
-          .attr("dx", "-.8em")
-          .attr("dy", ".15em")
-          .attr("transform", "rotate(-45)");
-      }
+      layoutBottomAxisLabels(xAxisG);
 
       chartArea.append("g")
         .call(d3.axisLeft(yScale));
@@ -1215,13 +1275,13 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
           })
           .attr("stroke", ({ row: d }) => d.isForecast ? "hsl(var(--background))" : "none")
           .attr("stroke-width", ({ row: d }) => d.isForecast ? 2 : 0)
-          .attr("opacity", ({ row: d }) => getOpacity(String(d[currentDimension]), d.isForecast ? 0.9 : 0.75))
+          .attr("opacity", ({ row: d }) => opacityOf(String(d[currentDimension]), d.isForecast ? 0.9 : 0.75))
           .style("cursor", "pointer")
           .call(dots => dots.append("title").text(({ row: d, y }) =>
-            `${currentDimension}: ${d[currentDimension]}\n${d.isForecast ? "Forecast (projected) " : ""}${yValueLabel}: ${formatChartValue(y as number)}${d.isForecast ? "" : "\nClick to filter or drill down, right-click for raw rows"}`
+            `${xLabel}: ${d[currentDimension]}\n${d.isForecast ? "Forecast (projected) " : ""}${yValueLabel}: ${formatChartValue(y as number)}${d.isForecast ? "" : "\nClick to filter or drill down, right-click for raw rows"}`
           ))
-          .on("click", (event, { row: d }) => handlePointClick(String(d[currentDimension])))
-          .on("contextmenu", (event, { row: d }) => handlePointRightClick(event, String(d[currentDimension])));
+          .on("click", (event, { row: d }) => pick(String(d[currentDimension])))
+          .on("contextmenu", (event, { row: d }) => rightPick(event, String(d[currentDimension])));
       }
 
       chartArea.append("text")
@@ -1239,7 +1299,7 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
         .style("text-anchor", "middle")
         .style("font-size", "11px")
         .style("fill", "hsl(var(--muted-foreground))")
-        .text(currentDimension);
+        .text(xLabel);
     }
 
     function renderBubbleChart() {
@@ -1317,7 +1377,7 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
         .style("text-anchor", "middle")
         .style("font-size", "11px")
         .style("fill", "hsl(var(--muted-foreground))")
-        .text(currentDimension);
+        .text(xLabel);
     }
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1423,7 +1483,39 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
             {chartAnomalies.length} {chartAnomalies.length === 1 ? "Outlier" : "Outliers"}
           </Badge>
         )}
-        <svg ref={svgRef} className="w-full h-full max-w-full max-h-full block overflow-visible" role="img" aria-label={chart.title ? `Chart: ${chart.title}` : `${chart.type} visualization`} />
+        {(barHint || (chart.type === 'bar' && chart.topN)) && (
+          <div className="absolute top-1 left-2 z-10 max-w-[80%] flex flex-wrap items-center gap-1 rounded-md border border-border bg-background/95 px-2 py-1 text-[10px] text-muted-foreground" data-testid="chart-density-hint">
+            {barHint ? (
+              <>
+                <span>{barHint.bars.toLocaleString()} bars is too many to read.</span>
+                {barHint.period ? (
+                  <>
+                    <span>Group {currentDimension} by</span>
+                    {(["month", "quarter", "year"] as const)
+                      .filter(p => ["day", "week", "month", "quarter", "year"].indexOf(p) > ["day", "week", "month", "quarter", "year"].indexOf(barHint.period!))
+                      .map(p => (
+                        <Button key={p} variant="outline" size="sm" className="h-5 px-1.5 text-[10px]" onClick={() => updateChart(chart.id, { dateGranularity: p })}>
+                          {granularityName(p)}
+                        </Button>
+                      ))}
+                  </>
+                ) : chart.topN ? null : (
+                  <Button variant="outline" size="sm" className="h-5 px-1.5 text-[10px]" onClick={() => updateChart(chart.id, { topN: TOP_N_DEFAULT })}>
+                    Show Top {TOP_N_DEFAULT} + Other
+                  </Button>
+                )}
+              </>
+            ) : (
+              <>
+                <span>Top {chart.topN} + Other</span>
+                <Button variant="ghost" size="sm" className="h-5 px-1.5 text-[10px]" onClick={() => updateChart(chart.id, { topN: undefined })}>
+                  Show all
+                </Button>
+              </>
+            )}
+          </div>
+        )}
+        <svg ref={svgRef} className="dv-chart w-full h-full max-w-full max-h-full block overflow-visible" role="img" aria-label={chart.title ? `Chart: ${chart.title}` : `${chart.type} visualization`} />
         
         {/* Screen Reader Accessible Fallback Table */}
         <div className="sr-only">

@@ -40,8 +40,8 @@ describe('persistenceService hydrate - allIntegerValues backfill', () => {
 
   it('backfills allIntegerValues on hydrate for a dataset persisted before this field existed', async () => {
     await persistenceService.hydrate();
-
-    const hydrated = useDatasetStore.getState().datasets.find(d => d.id === 'ds1')!;
+    // Not the active dataset, so its rows (and the backfill) come when it is loaded.
+    const hydrated = (await useDatasetStore.getState().loadRows('ds1'))!;
     const col = hydrated.metadata!.columns.find(c => c.name === 'Education')!;
     expect(col.allIntegerValues).toBe(true);
   });

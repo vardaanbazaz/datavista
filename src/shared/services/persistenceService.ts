@@ -1,5 +1,6 @@
 import Dexie, { type Table } from "dexie";
-import { db, toStoredDataset, toRowChunk, fromStoredDataset, type DatasetRowChunk } from "@/shared/lib/db";
+import { db, toStoredDataset, toRowChunk, toPendingDataset } from "@/shared/lib/db";
+import { readDatasetRows, prepareLoadedDataset } from "@/shared/services/datasetRows";
 import { useUiStore } from "@/store/uiStore";
 import { useDatasetStore } from "@/store/datasetStore";
 import { useFilterStore } from "@/store/filterStore";
@@ -16,10 +17,9 @@ import {
 } from "@/shared/utils/validators";
 import { Dataset, ChartConfig, Dashboard, FilterState, Query } from "@/shared/types";
 import { queryEngine } from "@/shared/services/queryEngine";
-import { formulaEngine } from "@/shared/services/formulaEngine";
-import { windowEngine } from "@/shared/services/window";
 import type { PivotConfig } from "@/shared/services/pivot";
 import { toast } from "@/shared/hooks/use-toast";
+import { perfMark, perfMeasure } from "@/shared/lib/perfMarks";
 
 function createDebouncer(delay: number) {
   let timer: ReturnType<typeof setTimeout> | null = null;
@@ -100,9 +100,11 @@ function createDatasetSync() {
 
   async function saveRows(id: string) {
     const d = latest(id);
-    if (!d) return;
+    // Rows still on disk only (Dataset.rowsPending): nothing in memory to write.
+    if (!d || d.rowsPending) return;
     const stored = toStoredDataset(d);
     target.set(id, rowsRevision(d));
+    perfMark("rows-save");
     try {
       await db.transaction("rw", db.datasets, db.datasetRows, async () => {
         // One put per chunk, awaited in turn: each is its own structured clone, so the
@@ -117,6 +119,7 @@ function createDatasetSync() {
         await db.datasets.put(stored);
       });
       onDisk.set(id, rowsRevision(d));
+      perfMeasure("rows-save", "rows-save");
     } catch (e) {
       // Nothing was written (the transaction aborted). Forget the target so the next
       // change to this dataset tries the rows again.
@@ -165,7 +168,11 @@ function createDatasetSync() {
         enqueue(() => remove(id));
       }
       for (const d of next) {
-        if (prevById.get(d.id) === d) continue;
+        const before = prevById.get(d.id);
+        if (before === d) continue;
+        // Rows just read from disk (datasetStore.loadRows): the same version as on disk,
+        // only re-derived (calculated columns, backfills), so nothing to write.
+        if (before?.rowsPending && !d.rowsPending && rowsRevision(before) === rowsRevision(d)) continue;
         if (target.get(d.id) !== rowsRevision(d)) {
           target.set(d.id, rowsRevision(d));
           dirty.add(d.id);
@@ -266,53 +273,41 @@ function reportSyncFailure(what: string, e: unknown) {
   }
 }
 
-/**
- * Datasets persisted before ColumnMetadata.allIntegerValues existed load without it.
- * Recompute it from the dataset's own rows so the "might be categorical" heuristic
- * (src/shared/utils/columnType.ts) doesn't have to special-case a missing field beyond
- * its existing fail-closed default. No-ops (returns the dataset unchanged) if metadata
- * is absent or every column already has the field.
- */
-function backfillAllIntegerValues(dataset: Dataset): Dataset {
-  if (!dataset.metadata) return dataset;
-  const needsBackfill = dataset.metadata.columns.some((c) => c.allIntegerValues === undefined);
-  if (!needsBackfill) return dataset;
-
-  return {
-    ...dataset,
-    metadata: {
-      ...dataset.metadata,
-      columns: dataset.metadata.columns.map((col) => {
-        if (col.allIntegerValues !== undefined) return col;
-        if (col.inferredDataType !== 'numeric') return { ...col, allIntegerValues: false };
-        const allIntegers = dataset.data.every((row) => {
-          const val = row[col.name];
-          return val === null || val === undefined || (typeof val === 'number' && Number.isInteger(val));
-        });
-        return { ...col, allIntegerValues: allIntegers };
-      }),
-    },
-  };
+/** Startup step for the loading screen (uiStore.startupStatus). */
+function setStartupStatus(step: string, loadedRows?: number, totalRows?: number) {
+  useUiStore.setState({ startupStatus: { step, loadedRows, totalRows } });
 }
 
-async function loadDatasets(): Promise<{ datasets: Dataset[] }> {
+/**
+ * The stored datasets, with rows read only for `activeId`: the others stay on disk
+ * (Dataset.rowsPending) until selected (datasetStore.loadRows), so a big inactive dataset
+ * no longer delays startup.
+ */
+async function loadDatasets(activeId: string | null | undefined): Promise<Dataset[]> {
+  perfMark("startup:metadata");
   const stored = await db.datasets.toArray();
+  perfMeasure("startup:read-metadata", "startup:metadata");
   const datasets: Dataset[] = [];
   for (const s of stored) {
-    // Chunk by chunk inside one read transaction: a consistent snapshot, and each chunk is
-    // its own structured clone, so no single main-thread block covers all the rows.
-    const chunks = await db.transaction("r", db.datasetRows, async () => {
-      const out: (DatasetRowChunk | undefined)[] = [];
-      for (let i = 0; i < (s.chunkCount ?? 0); i++) {
-        out.push(await db.datasetRows.get([s.id, i]));
-      }
-      return out;
-    });
-    const dataset = fromStoredDataset(s, chunks);
-    if (dataset) datasets.push(dataset);
-    else console.error(`Dataset ${s.id} has missing row chunks; skipped.`);
+    if (s.id !== activeId) {
+      datasets.push(toPendingDataset(s));
+      continue;
+    }
+    setStartupStatus(`Loading rows of “${s.name}”`, 0, s.rowCount);
+    perfMark("startup:rows");
+    const dataset = await readDatasetRows(s, (loaded, total) => setStartupStatus(`Loading rows of “${s.name}”`, loaded, total));
+    perfMeasure("startup:read-rows", "startup:rows");
+    if (!dataset) {
+      console.error(`Dataset ${s.id} has missing row chunks; skipped.`);
+      continue;
+    }
+    // Calculated and window columns are computed, not stored.
+    setStartupStatus(`Preparing “${s.name}”`);
+    perfMark("startup:evaluate");
+    datasets.push(prepareLoadedDataset(dataset));
+    perfMeasure("startup:evaluate", "startup:evaluate");
   }
-  return { datasets };
+  return datasets;
 }
 
 const datasetSync = createDatasetSync();
@@ -395,16 +390,14 @@ export const persistenceService = {
     }, 4000);
 
     try {
-      // 1. Fetch datasets (metadata records + their row chunks)
-      const { datasets: allDatasets } = await loadDatasets();
-      const validDatasets = allDatasets.filter(isValidDataset);
+      setStartupStatus("Opening the local database");
+      // Dexie opens the database on the first read, so this measure is open + one small read.
+      perfMark("startup:open-db");
 
-      // 2. Fetch charts
-      const allCharts = await db.charts.toArray();
-      const validCharts = allCharts.filter((c) => isValidChartConfig(c) && validDatasets.some((d) => d.id === c.datasetId));
-
-      // 3. Fetch filters
+      // 1. Fetch filters
       const allFilters = await db.filters.toArray();
+      perfMeasure("startup:open-db", "startup:open-db");
+      setStartupStatus("Reading saved datasets");
       const validFiltersMap: Record<string, FilterState> = {};
       allFilters.forEach((f) => {
         if (isValidFilterState(f.state)) {
@@ -412,7 +405,7 @@ export const persistenceService = {
         }
       });
 
-      // 4. Fetch UI preferences
+      // 2. Fetch UI preferences
       const preferences = await db.uiState.toArray();
       // Only entries that passed isValidUIState are stored, so the known keys carry the
       // types that validator enforces.
@@ -423,26 +416,26 @@ export const persistenceService = {
         }
       });
 
-      // Fetch dashboards
+      // 3. Fetch dashboards
       const allDashboards = await db.dashboards.toArray();
       const validDashboards = allDashboards.filter(isValidDashboard);
 
-      // 5. Hydrate datasetStore
-      // Re-run BOTH formulaEngine and windowEngine here, not just formulaEngine — this is
-      // the sole bridge from persisted (IndexedDB) data into a live session, so it's the
-      // one place a defensive re-evaluation is worth its cost: it self-heals any dataset
-      // that was persisted with calculatedFields/windowQueries defined but without their
-      // materialized columns (e.g. from before this fix, or from any future bypass that
-      // writes datasets[] directly). windowEngine.evaluate no-ops for datasets with no
-      // window queries, so this is free for the common case.
-      const evaluatedDatasets = validDatasets
-        .map(backfillAllIntegerValues)
-        .map(d => windowEngine.evaluate(formulaEngine.evaluateCalculatedFields(d)));
+      // 4. Datasets: rows only for the one the session reopens on (the active dashboard's
+      // dataset, else the active dataset); loaded ones get their calculated and window
+      // columns re-materialized (datasetRows.prepareLoadedDataset).
+      const reopenDashboard = validDashboards.find((d) => d.id === prefs["activeDashboardId"]);
+      const reopenDatasetId = reopenDashboard ? reopenDashboard.datasetId : (prefs["activeDatasetId"] as string | null | undefined);
+      const evaluatedDatasets = (await loadDatasets(reopenDatasetId)).filter(isValidDataset);
+
+      // 5. Fetch charts
+      const allCharts = await db.charts.toArray();
+      const validCharts = allCharts.filter((c) => isValidChartConfig(c) && evaluatedDatasets.some((d) => d.id === c.datasetId));
+
       useDatasetStore.setState({
         datasets: evaluatedDatasets
       });
 
-      // 6. Hydrate chartStore
+      // Hydrate chartStore
       useChartStore.setState({
         charts: validCharts
       });
@@ -458,7 +451,7 @@ export const persistenceService = {
       
       if (activeDashboard) {
         useDashboardStore.setState({ activeDashboardId: activeDashboard.id });
-        const activeDataset = evaluatedDatasets.find((d) => d.id === activeDashboard.datasetId);
+        const activeDataset = evaluatedDatasets.find((d) => d.id === activeDashboard.datasetId && !d.rowsPending);
         if (activeDataset) {
           useDatasetStore.setState({ activeDataset });
           await restorePivotConfig(activeDataset.id);
@@ -489,7 +482,7 @@ export const persistenceService = {
         }
       } else {
         const activeDatasetId = prefs["activeDatasetId"];
-        const activeDataset = evaluatedDatasets.find((d) => d.id === activeDatasetId);
+        const activeDataset = evaluatedDatasets.find((d) => d.id === activeDatasetId && !d.rowsPending);
         if (activeDataset) {
           useDatasetStore.setState({ activeDataset });
           await restorePivotConfig(activeDataset.id);
@@ -542,7 +535,8 @@ export const persistenceService = {
       hydratedState = { datasets: evaluatedDatasets, charts: validCharts, dashboards: validDashboards };
 
       // Trigger hydration readiness (real IndexedDB load complete)
-      useUiStore.setState({ isDataHydrated: true });
+      perfMark("startup:hydrated");
+      useUiStore.setState({ isDataHydrated: true, startupStatus: null });
     } catch (error) {
       console.error("Hydration failed, falling back to clean memory state:", error);
       toast({

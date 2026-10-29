@@ -23,7 +23,7 @@ export const summaryEngine = {
     }
 
     // 1. Detect statistical anomalies
-    let anomalies = anomalyDetector.detectDashboardAnomalies(charts, rows ?? dataset.data);
+    let anomalies = anomalyDetector.detectDashboardAnomalies(charts, rows ?? dataset.data, dataset);
     if (anomalies.length === 0) {
       anomalies = anomalyDetector.detectDatasetAnomalies(dataset);
     }

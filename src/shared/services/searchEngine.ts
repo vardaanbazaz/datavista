@@ -1,3 +1,4 @@
+import { datasetRowCount } from "@/shared/services/datasetRows";
 import { useDatasetStore } from "@/store/datasetStore";
 import { useDashboardStore } from "@/features/dashboards/store/dashboardStore";
 import { useTemplateStore } from "@/features/dashboards/store/templateStore";
@@ -58,7 +59,7 @@ export const searchEngine = {
           id: `ds-${dataset.id}`,
           type: "dataset",
           title: dataset.name,
-          subtitle: `${dataset.data?.length || 0} rows, ${dataset.columns?.length || 0} columns`,
+          subtitle: `${datasetRowCount(dataset)} rows, ${dataset.columns?.length || 0} columns`,
           datasetId: dataset.id,
         });
       }

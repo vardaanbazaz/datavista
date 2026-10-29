@@ -7,6 +7,8 @@ interface ChartState {
   setCharts: (charts: ChartConfig[]) => void;
   createChart: (chart: ChartConfig) => void;
   deleteChart: (chartId: string) => void;
+  /** Changes some settings of one chart (e.g. its date bucket or Top N from the chart's hint). */
+  updateChart: (chartId: string, changes: Partial<Omit<ChartConfig, "id">>) => void;
   deleteDatasetCharts: (datasetId: string) => void;
 }
 
@@ -32,6 +34,10 @@ export const useChartStore = create<ChartState>((set) => ({
     return { charts: updatedCharts };
   }),
   
+  updateChart: (chartId, changes) => set((state) => ({
+    charts: state.charts.map(c => (c.id === chartId ? { ...c, ...changes } : c)),
+  })),
+
   deleteDatasetCharts: (datasetId) => set((state) => ({
     charts: state.charts.filter(c => c.datasetId !== datasetId)
   }))

@@ -159,6 +159,13 @@ function restoreExternalContext(snapshot: DashboardSnapshotState) {
     const dataset = snapshot.activeDatasetId
       ? useDatasetStore.getState().datasets.find(d => d.id === snapshot.activeDatasetId) ?? null
       : null;
+    // Rows still on disk (left there at startup): load them, then apply this context.
+    if (dataset?.rowsPending) {
+      void useDatasetStore.getState().loadRows(dataset.id).then((loaded) => {
+        if (loaded) restoreExternalContext(snapshot);
+      });
+      return;
+    }
     // Raw setState (not setActiveDataset): mirrors what loadDashboard did, without
     // re-running formulaEngine/windowEngine augmentation on the restored object.
     useDatasetStore.setState({ activeDataset: dataset });
@@ -482,6 +489,15 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         title: "Error",
         description: "Dashboard not found.",
         variant: "destructive",
+      });
+      return;
+    }
+
+    // Its dataset's rows are still on disk (left there at startup): load, then open.
+    const pending = useDatasetStore.getState().datasets.find(d => d.id === dashboard.datasetId && d.rowsPending);
+    if (pending) {
+      void useDatasetStore.getState().loadRows(pending.id).then((loaded) => {
+        if (loaded) get().loadDashboard(id);
       });
       return;
     }

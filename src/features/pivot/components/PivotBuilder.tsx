@@ -2,6 +2,7 @@ import React from "react";
 import { cn } from "@/shared/lib/utils";
 import { Dataset, AggregationOperator } from "@/shared/types";
 import { getEffectiveColumnType } from "@/shared/utils/columnType";
+import { aggregationFlag, aggregationNote } from "@/shared/utils/columnRoles";
 import { PivotConfig, PivotValueField } from "@/shared/services/pivot";
 import { usePivotStore } from "@/store/pivotStore";
 import { Button } from "@/shared/components/ui/button";
@@ -145,7 +146,8 @@ export const PivotBuilder: React.FC<PivotBuilderProps> = ({ dataset }) => {
   const addValueField = (colName: string, operator: AggregationOperator = 'sum') => {
     // We can allow multiple of the same value fields with different aggregates
     const colMetadata = columns.find(c => c.name === colName);
-    const resolvedOp = (colMetadata?.type === 'numeric' ? operator : 'count') as AggregationOperator;
+    // Year- and ID-like numbers start as Count (adding them up means nothing); the user can still pick Sum.
+    const resolvedOp = (colMetadata?.type === 'numeric' && !aggregationFlag(dataset, colName) ? operator : 'count') as AggregationOperator;
     
     const vf: PivotValueField = {
       column: colName,
@@ -482,6 +484,11 @@ export const PivotBuilder: React.FC<PivotBuilderProps> = ({ dataset }) => {
                         ))}
                       </SelectContent>
                     </Select>
+                    {aggregationNote(aggregationFlag(dataset, vf.column), vf.operator) && (
+                      <p className="text-[10px] leading-snug text-amber-600 dark:text-amber-400" role="note" data-testid="aggregation-note">
+                        {aggregationNote(aggregationFlag(dataset, vf.column), vf.operator)}
+                      </p>
+                    )}
 
                     {/* Weighted Average Secondary Input */}
                     {vf.operator === "weighted_average" && (

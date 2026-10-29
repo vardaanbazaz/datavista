@@ -109,8 +109,12 @@ test.describe("Disabled icon controls explain themselves", () => {
     await undo.click({ force: true });
     await expect(undo).toHaveAttribute("aria-disabled", "true");
 
-    // Keyboard users reach it too.
+    // Keyboard users reach it too. The click left the button focused, so focus() alone
+    // would fire no focus event and only the closing hover tooltip could satisfy the
+    // check (it failed whenever that one closed first). Blur, wait for no tooltip, refocus.
     await page.mouse.move(0, 0);
+    await undo.blur();
+    await expect(page.getByRole("tooltip")).toHaveCount(0);
     await undo.focus();
     await expect(page.getByRole("tooltip")).toContainText("nothing to undo yet");
   });

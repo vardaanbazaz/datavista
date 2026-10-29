@@ -23,6 +23,7 @@ import { KPICardConfig } from "../types";
 import { AggregationOperator, ConditionalFormatRule } from "@/shared/types";
 import { ConditionalFormattingBuilder } from "@/features/dashboards/components/ConditionalFormattingBuilder";
 import { getEffectiveColumnTypes } from "@/shared/utils/columnType";
+import { aggregationFlag, aggregationNote } from "@/shared/utils/columnRoles";
 import { Palette } from "lucide-react";
 
 interface KPIBuilderProps {
@@ -38,6 +39,8 @@ export function KPIBuilder({ isOpen, onClose, onSave, editKpi = null }: KPIBuild
   const [title, setTitle] = useState("");
   const [metricCol, setMetricCol] = useState("");
   const [aggregation, setAggregation] = useState<AggregationOperator>("sum");
+  // Until the user picks an aggregation, it follows the column: Count for year/ID-like ones.
+  const [aggregationTouched, setAggregationTouched] = useState(false);
   const [polarity, setPolarity] = useState<"positive" | "negative">("positive");
   const [enableTrend, setEnableTrend] = useState(false);
   const [trendDateCol, setTrendDateCol] = useState("");
@@ -67,6 +70,7 @@ export function KPIBuilder({ isOpen, onClose, onSave, editKpi = null }: KPIBuild
       setTitle(editKpi.title);
       setMetricCol(editKpi.primaryMetric.column);
       setAggregation(editKpi.primaryMetric.aggregation);
+      setAggregationTouched(true);
       setPolarity(editKpi.polarity);
       setEnableTrend(!!editKpi.trendConfiguration);
       if (editKpi.trendConfiguration) {
@@ -83,6 +87,7 @@ export function KPIBuilder({ isOpen, onClose, onSave, editKpi = null }: KPIBuild
       setTitle("");
       setMetricCol(allColumns[0] || "");
       setAggregation("sum");
+      setAggregationTouched(false);
       setPolarity("positive");
       setEnableTrend(false);
       setTrendDateCol(dateColumns[0] || "");
@@ -146,7 +151,13 @@ export function KPIBuilder({ isOpen, onClose, onSave, editKpi = null }: KPIBuild
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="metric-col" className="text-sm font-semibold">Measure Column</Label>
-                <Select value={metricCol} onValueChange={setMetricCol}>
+                <Select
+                  value={metricCol}
+                  onValueChange={(col) => {
+                    setMetricCol(col);
+                    if (!aggregationTouched) setAggregation(aggregationFlag(dataset, col) ? "count" : "sum");
+                  }}
+                >
                   <SelectTrigger id="metric-col" className="glass">
                     <SelectValue placeholder="Select column" />
                   </SelectTrigger>
@@ -162,7 +173,13 @@ export function KPIBuilder({ isOpen, onClose, onSave, editKpi = null }: KPIBuild
 
               <div className="space-y-2">
                 <Label htmlFor="aggregation" className="text-sm font-semibold">Aggregation</Label>
-                <Select value={aggregation} onValueChange={(val: AggregationOperator) => setAggregation(val)}>
+                <Select
+                  value={aggregation}
+                  onValueChange={(val: AggregationOperator) => {
+                    setAggregation(val);
+                    setAggregationTouched(true);
+                  }}
+                >
                   <SelectTrigger id="aggregation" className="glass">
                     <SelectValue placeholder="Select agg" />
                   </SelectTrigger>
@@ -177,6 +194,11 @@ export function KPIBuilder({ isOpen, onClose, onSave, editKpi = null }: KPIBuild
                     <SelectItem value="stddev">Std. deviation (sample)</SelectItem>
                   </SelectContent>
                 </Select>
+                {aggregationNote(aggregationFlag(dataset, metricCol), aggregation) && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400" role="note" data-testid="aggregation-note">
+                    {aggregationNote(aggregationFlag(dataset, metricCol), aggregation)}
+                  </p>
+                )}
               </div>
             </div>
 

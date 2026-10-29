@@ -409,9 +409,17 @@ export const reparseDateColumn = (dataset: Dataset, column: string, dayFirst: bo
   const sources = dataset.dateSourceValues?.[column];
   if (!sources || sources.length !== dataset.data.length || !dataset.metadata) return dataset;
 
+  // Each distinct source text is parsed once (a date column repeats its days a lot).
+  const parsed = new Map<string, string>();
   const data = dataset.data.map((row, i) => {
     const src = sources[i];
-    return { ...row, [column]: src === null ? null : (parseDateValue(src, dayFirst) ?? src) };
+    if (src === null) return { ...row, [column]: null };
+    let value = parsed.get(src);
+    if (value === undefined) {
+      value = parseDateValue(src, dayFirst) ?? src;
+      parsed.set(src, value);
+    }
+    return { ...row, [column]: value };
   });
   const analysis = analyzeDateColumn(sources.filter((v): v is string => v !== null), dayFirst, dayFirst);
   const fresh = generateDatasetMetadata(

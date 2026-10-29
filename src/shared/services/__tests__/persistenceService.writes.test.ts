@@ -156,9 +156,13 @@ describe("persistence writes only what an action changed", () => {
 
   it("selecting another dataset writes no rows and no dataset records", async () => {
     app = await setup({ datasets: [makeDataset("ds1", 100), makeDataset("ds2", 100)], active: "ds1" });
+    // ds2 wasn't active, so its rows are still on disk: selecting reads them, writes nothing back.
+    expect(app.useDatasetStore.getState().datasets[1].rowsPending).toBeDefined();
     app.useDatasetStore.getState().selectDataset(app.useDatasetStore.getState().datasets[1]);
+    await app.useDatasetStore.getState().loadRows("ds2");
     await app.persistenceService.whenIdle();
 
+    expect(app.useDatasetStore.getState().activeDataset?.data).toHaveLength(100);
     app.noRowWrites();
     expect(app.spies.metaPut).not.toHaveBeenCalled();
     expect((await app.db.uiState.get("activeDatasetId"))?.value).toBe("ds2");
@@ -334,3 +338,61 @@ async function readBack(a: App) {
   const chunks = await a.db.datasetRows.where("datasetId").equals("ds1").sortBy("index");
   return { meta, chunks };
 }
+
+describe("datasets left on disk at startup (rowsPending)", () => {
+  it("only the active dataset's rows are read; the others keep their stored row count", async () => {
+    app = await setup({ datasets: [makeDataset("ds1", 100), makeDataset("ds2", 45_000)], active: "ds1" });
+    const [ds1, ds2] = app.useDatasetStore.getState().datasets;
+    expect(ds1.data).toHaveLength(100);
+    expect(ds1.rowsPending).toBeUndefined();
+    expect(ds2.data).toHaveLength(0);
+    expect(ds2.rowsPending).toEqual({ rowCount: 45_000, chunkCount: 3 });
+  });
+
+  it("renaming an unloaded dataset writes its metadata with the stored counts, and its rows survive a reload", async () => {
+    app = await setup({ datasets: [makeDataset("ds1", 100), makeDataset("ds2", 45_000)], active: "ds1" });
+    app.useDatasetStore.getState().renameDataset("ds2", "Renamed");
+    await app.persistenceService.whenIdle();
+    app.noRowWrites();
+    expect(app.spies.metaPut).toHaveBeenCalledTimes(1);
+    const record = await app.db.datasets.get("ds2");
+    expect(record).toMatchObject({ name: "Renamed", rowCount: 45_000, chunkCount: 3 });
+    expect(record).not.toHaveProperty("rowsPending");
+    app.db.close();
+
+    app = await setup({ keepDb: true });
+    const loaded = await app.useDatasetStore.getState().loadRows("ds2");
+    expect(loaded?.name).toBe("Renamed");
+    expect(loaded?.data).toEqual(makeDataset("ds2", 45_000).data);
+  });
+
+  it("deleting an unloaded dataset removes its metadata and every chunk", async () => {
+    app = await setup({ datasets: [makeDataset("ds1", 100), makeDataset("ds2", 45_000)], active: "ds1" });
+    app.useDatasetStore.getState().deleteDataset("ds2");
+    await app.persistenceService.whenIdle();
+    expect(await app.db.datasets.get("ds2")).toBeUndefined();
+    expect(await app.db.datasetRows.where("datasetId").equals("ds2").count()).toBe(0);
+    expect(await app.db.datasetRows.where("datasetId").equals("ds1").count()).toBe(1);
+  });
+
+  it("a rename made while the rows load is kept", async () => {
+    app = await setup({ datasets: [makeDataset("ds1", 100), makeDataset("ds2", 45_000)], active: "ds1" });
+    const load = app.useDatasetStore.getState().loadRows("ds2");
+    app.useDatasetStore.getState().renameDataset("ds2", "Renamed meanwhile");
+    const loaded = await load;
+    await app.persistenceService.whenIdle();
+    expect(loaded?.name).toBe("Renamed meanwhile");
+    expect(app.useDatasetStore.getState().datasets[1].name).toBe("Renamed meanwhile");
+    app.noRowWrites();
+    expect((await app.db.datasets.get("ds2"))?.name).toBe("Renamed meanwhile");
+  });
+
+  it("deleting the active dataset moves to an unloaded one only after its rows are in", async () => {
+    app = await setup({ datasets: [makeDataset("ds1", 100), makeDataset("ds2", 300)], active: "ds1" });
+    app.useDatasetStore.getState().deleteDataset("ds1");
+    expect(app.useDatasetStore.getState().activeDataset).toBeNull();
+    await app.useDatasetStore.getState().loadRows("ds2");
+    expect(app.useDatasetStore.getState().activeDataset?.id).toBe("ds2");
+    expect(app.useDatasetStore.getState().activeDataset?.data).toHaveLength(300);
+  });
+});

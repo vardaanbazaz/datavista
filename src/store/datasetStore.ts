@@ -9,10 +9,27 @@ import { formulaEngine } from "@/shared/services/formulaEngine";
 import { windowEngine } from "@/shared/services/window";
 import { queryCache } from "@/shared/services/optimizer";
 import { reparseDateColumn } from "@/shared/services/parsingService";
+import { perfMark, perfMeasure } from "@/shared/lib/perfMarks";
+import { loadPendingRows } from "@/shared/services/datasetRows";
+
+/** A dataset whose rows are being read from disk (datasetStore.loadRows). */
+export interface RowsLoading {
+  datasetId: string;
+  name: string;
+  loadedRows: number;
+  totalRows: number;
+}
 
 interface DatasetState {
   datasets: Dataset[];
   activeDataset: Dataset | null;
+  /** Set while a dataset left on disk at startup is being loaded. */
+  rowsLoading: RowsLoading | null;
+  /**
+   * The dataset with its rows: as is when loaded, read from disk (with progress in
+   * `rowsLoading`) when it was left there at startup. Null if it's gone or its rows are missing.
+   */
+  loadRows: (datasetId: string) => Promise<Dataset | null>;
   setDatasets: (datasets: Dataset[]) => void;
   setActiveDataset: (dataset: Dataset | null) => void;
   uploadDataset: (dataset: Dataset) => Promise<void>;
@@ -42,6 +59,11 @@ interface DatasetState {
 function withNewRows(dataset: Dataset): Dataset {
   return { ...dataset, rowsRevision: (dataset.rowsRevision ?? 0) + 1 };
 }
+
+/** One read per dataset at a time; a second request waits for the first. */
+const rowLoads = new Map<string, Promise<Dataset | null>>();
+/** The dataset the user picked last, so a slower load that finishes later doesn't take over. */
+let lastSelectedId: string | null = null;
 
 export const useDatasetStore = create<DatasetState>((set, get) => {
   /**
@@ -88,9 +110,65 @@ export const useDatasetStore = create<DatasetState>((set, get) => {
     return evaluated;
   }
 
+  /** Makes a loaded dataset the active one (the shared tail of selectDataset). */
+  function activate(dataset: Dataset) {
+    const evaluated = windowEngine.evaluate(formulaEngine.evaluateCalculatedFields(dataset));
+    set({ activeDataset: evaluated });
+    useFilterStore.getState().setFilteredData(evaluated.data);
+    useFilterStore.getState().resetFilters();
+  }
+
   return {
   datasets: [],
   activeDataset: null,
+  rowsLoading: null,
+
+  loadRows: (datasetId) => {
+    const current = get().datasets.find((d) => d.id === datasetId);
+    if (!current) return Promise.resolve(null);
+    if (!current.rowsPending) return Promise.resolve(current);
+    const running = rowLoads.get(datasetId);
+    if (running) return running;
+
+    const totalRows = current.rowsPending.rowCount;
+    set({ rowsLoading: { datasetId, name: current.name, loadedRows: 0, totalRows } });
+    const job = loadPendingRows(current, (loadedRows) => {
+      if (get().rowsLoading?.datasetId === datasetId) {
+        set({ rowsLoading: { datasetId, name: current.name, loadedRows, totalRows } });
+      }
+    })
+      .then((loaded) => {
+        // The dataset may have been renamed or deleted while its rows were read.
+        const latest = get().datasets.find((d) => d.id === datasetId);
+        if (!latest) return null;
+        if (!loaded) {
+          toast({
+            title: "Dataset could not be loaded",
+            description: `Saved rows of "${latest.name}" are incomplete.`,
+            variant: "destructive",
+          });
+          return null;
+        }
+        // Keep a rename made while loading; metadata from the load (it may be re-derived)
+        // unless the metadata itself changed meanwhile.
+        const merged: Dataset = latest.rowsPending
+          ? { ...loaded, name: latest.name, metadata: latest.metadata === current.metadata ? loaded.metadata : latest.metadata }
+          : latest;
+        if (latest.rowsPending) set({ datasets: get().datasets.map((d) => (d.id === datasetId ? merged : d)) });
+        return merged;
+      })
+      .catch((e) => {
+        console.error(`Failed to load rows of dataset ${datasetId}:`, e);
+        toast({ title: "Dataset could not be loaded", description: String(e), variant: "destructive" });
+        return null;
+      })
+      .finally(() => {
+        rowLoads.delete(datasetId);
+        if (get().rowsLoading?.datasetId === datasetId) set({ rowsLoading: null });
+      });
+    rowLoads.set(datasetId, job);
+    return job;
+  },
   setDatasets: (datasets) => {
     const evaluated = datasets.map(d => windowEngine.evaluate(formulaEngine.evaluateCalculatedFields(d)));
     set({ datasets: evaluated });
@@ -200,10 +278,15 @@ export const useDatasetStore = create<DatasetState>((set, get) => {
   },
   
   selectDataset: (dataset) => {
-    const evaluated = windowEngine.evaluate(formulaEngine.evaluateCalculatedFields(dataset));
-    set({ activeDataset: evaluated });
-    useFilterStore.getState().setFilteredData(evaluated.data);
-    useFilterStore.getState().resetFilters();
+    lastSelectedId = dataset.id;
+    if (!dataset.rowsPending) {
+      activate(dataset);
+      return;
+    }
+    // Rows still on disk: load them (MainContent shows rowsLoading), then switch.
+    void get().loadRows(dataset.id).then((loaded) => {
+      if (loaded && lastSelectedId === dataset.id) activate(loaded);
+    });
   },
   
   renameDataset: (id, newName) => {
@@ -260,9 +343,15 @@ export const useDatasetStore = create<DatasetState>((set, get) => {
     if (activeDataset && activeDataset.id === id) {
       if (updatedDatasets.length > 0) {
         const nextActive = updatedDatasets[0];
-        set({ activeDataset: nextActive });
-        useFilterStore.getState().setFilteredData(nextActive.data);
-        useFilterStore.getState().resetFilters();
+        if (nextActive.rowsPending) {
+          set({ activeDataset: null });
+          useFilterStore.getState().setFilteredData([]);
+          get().selectDataset(nextActive);
+        } else {
+          set({ activeDataset: nextActive });
+          useFilterStore.getState().setFilteredData(nextActive.data);
+          useFilterStore.getState().resetFilters();
+        }
       } else {
         set({ activeDataset: null });
         useFilterStore.getState().setFilteredData([]);
@@ -357,7 +446,9 @@ export const useDatasetStore = create<DatasetState>((set, get) => {
   },
 
   setDateDayFirst: (columnName, dayFirst) => {
+    perfMark("date-toggle");
     applyActiveDatasetUpdate((dataset) => reparseDateColumn(dataset, columnName, dayFirst));
+    perfMeasure("date-toggle", "date-toggle");
   },
 
   dismissDateReimportNotice: (datasetId) => {

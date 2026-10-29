@@ -334,6 +334,28 @@ export function stepDateKey(key: unknown, steps: number): string | null {
 }
 
 /**
+ * First and last calendar day ("YYYY-MM-DD") covered by a stored date (that one day) or a
+ * period key ("2024" → Jan 1–Dec 31, "2024-Q1", "2024-02", "2024-W05"), for a `between`
+ * filter on a chart bucket. Null for anything else.
+ */
+export function periodKeyRange(key: unknown): { start: string; end: string } | null {
+  const stored = parseStoredDate(key);
+  if (stored) {
+    const day = formatCalendar({ year: stored.year, month: stored.month, day: stored.day });
+    return { start: day, end: day };
+  }
+  const start = dateKeyParts(key);
+  const next = stepDateKey(key, 1);
+  const nextStart = next ? dateKeyParts(next) : null;
+  if (!start || !nextStart) return null;
+  const last = new Date(partsToUtcMs(nextStart) - 86_400_000);
+  return {
+    start: formatCalendar({ year: start.year, month: start.month, day: start.day }),
+    end: formatCalendar({ year: last.getUTCFullYear(), month: last.getUTCMonth() + 1, day: last.getUTCDate() }),
+  };
+}
+
+/**
  * A date-picker `Date` (local midnight of the day the user clicked) → "YYYY-MM-DD". Local
  * getters are correct here and only here: the picker's Date stands for a local calendar day.
  */
@@ -426,8 +448,18 @@ export function analyzeDateColumn(
   let firstOver12 = false;
   let secondOver12 = false;
   let numericDayMonthCount = 0;
+  // Date columns repeat values a lot (600k rows, a few thousand days): match each distinct
+  // string once. The shared DateMatch objects are only read below.
+  const seen = new Map<string, DateMatch | null>();
   for (const v of values) {
-    const match = typeof v === "string" ? matchDate(v) : null;
+    let match: DateMatch | null = null;
+    if (typeof v === "string") {
+      match = seen.get(v) ?? null;
+      if (match === null && !seen.has(v)) {
+        match = matchDate(v);
+        seen.set(v, match);
+      }
+    }
     matches.push(match);
     if (match?.shape === "numeric-dm") {
       numericDayMonthCount++;
@@ -447,12 +479,18 @@ export function analyzeDateColumn(
   }
   let validCount = 0;
   const formatCounts = new Map<string, number>();
+  // Per distinct match (shared by equal strings): its label, or null if it isn't valid.
+  const labelOf = new Map<DateMatch, string | null>();
   for (const match of matches) {
     if (!match) continue;
     if (match.shape === "numeric-dm" && ambiguousMixed) continue;
-    if (resolve(match, dayFirst ?? localeDefaultDayFirst)) {
+    let label = labelOf.get(match);
+    if (label === undefined) {
+      label = resolve(match, dayFirst ?? localeDefaultDayFirst) ? formatLabel(match, dayFirst ?? localeDefaultDayFirst) : null;
+      labelOf.set(match, label);
+    }
+    if (label !== null) {
       validCount++;
-      const label = formatLabel(match, dayFirst ?? localeDefaultDayFirst);
       formatCounts.set(label, (formatCounts.get(label) ?? 0) + 1);
     }
   }

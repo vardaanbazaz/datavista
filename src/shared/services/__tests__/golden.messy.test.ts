@@ -83,7 +83,7 @@ const FIXTURES: { file: string; rows: number; numeric: string[] }[] = [
   { file: 'cafe.csv', rows: 81, numeric: ['Quantity', 'Price Per Unit', 'Total Spent'] },
   // Price is categorical in this subset: it oversamples "$x.xx" prices (later batch: currency)
   { file: 'playstore.csv', rows: 80, numeric: ['Rating', 'Reviews'] },
-  { file: 'netflix.csv', rows: 64, numeric: ['release_year'] },
+  { file: 'netflix.csv', rows: 66, numeric: ['release_year'] },
   { file: 'glassdoor.csv', rows: 31, numeric: ['index', 'Rating', 'Founded'] },
 ];
 

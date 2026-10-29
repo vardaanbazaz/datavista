@@ -7,6 +7,13 @@ export type { ViewType };
 
 export type LlmProvider = 'gemini' | 'openai';
 
+/** One startup step: "Loading rows of “sales”", with rows read so far when known. */
+export interface StartupStatus {
+  step: string;
+  loadedRows?: number;
+  totalRows?: number;
+}
+
 interface UiState {
   activeView: ViewType;
   showWelcome: boolean;
@@ -20,6 +27,8 @@ interface UiState {
    * load even starts. UI loading gates should wait on this one, not `isHydrated`.
    */
   isDataHydrated: boolean;
+  /** What startup is doing right now, for the loading screen (persistenceService.hydrate). Not persisted. */
+  startupStatus: StartupStatus | null;
   llmApiKey: string;
   llmProvider: LlmProvider;
   hasSeenTour: boolean;
@@ -58,6 +67,7 @@ export const useUiStore = create<UiState>()(
       theme: 'system',
       isHydrated: false,
       isDataHydrated: false,
+      startupStatus: null,
       llmApiKey: '',
       llmProvider: 'gemini',
       hasSeenTour: false,

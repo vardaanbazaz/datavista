@@ -43,6 +43,7 @@ import { Hint } from "@/shared/components/Hint";
 import { modKey, formatShortcut } from "@/shared/lib/platform";
 import { motion } from "framer-motion";
 import { Sparkles } from "lucide-react";
+import { datasetRowCount } from "@/shared/services/datasetRows";
 
 export function Sidebar({
   onOpenSearch,
@@ -390,7 +391,7 @@ export function Sidebar({
                     <div className="flex-1 min-w-0">
                       <div className="font-medium truncate">{dataset.name}</div>
                       <div className="text-xs text-muted-foreground">
-                        {dataset.data.length} rows, {dataset.columns.length} columns
+                        {datasetRowCount(dataset).toLocaleString()} rows, {dataset.columns.length} columns
                       </div>
                     </div>
                   </Button>

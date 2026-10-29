@@ -151,7 +151,7 @@
     }
   },
   "netflix.csv": {
-    "rowCount": 64,
+    "rowCount": 66,
     "columns": [
       "show_id",
       "type",
@@ -176,23 +176,24 @@
         "std": 1309.7464131146405
       },
       "release_year": {
-        "count": 64,
-        "sum": 128811.0,
-        "mean": 2012.671875,
+        "count": 66,
+        "sum": 132824.0,
+        "mean": 2012.4848484848485,
         "min": 1925.0,
         "max": 2021.0,
-        "std": 15.54517705791429
+        "std": 15.341489672170216
       }
     },
     "dateStats": {
       "date_added": {
         "format": "%B %d, %Y",
-        "validCount": 60,
+        "validCount": 62,
         "invalidCount": 0,
         "missingCount": 4,
-        "min": "2014-11-07",
+        "min": "2008-01-01",
         "max": "2021-09-25",
         "yearCounts": {
+          "2008": 2,
           "2014": 1,
           "2016": 3,
           "2017": 7,
