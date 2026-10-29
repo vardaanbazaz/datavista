@@ -39,13 +39,13 @@ describe("columnAggregationFlag", () => {
   });
 
   it("id: an id-like name word", () => {
-    for (const name of ["Customer ID", "StockCode", "EmployeeNumber", "zip", "PIN", "phone", "Invoice No"]) {
+    for (const name of ["Customer ID", "StockCode", "EmployeeNumber", "zip", "PIN", "phone", "Invoice No", "Invoice", "invoice_id"]) {
       expect(columnAggregationFlag(col(name)), name).toBe("id");
     }
   });
 
   it("never matches inside words: paid, valid, width, decode, phoneme", () => {
-    for (const name of ["paid", "valid", "width", "decode", "Phoneme", "Ideal", "nominal"]) {
+    for (const name of ["paid", "valid", "width", "decode", "Phoneme", "Ideal", "nominal", "Invoiced amount"]) {
       expect(columnAggregationFlag(col(name)), name).toBe(null);
     }
   });

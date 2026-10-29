@@ -1,5 +1,5 @@
 import Dexie, { type Table } from "dexie";
-import { db, toStoredDataset, toRowChunk, toPendingDataset } from "@/shared/lib/db";
+import { db, toStoredDataset, toRowChunk, toPendingDataset, compareDatasetOrder } from "@/shared/lib/db";
 import { readDatasetRows, prepareLoadedDataset } from "@/shared/services/datasetRows";
 import { useUiStore } from "@/store/uiStore";
 import { useDatasetStore } from "@/store/datasetStore";
@@ -76,6 +76,8 @@ function createDatasetSync() {
   const onDisk = new Map<string, number>();
   /** Revision on disk or waiting to be written. */
   const target = new Map<string, number>();
+  /** The removedDuplicates array on disk, per id: rewritten only when it changes (remove / undo). */
+  const removedOnDisk = new Map<string, Dataset["removedDuplicates"]>();
   /** Ids with a row save waiting for the debounce. */
   const dirty = new Set<string>();
   const debounce = createDebouncer(ROW_SAVE_DELAY_MS);
@@ -106,7 +108,13 @@ function createDatasetSync() {
     target.set(id, rowsRevision(d));
     perfMark("rows-save");
     try {
-      await db.transaction("rw", db.datasets, db.datasetRows, async () => {
+      const removed = d.removedDuplicates;
+      const removedChanged = removedOnDisk.get(id) !== removed;
+      await db.transaction("rw", db.datasets, db.datasetRows, db.removedRows, async () => {
+        if (removedChanged) {
+          if (removed) await db.removedRows.put({ datasetId: id, rows: removed });
+          else await db.removedRows.delete(id);
+        }
         // One put per chunk, awaited in turn: each is its own structured clone, so the
         // main thread is free between them (bulkPut would clone them all in one go).
         for (let i = 0; i < stored.chunkCount; i++) {
@@ -119,6 +127,7 @@ function createDatasetSync() {
         await db.datasets.put(stored);
       });
       onDisk.set(id, rowsRevision(d));
+      removedOnDisk.set(id, removed);
       perfMeasure("rows-save", "rows-save");
     } catch (e) {
       // Nothing was written (the transaction aborted). Forget the target so the next
@@ -130,9 +139,11 @@ function createDatasetSync() {
 
   async function remove(id: string) {
     onDisk.delete(id);
+    removedOnDisk.delete(id);
     try {
-      await db.transaction("rw", db.datasets, db.datasetRows, async () => {
+      await db.transaction("rw", db.datasets, db.datasetRows, db.removedRows, async () => {
         await db.datasets.delete(id);
+        await db.removedRows.delete(id);
         await db.datasetRows
           .where("[datasetId+index]")
           .between([id, Dexie.minKey], [id, Dexie.maxKey], true, true)
@@ -156,6 +167,7 @@ function createDatasetSync() {
       for (const d of datasets) {
         onDisk.set(d.id, rowsRevision(d));
         target.set(d.id, rowsRevision(d));
+        removedOnDisk.set(d.id, d.removedDuplicates);
       }
     },
     onChange(next: Dataset[], prev: Dataset[]) {
@@ -172,7 +184,10 @@ function createDatasetSync() {
         if (before === d) continue;
         // Rows just read from disk (datasetStore.loadRows): the same version as on disk,
         // only re-derived (calculated columns, backfills), so nothing to write.
-        if (before?.rowsPending && !d.rowsPending && rowsRevision(before) === rowsRevision(d)) continue;
+        if (before?.rowsPending && !d.rowsPending && rowsRevision(before) === rowsRevision(d)) {
+          removedOnDisk.set(d.id, d.removedDuplicates);
+          continue;
+        }
         if (target.get(d.id) !== rowsRevision(d)) {
           target.set(d.id, rowsRevision(d));
           dirty.add(d.id);
@@ -285,7 +300,7 @@ function setStartupStatus(step: string, loadedRows?: number, totalRows?: number)
  */
 async function loadDatasets(activeId: string | null | undefined): Promise<Dataset[]> {
   perfMark("startup:metadata");
-  const stored = await db.datasets.toArray();
+  const stored = (await db.datasets.toArray()).sort(compareDatasetOrder);
   perfMeasure("startup:read-metadata", "startup:metadata");
   const datasets: Dataset[] = [];
   for (const s of stored) {
@@ -337,6 +352,17 @@ function seedBaselines() {
 export const persistenceService = {
   isHydrating: false,
   initialized: false,
+  /** Set by "Clear all local data": store changes are no longer written. */
+  stopped: false,
+
+  /**
+   * Stops writing store changes and waits for every write already started or waiting, so
+   * nothing lands in IndexedDB after it has been deleted (clearLocalData.ts).
+   */
+  async stopWriting() {
+    this.stopped = true;
+    await this.whenIdle();
+  },
 
   init() {
     if (this.initialized) return;
@@ -374,7 +400,7 @@ export const persistenceService = {
   },
 
   async hydrate() {
-    if (this.isHydrating) return;
+    if (this.isHydrating || this.stopped) return;
     this.isHydrating = true;
     let hydratedState: { datasets: Dataset[]; charts: ChartConfig[]; dashboards: Dashboard[] } | null = null;
 
@@ -620,7 +646,7 @@ export const persistenceService = {
   subscribeToStoreUpdates() {
     // Watch datasetStore
     useDatasetStore.subscribe((state, prev) => {
-      if (this.isHydrating) return;
+      if (this.isHydrating || this.stopped) return;
 
       // Decide what to write synchronously, before any await, so two quick changes are
       // compared in order.
@@ -637,7 +663,7 @@ export const persistenceService = {
 
     // Watch filterStore
     useFilterStore.subscribe((state) => {
-      if (this.isHydrating) return;
+      if (this.isHydrating || this.stopped) return;
 
       const activeDataset = useDatasetStore.getState().activeDataset;
       if (activeDataset && state.activeFilters !== last.filters) {
@@ -670,7 +696,7 @@ export const persistenceService = {
 
     // Watch chartStore
     useChartStore.subscribe((state, prev) => {
-      if (this.isHydrating) return;
+      if (this.isHydrating || this.stopped) return;
 
       if (state.charts !== prev.charts) {
         // Chart Lifecycle Safety: Clean up deleted charts from all dashboards
@@ -698,7 +724,7 @@ export const persistenceService = {
 
     // Watch dashboardStore
     useDashboardStore.subscribe((state, prev) => {
-      if (this.isHydrating) return;
+      if (this.isHydrating || this.stopped) return;
 
       if (state.dashboards !== prev.dashboards) {
         dashboardSync.schedule(state.dashboards);
@@ -718,7 +744,7 @@ export const persistenceService = {
 
     // Watch uiStore
     useUiStore.subscribe(async (state) => {
-      if (this.isHydrating) return;
+      if (this.isHydrating || this.stopped) return;
 
       if (state.theme !== last.theme) {
         last.theme = state.theme;
@@ -748,7 +774,7 @@ export const persistenceService = {
 
     // Watch pivotStore
     usePivotStore.subscribe((state) => {
-      if (this.isHydrating) return;
+      if (this.isHydrating || this.stopped) return;
       const activeDataset = useDatasetStore.getState().activeDataset;
       if (activeDataset) {
         track(db.uiState.put({

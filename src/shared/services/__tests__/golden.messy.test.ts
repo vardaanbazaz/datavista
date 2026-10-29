@@ -7,6 +7,7 @@ import { queryEngine, numericColumnSet } from '../queryEngine';
 import { statsEngine } from '../stats';
 import { summarizeNumericColumns } from '../stats/columnSummary';
 import { aggregateValues } from '@/features/charts/lib/chartAggregation';
+import { addColumnFix } from '../columnFixes';
 import { Dataset, QueryAggregation } from '../../types';
 
 /**
@@ -33,8 +34,20 @@ function expectStat(actual: Stat, expected: Stat, label: string) {
   for (const k of ['sum', 'mean', 'min', 'max', 'std'] as const) expectClose(actual[k], expected[k], `${label} ${k}`);
 }
 
-function load(file: string): Dataset {
-  return processRawData(parseCsvText(readFileSync(resolve(DIR, file), 'utf8')).rows, file);
+function load(file: string, { exclude = false } = {}): Dataset {
+  const parsed = parseCsvText(readFileSync(resolve(DIR, file), 'utf8'));
+  // "Exclude N rows" in the import summary (importCore.runImport) drops the rows with problems.
+  const bad = new Set(parsed.errors.filter(e => e.row !== undefined).map(e => e.row as number));
+  const rows = exclude ? parsed.rows.filter((_, i) => !bad.has(i)) : parsed.rows;
+  return processRawData(rows, file);
+}
+
+/** Every engine equals the expected stats for `col`. */
+function expectEngines(ds: Dataset, col: string, expected: Stat, label: string) {
+  expect(expected, `no reference stats for ${label} ${col}`).toBeDefined();
+  for (const [engine, stat] of Object.entries(engines(ds, col))) {
+    expectStat(stat, expected, `${label} ${col} [${engine}]`);
+  }
 }
 
 const OPS = ['count', 'sum', 'avg', 'min', 'max', 'stddev'] as const;
@@ -68,21 +81,22 @@ function engines(ds: Dataset, col: string): Record<string, Stat> {
 }
 
 /**
- * Columns whose current-rule values are knowingly wrong and fixed in a later batch, so they
- * are NOT compared with the oracle yet (see the it.todo's). Engines must still agree.
+ * Columns whose plain-import values still hold something the user must approve removing
+ * (the -1 sentinel, the shifted row). On a plain load engines must agree with each other;
+ * the oracle check is done after the fix, below (fixedStats).
  */
 const NOT_ORACLE_CHECKED: Record<string, Record<string, string>> = {
-  'playstore.csv': { Rating: 'shifted row 10473 (Rating 19) is still included' },
+  'playstore.csv': { Rating: 'shifted row 10473 (Rating 19) is kept unless excluded' },
   'glassdoor.csv': {
-    Rating: '-1 sentinel is still included',
-    Founded: '-1 sentinel is still included',
+    Rating: '-1 sentinel is kept until the user treats it as missing',
+    Founded: '-1 sentinel is kept until the user treats it as missing',
   },
 };
 
 const FIXTURES: { file: string; rows: number; numeric: string[] }[] = [
   { file: 'cafe.csv', rows: 81, numeric: ['Quantity', 'Price Per Unit', 'Total Spent'] },
-  // Price is categorical in this subset: it oversamples "$x.xx" prices (later batch: currency)
-  { file: 'playstore.csv', rows: 80, numeric: ['Rating', 'Reviews'] },
+  // Price: "$x.xx" values, converted by the import's currency fix
+  { file: 'playstore.csv', rows: 80, numeric: ['Rating', 'Reviews', 'Price'] },
   { file: 'netflix.csv', rows: 66, numeric: ['release_year'] },
   { file: 'glassdoor.csv', rows: 31, numeric: ['index', 'Rating', 'Founded'] },
 ];
@@ -97,6 +111,10 @@ describe('golden: messy-data fixtures', () => {
         expect(ds.data.length).toBe(rows);
         expect(g.rowCount).toBe(rows);
         expect(ds.columns).toEqual(g.columns);
+      });
+
+      it('exact duplicate rows match pandas duplicated()', () => {
+        expect(ds.metadata!.quality!.duplicateRowCount).toBe(g.duplicateRows);
       });
 
       it('numeric columns are the expected ones', () => {
@@ -173,7 +191,38 @@ describe('golden: messy-data fixtures', () => {
     expect(row.title).toBe('Consequences\u00a0');
   });
 
-  it.todo('glassdoor: Rating/Founded match the oracle with the -1 sentinel excluded (later batch: sentinel handling)');
-  it.todo('playstore: Rating matches the oracle with shifted row 10473 (Rating 19) excluded (later batch: malformed-row handling)');
-  it.todo('playstore: Price "$x.xx" values parse as numbers (later batch: currency parsing)');
+  it('glassdoor: Rating/Founded offer -1 as missing, and after Yes every engine matches the oracle', () => {
+    let ds = load('glassdoor.csv');
+    const fixed = golden['glassdoor.csv'].fixedStats;
+    for (const col of ['Rating', 'Founded']) {
+      const sentinel = ds.metadata!.columns.find(c => c.name === col)!.quality!.sentinel;
+      expect(sentinel, col).toMatchObject({ value: -1 });
+      ds = addColumnFix(ds, { id: `sentinel:${col}`, column: col, kind: 'sentinel', auto: false, sentinel: -1 });
+      expectEngines(ds, col, fixed[col], 'glassdoor.csv (-1 as missing)');
+    }
+  });
+
+  it('playstore: with the parse-problem row excluded, Rating matches the oracle', () => {
+    const parsed = parseCsvText(readFileSync(resolve(DIR, 'playstore.csv'), 'utf8'));
+    const rows = [...new Set(parsed.errors.filter(e => e.row !== undefined).map(e => e.row))];
+    expect(rows).toEqual(golden['playstore.csv'].excludedRows);
+    const ds = load('playstore.csv', { exclude: true });
+    expectEngines(ds, 'Rating', golden['playstore.csv'].fixedStats.Rating, 'playstore.csv (excluded)');
+  });
+
+  it('playstore: Price "$x.xx" converts to numbers (currency USD, "$"), and undo-able', () => {
+    const ds = load('playstore.csv');
+    expect(ds.columnTypes.Price).toBe('numeric');
+    expect(ds.metadata!.columnFixes).toEqual([
+      expect.objectContaining({ column: 'Price', kind: 'currency', auto: true, currency: { code: 'USD', symbol: '$' } }),
+    ]);
+    expect(ds.fixSourceValues!.Price.some(v => typeof v === 'string' && v.startsWith('$'))).toBe(true);
+  });
+
+  it('playstore: Installs "Convert to number…" matches the oracle', () => {
+    let ds = load('playstore.csv', { exclude: true });
+    expect(ds.metadata!.columns.find(c => c.name === 'Installs')!.quality!.suffixCandidate).toBeDefined();
+    ds = addColumnFix(ds, { id: 'numberSuffix:Installs', column: 'Installs', kind: 'numberSuffix', auto: false });
+    expectEngines(ds, 'Installs', golden['playstore.csv'].fixedStats.Installs, 'playstore.csv (Installs converted)');
+  });
 });

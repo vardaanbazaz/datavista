@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { Dataset, CalculatedField, WindowQuery, DataRow, DatasetMetadata } from "@/shared/types";
+import { Dataset, CalculatedField, WindowQuery, DataRow, DatasetMetadata, ColumnFix } from "@/shared/types";
 import { useUiStore } from "./uiStore";
 import { useFilterStore } from "./filterStore";
 import { useChartStore } from "./chartStore";
@@ -9,6 +9,8 @@ import { formulaEngine } from "@/shared/services/formulaEngine";
 import { windowEngine } from "@/shared/services/window";
 import { queryCache } from "@/shared/services/optimizer";
 import { reparseDateColumn } from "@/shared/services/parsingService";
+import { addColumnFix, mergeColumnMeta, removeColumnFix, removeDuplicateRows, restoreDuplicateRows, sourceColumns } from "@/shared/services/columnFixes";
+import { computeColumnMetadata } from "@/shared/services/columnMeta/client";
 import { perfMark, perfMeasure } from "@/shared/lib/perfMarks";
 import { loadPendingRows } from "@/shared/services/datasetRows";
 
@@ -39,7 +41,8 @@ interface DatasetState {
     newMetadata?: DatasetMetadata,
     newColumnTypes?: Record<string, "numeric" | "categorical" | "date">,
     newColumns?: string[],
-    newDateSourceValues?: Dataset["dateSourceValues"]
+    newDateSourceValues?: Dataset["dateSourceValues"],
+    newFixSourceValues?: Dataset["fixSourceValues"]
   ) => void;
   selectDataset: (dataset: Dataset) => void;
   renameDataset: (id: string, newName: string) => void;
@@ -53,12 +56,30 @@ interface DatasetState {
   setDateDayFirst: (columnName: string, dayFirst: boolean) => void;
   /** Hides the "re-import for correct dates" notice for this dataset, for good. */
   dismissDateReimportNotice: (datasetId: string) => void;
+  /** Applies a column fix to the active dataset (services/columnFixes.ts); rows are rewritten. */
+  applyColumnFix: (fix: Omit<ColumnFix, "previousType" | "changedCount">) => void;
+  /** Undoes one column fix, restoring the original cells (and replaying the column's other fixes). */
+  undoColumnFix: (fixId: string) => void;
+  /** Removes the exact duplicate rows found at import, keeping each first occurrence. */
+  removeDuplicates: () => void;
+  /** Puts the removed duplicate rows back where they were. */
+  restoreDuplicates: () => void;
+  /** "Don't ask again" for one data-quality suggestion (metadata only). */
+  dismissSuggestion: (datasetId: string, key: string) => void;
+  /**
+   * Datasets saved before data-quality findings existed: computes them, one column per task,
+   * and stores them in metadata (metadata-only write).
+   */
+  ensureColumnQuality: (datasetId: string) => void;
 }
 
 /** Marks a dataset's cell values as changed, so persistence rewrites its rows. */
 function withNewRows(dataset: Dataset): Dataset {
   return { ...dataset, rowsRevision: (dataset.rowsRevision ?? 0) + 1 };
 }
+
+/** Datasets whose missing data-quality findings are being computed (ensureColumnQuality). */
+const qualityBackfills = new Set<string>();
 
 /** One read per dataset at a time; a second request waits for the first. */
 const rowLoads = new Map<string, Promise<Dataset | null>>();
@@ -116,6 +137,27 @@ export const useDatasetStore = create<DatasetState>((set, get) => {
     set({ activeDataset: evaluated });
     useFilterStore.getState().setFilteredData(evaluated.data);
     useFilterStore.getState().resetFilters();
+  }
+
+  /**
+   * Recounts the metadata of columns whose cells just changed (column fix, duplicates) in a
+   * worker, then stores it, unless the rows changed again meanwhile (a later recount wins).
+   * Until then those columns show their previous counts.
+   */
+  function recountColumns(datasetId: string, columns: string[]) {
+    const dataset = get().datasets.find((d) => d.id === datasetId);
+    if (!dataset?.metadata) return;
+    const revision = dataset.rowsRevision;
+    computeColumnMetadata(dataset, columns)
+      .then((fresh) => {
+        const patch = (d: Dataset): Dataset =>
+          d.id === datasetId && d.metadata && d.rowsRevision === revision
+            ? { ...d, metadata: { ...d.metadata, columns: mergeColumnMeta(d.metadata.columns, fresh) } }
+            : d;
+        const { datasets, activeDataset } = get();
+        set({ datasets: datasets.map(patch), activeDataset: activeDataset ? patch(activeDataset) : null });
+      })
+      .catch((e) => console.error("Column recount failed:", e));
   }
 
   return {
@@ -183,10 +225,13 @@ export const useDatasetStore = create<DatasetState>((set, get) => {
     // Simulate processing time for better UX
     await new Promise(resolve => setTimeout(resolve, 1000));
     
+    // Sidebar position: after every dataset already there (upload order, stable across reloads).
+    const order = get().datasets.reduce((max, d) => Math.max(max, d.order ?? -1), -1) + 1;
     const initialDataset: Dataset = {
       ...dataset,
       version: dataset.version || 1,
       lastUpdated: dataset.lastUpdated || Date.now(),
+      order: dataset.order ?? order,
     };
 
     const evaluated = windowEngine.evaluate(formulaEngine.evaluateCalculatedFields(initialDataset));
@@ -202,13 +247,20 @@ export const useDatasetStore = create<DatasetState>((set, get) => {
     useUiStore.getState().setActiveView('overview');
     useUiStore.getState().setIsLoading(false);
 
+    // Import summary: rows, plus what the data-quality checks found (details in the Data view).
+    const dupes = dataset.metadata?.quality?.duplicateRowCount ?? 0;
+    const converted = (dataset.metadata?.columnFixes ?? []).filter((f) => f.auto).map((f) => f.column);
+    const notes = [
+      dupes > 0 ? `${dupes.toLocaleString()} duplicate ${dupes === 1 ? "row" : "rows"}` : "",
+      converted.length > 0 ? `converted to numbers: ${converted.join(", ")}` : "",
+    ].filter(Boolean);
     toast({
       title: "Dataset uploaded successfully",
-      description: `${dataset.name} with ${dataset.data.length} rows`,
+      description: `${dataset.name} with ${dataset.data.length.toLocaleString()} rows${notes.length ? ` · ${notes.join(" · ")} (see Data view)` : ""}`,
     });
   },
 
-  updateDatasetData: (datasetId, newRawData, newMetadata, newColumnTypes, newColumns, newDateSourceValues) => {
+  updateDatasetData: (datasetId, newRawData, newMetadata, newColumnTypes, newColumns, newDateSourceValues, newFixSourceValues) => {
     const { datasets, activeDataset } = get();
     const targetDataset = datasets.find((d) => d.id === datasetId);
     if (!targetDataset) return;
@@ -251,8 +303,10 @@ export const useDatasetStore = create<DatasetState>((set, get) => {
       lastUpdated: Date.now(),
       calculatedFields: targetDataset.calculatedFields || [],
       windowQueries: targetDataset.windowQueries || [],
-      // Original date text belongs to the rows it came with; old text would misalign.
+      // Original date text and fix sources belong to the rows they came with; old ones would
+      // misalign, so the new file's import fixes replace the old fixes.
       dateSourceValues: newDateSourceValues,
+      fixSourceValues: newFixSourceValues,
     };
 
     const evaluated = windowEngine.evaluate(formulaEngine.evaluateCalculatedFields(withNewRows(updatedDataset)));
@@ -449,6 +503,67 @@ export const useDatasetStore = create<DatasetState>((set, get) => {
     perfMark("date-toggle");
     applyActiveDatasetUpdate((dataset) => reparseDateColumn(dataset, columnName, dayFirst));
     perfMeasure("date-toggle", "date-toggle");
+  },
+
+  applyColumnFix: (fix) => {
+    perfMark("column-fix");
+    const updated = applyActiveDatasetUpdate((dataset) => addColumnFix(dataset, fix, { deferMeta: true }));
+    perfMeasure("column-fix", "column-fix");
+    if (updated) recountColumns(updated.id, [fix.column]);
+  },
+
+  undoColumnFix: (fixId) => {
+    const column = get().activeDataset?.metadata?.columnFixes?.find((f) => f.id === fixId)?.column;
+    perfMark("column-fix");
+    const updated = applyActiveDatasetUpdate((dataset) => removeColumnFix(dataset, fixId, { deferMeta: true }));
+    perfMeasure("column-fix", "column-fix");
+    if (updated && column) recountColumns(updated.id, [column]);
+  },
+
+  removeDuplicates: () => {
+    perfMark("duplicates");
+    const updated = applyActiveDatasetUpdate((dataset) => removeDuplicateRows(dataset, { deferMeta: true }));
+    perfMeasure("duplicates", "duplicates");
+    if (updated) recountColumns(updated.id, sourceColumns(updated));
+  },
+
+  restoreDuplicates: () => {
+    perfMark("duplicates");
+    const updated = applyActiveDatasetUpdate((dataset) => restoreDuplicateRows(dataset, { deferMeta: true }));
+    perfMeasure("duplicates", "duplicates");
+    if (updated) recountColumns(updated.id, sourceColumns(updated));
+  },
+
+  dismissSuggestion: (datasetId, key) => {
+    const dismiss = (d: Dataset): Dataset => {
+      if (d.id !== datasetId || !d.metadata) return d;
+      const quality = d.metadata.quality ?? { duplicateRowCount: 0, duplicateIndices: [] };
+      if (quality.dismissed?.includes(key)) return d;
+      return { ...d, metadata: { ...d.metadata, quality: { ...quality, dismissed: [...(quality.dismissed ?? []), key] } } };
+    };
+    const { datasets, activeDataset } = get();
+    set({ datasets: datasets.map(dismiss), activeDataset: activeDataset ? dismiss(activeDataset) : null });
+  },
+
+  ensureColumnQuality: (datasetId) => {
+    if (qualityBackfills.has(datasetId)) return;
+    const dataset = get().datasets.find((d) => d.id === datasetId);
+    if (!dataset?.metadata || dataset.rowsPending) return;
+    const missing = sourceColumns(dataset).filter((name) => !dataset.metadata!.columns.find((c) => c.name === name)?.quality);
+    if (missing.length === 0) return;
+    qualityBackfills.add(datasetId);
+    computeColumnMetadata(dataset, missing)
+      .then((fresh) => {
+        const byName = new Map(fresh.map((c) => [c.name, c.quality]));
+        const withQuality = (d: Dataset): Dataset =>
+          d.id === datasetId && d.metadata
+            ? { ...d, metadata: { ...d.metadata, columns: d.metadata.columns.map((c) => (!c.quality && byName.get(c.name) ? { ...c, quality: byName.get(c.name) } : c)) } }
+            : d;
+        const { datasets, activeDataset } = get();
+        set({ datasets: datasets.map(withQuality), activeDataset: activeDataset ? withQuality(activeDataset) : null });
+      })
+      .catch((e) => console.error("Data-quality backfill failed:", e))
+      .finally(() => qualityBackfills.delete(datasetId));
   },
 
   dismissDateReimportNotice: (datasetId) => {

@@ -21,6 +21,7 @@ import {
   AlertTriangle
 } from "lucide-react";
 import { Hint } from "@/shared/components/Hint";
+import { columnsOfType } from "@/shared/utils/columnType";
 
 export const WindowExplorer: React.FC = () => {
   const activeDataset = useDatasetStore((state) => state.activeDataset);
@@ -58,12 +59,7 @@ export const WindowExplorer: React.FC = () => {
 
   const numericColumns = useMemo(() => {
     if (!activeDataset) return [];
-    if (activeDataset.metadata) {
-      return activeDataset.metadata.columns
-        .filter(c => c.inferredDataType === 'numeric')
-        .map(c => c.name);
-    }
-    return activeDataset.columns.filter(col => activeDataset.columnTypes[col] === 'numeric');
+    return columnsOfType(activeDataset, 'numeric');
   }, [activeDataset]);
 
   // Defaults

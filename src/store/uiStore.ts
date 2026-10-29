@@ -42,6 +42,9 @@ interface UiState {
    */
   hasAcknowledgedAiInsights: boolean;
   isSnapshotManagerOpen: boolean;
+  /** The "Data & privacy" dialog (clear all local data). Not persisted. */
+  isPrivacyOpen: boolean;
+  setIsPrivacyOpen: (open: boolean) => void;
   setActiveView: (view: ViewType) => void;
   setShowWelcome: (show: boolean) => void;
   setIsLoading: (loading: boolean) => void;
@@ -74,6 +77,7 @@ export const useUiStore = create<UiState>()(
       runTour: false,
       hasAcknowledgedAiInsights: false,
       isSnapshotManagerOpen: false,
+      isPrivacyOpen: false,
       setActiveView: (view) => set({ activeView: view }),
       setShowWelcome: (show) => set({ showWelcome: show }),
       setIsLoading: (loading) => set({ isLoading: loading }),
@@ -88,6 +92,7 @@ export const useUiStore = create<UiState>()(
       resetTour: () => set({ hasSeenTour: false, runTour: true }),
       setHasAcknowledgedAiInsights: (acknowledged) => set({ hasAcknowledgedAiInsights: acknowledged }),
       setIsSnapshotManagerOpen: (open) => set({ isSnapshotManagerOpen: open }),
+      setIsPrivacyOpen: (open) => set({ isPrivacyOpen: open }),
     }),
     {
       name: 'datavista-ui-storage',

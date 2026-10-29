@@ -31,7 +31,17 @@ export function getEffectiveColumnType(
 ): 'numeric' | 'categorical' | 'date' {
   const colMeta = dataset.metadata?.columns.find(c => c.name === columnName);
   if (colMeta?.userOverrideType) return colMeta.userOverrideType;
-  return dataset.columnTypes[columnName];
+  // columnTypes already carries column fixes (a currency column converted to numeric).
+  return dataset.columnTypes[columnName] ?? colMeta?.inferredDataType ?? 'categorical';
+}
+
+/**
+ * Columns of one effective type: every column metadata knows (file, calculated and window
+ * columns), or `dataset.columns` without metadata.
+ */
+export function columnsOfType(dataset: Dataset, type: 'numeric' | 'categorical' | 'date'): string[] {
+  const names = dataset.metadata ? dataset.metadata.columns.map(c => c.name) : dataset.columns;
+  return names.filter(name => getEffectiveColumnType(dataset, name) === type);
 }
 
 /** Bulk form of getEffectiveColumnType, for per-column render loops and all-column filters. */

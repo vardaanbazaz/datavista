@@ -14,5 +14,6 @@ export async function seedDataset(dataset: Dataset) {
   for (let i = 0; i < stored.chunkCount; i++) {
     await db.datasetRows.put(toRowChunk(dataset, i));
   }
+  if (dataset.removedDuplicates) await db.removedRows.put({ datasetId: dataset.id, rows: dataset.removedDuplicates });
   await db.datasets.put(stored);
 }

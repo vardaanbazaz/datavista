@@ -5,6 +5,7 @@ import { computeDescriptive } from "./descriptive";
 import { computeCorrelationMatrix } from "./correlation";
 import { computeOutliers } from "./outliers";
 import { DescriptiveStats, OutlierInfo } from "./types";
+import { columnsOfType } from "@/shared/utils/columnType";
 
 export const statsEngine = {
   /**
@@ -18,9 +19,7 @@ export const statsEngine = {
     const outliers: Record<string, OutlierInfo> = {};
 
     // 1. Resolve numeric columns (imported and calculated)
-    const numericCols = dataset.metadata
-      ? dataset.metadata.columns.filter(c => c.inferredDataType === 'numeric').map(c => c.name)
-      : dataset.columns.filter(col => dataset.columnTypes[col] === "numeric");
+    const numericCols = columnsOfType(dataset, 'numeric');
 
     // 2. Extract column values and run summary calculations
     for (const col of numericCols) {

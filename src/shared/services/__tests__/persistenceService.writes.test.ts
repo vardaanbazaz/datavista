@@ -271,6 +271,92 @@ describe("persistence writes only what an action changed", () => {
   });
 });
 
+describe("column fixes", () => {
+  it("a fix rewrites that dataset's rows once (with its originals, in chunks); undo after a reload restores them", async () => {
+    app = await setup({ datasets: [makeDataset("ds1", 45_000), makeDataset("ds2", 100)], active: "ds1" });
+    const original = app.useDatasetStore.getState().datasets[0].data;
+    app.useDatasetStore.getState().applyColumnFix({ id: "s", column: "Sales", kind: "sentinel", auto: false, sentinel: 0 });
+    await new Promise((r) => setTimeout(r, 0)); // the metadata recount
+    await app.persistenceService.whenIdle();
+    expect(app.rowWrites()).toEqual(["ds1", "ds1", "ds1"]);
+    const chunk = await app.db.datasetRows.get(["ds1", 2]);
+    expect(chunk?.rows[0].Sales).toBe(null); // row 40,000: Sales 0
+    expect(chunk?.fixSourceValues?.Sales[0]).toBe(0);
+    const inMemory = app.useDatasetStore.getState().datasets[0];
+    expect(inMemory.metadata!.columns.find((c) => c.name === "Sales")!.missingValueCount).toBe(900);
+    app.db.close();
+
+    app = await setup({ keepDb: true });
+    const loaded = app.useDatasetStore.getState().datasets[0];
+    expect(loaded.data).toEqual(inMemory.data);
+    expect(loaded.fixSourceValues).toEqual(inMemory.fixSourceValues);
+    expect(loaded.metadata).toEqual(inMemory.metadata);
+
+    app.useDatasetStore.getState().undoColumnFix("s");
+    await new Promise((r) => setTimeout(r, 0));
+    await app.persistenceService.whenIdle();
+    const undone = app.useDatasetStore.getState().datasets[0];
+    expect(undone.data).toEqual(original);
+    expect(undone.fixSourceValues).toBeUndefined();
+    expect((await app.db.datasets.get("ds1"))?.fixSourceColumns).toBeUndefined();
+    expect((await app.db.datasetRows.get(["ds1", 2]))?.fixSourceValues).toBeUndefined();
+  });
+
+  it("removed duplicates live in their own table: a later rename writes no rows and a small record", async () => {
+    const ds = makeDataset("ds1", 100);
+    ds.metadata!.quality = { duplicateRowCount: 3, duplicateIndices: [1, 2, 3] };
+    app = await setup({ datasets: [ds], active: "ds1" });
+    const removedPut = vi.spyOn(app.db.removedRows, "put");
+    app.useDatasetStore.getState().removeDuplicates();
+    await new Promise((r) => setTimeout(r, 0));
+    await app.persistenceService.whenIdle();
+    expect(removedPut).toHaveBeenCalledTimes(1);
+    expect((await app.db.removedRows.get("ds1"))?.rows.map((r) => r.index)).toEqual([1, 2, 3]);
+    const stored = await app.db.datasets.get("ds1");
+    expect(stored?.metadata?.removedDuplicateCount).toBe(3);
+    expect(JSON.stringify(stored)).not.toContain('"row"');
+
+    app.spies.rowPut.mockClear();
+    app.spies.metaPut.mockClear();
+    removedPut.mockClear();
+    app.useDatasetStore.getState().renameDataset("ds1", "Renamed");
+    await app.persistenceService.whenIdle();
+    app.noRowWrites();
+    expect(removedPut).not.toHaveBeenCalled();
+    expect(app.spies.metaPut).toHaveBeenCalledTimes(1);
+    const record = app.spies.metaPut.mock.calls[0][0] as Record<string, unknown>;
+    expect(record).not.toHaveProperty("data");
+    expect(record).not.toHaveProperty("removedDuplicates");
+    expect(JSON.stringify(record)).not.toContain('"row"');
+
+    // A calculated column rewrites the rows but not the removed rows (same array).
+    app.useDatasetStore.getState().addCalculatedField("Double", "[Sales] * 2");
+    await app.persistenceService.whenIdle();
+    expect(removedPut).not.toHaveBeenCalled();
+
+    const inMemory = app.useDatasetStore.getState().datasets[0];
+    app.db.close();
+    app = await setup({ keepDb: true });
+    expect(app.useDatasetStore.getState().datasets[0].removedDuplicates).toEqual(inMemory.removedDuplicates);
+
+    app.useDatasetStore.getState().restoreDuplicates();
+    await new Promise((r) => setTimeout(r, 0));
+    await app.persistenceService.whenIdle();
+    expect(await app.db.removedRows.get("ds1")).toBeUndefined();
+    expect(app.useDatasetStore.getState().datasets[0].data.length).toBe(100);
+    expect((await app.db.datasets.get("ds1"))?.metadata?.removedDuplicateCount).toBeUndefined();
+  });
+
+  it("\"Don't ask again\" writes metadata only", async () => {
+    app = await setup({ datasets: [makeDataset("ds1", 100)], active: "ds1" });
+    app.useDatasetStore.getState().dismissSuggestion("ds1", "sentinel:Sales:-1");
+    await app.persistenceService.whenIdle();
+    app.noRowWrites();
+    expect(app.spies.metaPut).toHaveBeenCalledTimes(1);
+    expect((await app.db.datasets.get("ds1"))?.metadata?.quality?.dismissed).toEqual(["sentinel:Sales:-1"]);
+  });
+});
+
 describe("row saves are chunked and all-or-nothing", () => {
   it("writes a large dataset in chunks and loads it back equal", async () => {
     app = await setup({ datasets: [makeDataset("ds1", 45_000, { withDates: true })], active: "ds1" });

@@ -23,6 +23,7 @@ import { useViewStore } from "../store/viewStore";
 import { useDrillStore } from "../store/drillStore";
 import { SaveViewModal } from "./SaveViewModal";
 import { Hint } from "@/shared/components/Hint";
+import { getEffectiveColumnTypes } from "@/shared/utils/columnType";
 
 export function GlobalFilterBar() {
   const activeDashboardId = useDashboardStore((state) => state.activeDashboardId);
@@ -63,7 +64,7 @@ export function GlobalFilterBar() {
     return dashboards.find((d) => d.id === activeDashboardId) || null;
   }, [dashboards, activeDashboardId]);
 
-  const columnTypes = dataset?.columnTypes || {};
+  const columnTypes = useMemo(() => (dataset ? getEffectiveColumnTypes(dataset) : {}), [dataset]);
   const columns = dataset?.columns || [];
   const colType = selectedColumn ? columnTypes[selectedColumn] || "categorical" : "categorical";
 

@@ -84,7 +84,7 @@ test("parse problems are listed; exclude removes Play Store's shifted row", asyn
 
   const dialog = page.getByTestId("import-dialog");
   await expect(dialog.getByTestId("import-summary-counts")).toHaveText(
-    /80 rows and 13 columns read from playstore\.csv\. 1 row has parse problems\./
+    /80 rows and 13 columns read from playstore\.csv\. 1 row has parse problems\. 8 duplicate rows/
   );
   const row = dialog.getByTestId("import-issue-row");
   await expect(row).toHaveCount(1);

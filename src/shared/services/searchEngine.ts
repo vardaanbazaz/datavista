@@ -4,6 +4,7 @@ import { useDashboardStore } from "@/features/dashboards/store/dashboardStore";
 import { useTemplateStore } from "@/features/dashboards/store/templateStore";
 import { useViewStore } from "@/features/dashboards/store/viewStore";
 import { SavedView } from "@/shared/types";
+import { getEffectiveColumnType } from "@/shared/utils/columnType";
 
 export interface SearchResultItem {
   id: string;
@@ -66,7 +67,7 @@ export const searchEngine = {
 
       for (const col of dataset.columns) {
         if (col.toLowerCase().includes(trimmed)) {
-          const colType = dataset.columnTypes?.[col] || "categorical";
+          const colType = getEffectiveColumnType(dataset, col);
           results.columns.push({
             id: `col-${dataset.id}-${col}`,
             type: "column",

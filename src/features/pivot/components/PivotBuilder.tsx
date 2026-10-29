@@ -101,8 +101,8 @@ export const PivotBuilder: React.FC<PivotBuilderProps> = ({ dataset }) => {
     }
     return dataset.columns.map(colName => ({
       name: colName,
-      type: dataset.columnTypes[colName] || 'categorical',
-      role: dataset.columnTypes[colName] === 'numeric' ? 'measure' : 'dimension',
+      type: getEffectiveColumnType(dataset, colName),
+      role: getEffectiveColumnType(dataset, colName) === 'numeric' ? 'measure' : 'dimension',
     }));
   };
 

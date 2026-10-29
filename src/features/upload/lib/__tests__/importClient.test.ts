@@ -101,7 +101,7 @@ describe("importFile with a worker", () => {
     worker.emit({ type: "sheets", sheets: [], canAppend: true });
     worker.emit({
       type: "review",
-      review: { fileName: "a", rowCount: 1, columnCount: 1, issues: { rowCount: 1, issueCount: 1, fileIssues: [], listed: [], excluded: false, sourceRowCount: 1 } },
+      review: { fileName: "a", rowCount: 1, columnCount: 1, issues: { rowCount: 1, issueCount: 1, fileIssues: [], listed: [], excluded: false, sourceRowCount: 1 }, duplicateRowCount: 0 },
     });
     await new Promise(r => setTimeout(r, 0));
     expect(worker.sent.slice(1)).toEqual([{ type: "sheet", choice: { kind: "append" } }, { type: "review", exclude: true }]);

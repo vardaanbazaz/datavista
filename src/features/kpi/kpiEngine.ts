@@ -2,6 +2,7 @@ import { queryEngine } from "@/shared/services/queryEngine";
 import { Dataset, Query, QueryFilters, GlobalFilter } from "@/shared/types";
 import { KPICardConfig } from "./types";
 import { filterManager } from "@/features/dashboards/services/filterManager";
+import { columnsOfType } from "@/shared/utils/columnType";
 
 export interface KPICardData {
   primaryValue: number;
@@ -42,7 +43,7 @@ export const kpiEngine = {
     // 2. Get trend and/or sparkline data
     if (config.trendConfiguration || config.sparkline) {
       const dateColumn = config.trendConfiguration?.dateColumn || 
-        Object.entries(dataset.columnTypes).find(([_, type]) => type === 'date')?.[0];
+        columnsOfType(dataset, 'date')[0];
 
       if (dateColumn) {
         const period = config.trendConfiguration?.comparisonPeriod || "month";

@@ -3,6 +3,7 @@ import { saveAs } from 'file-saver';
 import jsPDF from 'jspdf';
 import { ChartConfig, DataRow, Dataset } from '@/shared/types';
 import { summarizeNumericColumns } from '@/shared/services/stats/columnSummary';
+import { columnsOfType } from "@/shared/utils/columnType";
 
 /**
  * Recursively copy computed styles from source elements to target cloned elements
@@ -172,9 +173,7 @@ export const generatePDFReport = async (
       pdf.setFont('helvetica', 'normal');
       
       // Calculate summary statistics for numeric columns
-      const numericColumns = Object.entries(dataset.columnTypes)
-        .filter(([_, type]) => type === 'numeric')
-        .map(([col, _]) => col);
+      const numericColumns = columnsOfType(dataset, 'numeric');
 
       summarizeNumericColumns(filteredData, numericColumns).forEach(({ column: col, min, max, mean: avg }) => {
         pdf.text(`${col}: Min=${min.toFixed(2)}, Max=${max.toFixed(2)}, Avg=${avg.toFixed(2)}`, 20, yPosition);

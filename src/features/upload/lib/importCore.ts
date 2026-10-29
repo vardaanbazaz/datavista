@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx";
 import { parseCsvText, type CsvParseIssue } from "@/shared/services/csvParse";
 import { processRawData } from "@/shared/services/parsingService";
+import { findDuplicateRows } from "@/shared/services/dataQuality";
 import type { Dataset, ImportIssue, ImportIssuesSummary } from "@/shared/types";
 import { readWorkbookWithCalendarDates } from "./xlsxDates";
 import { fileExtension } from "./importLimits";
@@ -28,6 +29,8 @@ export interface ImportReview {
   rowCount: number;
   columnCount: number;
   issues: ImportIssuesSummary;
+  /** Exact duplicate rows among all rows read (the final count, after any exclusion, is in metadata.quality). */
+  duplicateRowCount: number;
 }
 
 export interface ImportIO {
@@ -240,6 +243,7 @@ export async function runImport(file: Blob, fileName: string, options: ImportOpt
         rowCount: rows.length,
         columnCount: parsed.headers.length,
         issues: importIssues,
+        duplicateRowCount: rows.length > 0 ? findDuplicateRows(rows, Object.keys(rows[0])).length : 0,
       });
       if (exclude) {
         const bad = new Set(parsed.errors.filter(e => e.row !== undefined).map(e => e.row as number));

@@ -5,7 +5,7 @@ import { getEffectiveColumnType } from "@/shared/utils/columnType";
  * Numeric columns whose numbers are labels, not amounts: adding them up (or averaging
  * them) gives a number nobody can use, e.g. "Sum of release_year" = 220,000.
  * - `year`: a whole number 1800–2100 in every cell, and the name has a "year"/"yr" word.
- * - `id`: the name has an id-like word (id, code, no, number, zip, pin, phone, index), or
+ * - `id`: the name has an id-like word (id, code, no, number, zip, pin, phone, index, invoice), or
  *   is pandas' unnamed index column ("Unnamed: 0"). Names only: "almost every value is a
  *   distinct integer" also describes amounts (HR MonthlyRate is 97% distinct).
  * Only a hint for defaults and notes: the stored column type is left alone.
@@ -13,7 +13,7 @@ import { getEffectiveColumnType } from "@/shared/utils/columnType";
 export type AggregationFlag = "year" | "id";
 
 const YEAR_WORDS = new Set(["year", "yr"]);
-const ID_WORDS = new Set(["id", "code", "no", "number", "zip", "pin", "phone", "index"]);
+const ID_WORDS = new Set(["id", "code", "no", "number", "zip", "pin", "phone", "index", "invoice"]);
 
 /**
  * Words of a column name: split on anything that isn't a letter or digit, on lower→upper
@@ -33,6 +33,13 @@ export function nameWords(name: string): string[] {
     .filter(Boolean);
 }
 
+/** The name says the column holds identifiers (an ID word, or pandas' "Unnamed: N" index column). */
+export function isIdName(name: string): boolean {
+  const words = nameWords(name);
+  if (words.some((w) => ID_WORDS.has(w))) return true;
+  return words.length === 2 && words[0] === "unnamed" && /^\d+$/.test(words[1]);
+}
+
 /** Flag for one column from its name and import metadata (exact min/max over every row), or null. */
 export function columnAggregationFlag(col: ColumnMetadata): AggregationFlag | null {
   const words = nameWords(col.name);
@@ -47,10 +54,8 @@ export function columnAggregationFlag(col: ColumnMetadata): AggregationFlag | nu
   ) {
     return "year";
   }
-  if (words.some((w) => ID_WORDS.has(w))) return "id";
   // pandas writes its index column as "Unnamed: 0" (words: unnamed, 0).
-  if (words.length === 2 && words[0] === "unnamed" && /^\d+$/.test(words[1])) return "id";
-  return null;
+  return isIdName(col.name) ? "id" : null;
 }
 
 const cache = new WeakMap<object, Map<string, AggregationFlag | null>>();

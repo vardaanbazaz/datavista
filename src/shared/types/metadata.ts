@@ -26,6 +26,78 @@ export interface ColumnMetadata {
   role: 'dimension' | 'measure' | 'date' | 'identifier' | 'calculated' | 'hidden' | 'window';
   allIntegerValues: boolean;
   userOverrideType?: 'numeric' | 'categorical' | 'date' | null;
+  /** Data-quality findings for this column (services/dataQuality.ts). Absent on datasets saved before them. */
+  quality?: ColumnQuality;
+}
+
+export interface ValueCount {
+  value: string;
+  count: number;
+}
+
+/** What a column's values say about their own quality, computed with its metadata. */
+export interface ColumnQuality {
+  /** Non-blank cells that aren't valid for the column's type (numeric/date only), with the most common ones. */
+  invalidCount: number;
+  invalidSamples: ValueCount[];
+  /** Categorical columns: the 5 most common values. */
+  topValues?: ValueCount[];
+  /** Categorical columns: groups of values that differ only by case or whitespace, most common first. */
+  labelVariants?: ValueCount[][];
+  /** Numeric columns: one value that looks like a "missing" code (-1, -99, 9999). */
+  sentinel?: { value: number; count: number; reason: 'negative' | 'year' | 'nines' };
+  /** Text values like "10,000+", "19M": how many non-blank cells "Convert to number…" would read. */
+  suffixCandidate?: { convertible: number; total: number };
+}
+
+/**
+ * One change to a column's values, kept so it can be shown and undone. The column's original
+ * cells are in Dataset.fixSourceValues; services/columnFixes.ts replays every fix of a column
+ * from them, in order.
+ */
+export interface ColumnFix {
+  id: string;
+  column: string;
+  kind: 'sentinel' | 'currency' | 'thousands' | 'numberSuffix' | 'mergeLabels';
+  /** Applied by the import (currency, thousands) rather than chosen by the user. */
+  auto: boolean;
+  /** The column's type before this fix. */
+  previousType: 'numeric' | 'categorical' | 'date';
+  /** Cells this fix changed when it was applied. */
+  changedCount: number;
+  /** sentinel: the value that now means "missing". */
+  sentinel?: number;
+  /** currency: ISO-like code and the mark as written in the file ("$", "ksh"). */
+  currency?: { code: string; symbol: string };
+  /** thousands: the grouping seen. */
+  grouping?: 'western' | 'indian';
+  /** numberSuffix: cells that couldn't be read and became missing; whether any "+" lower bounds were read. */
+  unconvertible?: number;
+  lowerBound?: boolean;
+  /** mergeLabels: these values become `to`. */
+  merge?: { from: string[]; to: string };
+}
+
+/** A row taken out by "Remove duplicates", with its per-row source text, so undo can put it back. */
+export interface RemovedRow {
+  index: number;
+  row: Record<string, string | number | boolean | null>;
+  dateSource?: Record<string, string | null>;
+  fixSource?: Record<string, string | number | boolean | null>;
+}
+
+/** Dataset-wide findings from the import. */
+export interface DatasetQuality {
+  /** Exact duplicate rows (every column equal, compared as imported text), not counting each first occurrence. */
+  duplicateRowCount: number;
+  /** Their row indices, ascending. */
+  duplicateIndices: number[];
+  /** Columns left as text because they mix currencies: the codes found. */
+  currencyWarnings?: Record<string, string[]>;
+  /** Columns left as text because their comma use is inconsistent: why. */
+  groupingWarnings?: Record<string, string>;
+  /** Suggestions the user chose "Don't ask again" for (keys from dataQuality.suggestionKey). */
+  dismissed?: string[];
 }
 
 /** One row the parser had a problem with (field count, quotes). */
@@ -80,4 +152,13 @@ export interface DatasetMetadata {
   /** The user dismissed the "re-import for correct dates" notice. */
   dateReimportNoticeDismissed?: boolean;
   columns: ColumnMetadata[];
+  /** Duplicate rows and column warnings found at import. */
+  quality?: DatasetQuality;
+  /** Column fixes in the order they were applied (see ColumnFix). */
+  columnFixes?: ColumnFix[];
+  /**
+   * Rows removed by "Remove duplicates" (the rows themselves are in Dataset.removedDuplicates,
+   * stored in the `removedRows` table, never in this record).
+   */
+  removedDuplicateCount?: number;
 }

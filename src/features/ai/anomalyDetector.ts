@@ -3,6 +3,7 @@ import { computeOutliers } from "@/shared/services/stats/outliers";
 import { mean as meanOf, numericValues } from "@/shared/utils/numeric";
 import { aggregationFlag } from "@/shared/utils/columnRoles";
 import { chartReduction } from "@/features/charts/lib/chartAggregation";
+import { columnsOfType, getEffectiveColumnType } from "@/shared/utils/columnType";
 
 export interface DetectedAnomaly {
   id: string;
@@ -93,11 +94,9 @@ export const anomalyDetector = {
     const data = dataRows || dataset.data;
     if (!data || data.length < 3) return [];
 
-    const numericCols = dataset.metadata
-      ? dataset.metadata.columns.filter((c) => c.inferredDataType === "numeric").map((c) => c.name)
-      : dataset.columns.filter((col) => dataset.columnTypes[col] === "numeric");
+    const numericCols = columnsOfType(dataset, "numeric");
 
-    const categoryCol = dataset.columns.find(c => dataset.columnTypes[c] === 'categorical' || dataset.columnTypes[c] === 'date');
+    const categoryCol = dataset.columns.find(c => getEffectiveColumnType(dataset, c) !== 'numeric');
     const anomalies: DetectedAnomaly[] = [];
 
     for (const col of numericCols) {

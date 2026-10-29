@@ -39,15 +39,7 @@ export class TemplateEngine {
 
     // 2. Build required schema with inferred data types
     const requiredSchema: RequiredColumnSchema[] = Array.from(referencedColumnNames).map((colName) => {
-      let dataType: 'numeric' | 'categorical' | 'date' = 'categorical';
-      if (dataset.metadata?.columns) {
-        const colMeta = dataset.metadata.columns.find((c) => c.name === colName);
-        if (colMeta) {
-          dataType = colMeta.inferredDataType;
-        }
-      } else if (dataset.columnTypes && dataset.columnTypes[colName]) {
-        dataType = dataset.columnTypes[colName];
-      }
+      const dataType: 'numeric' | 'categorical' | 'date' = getEffectiveColumnType(dataset, colName);
       return { name: colName, dataType };
     });
 

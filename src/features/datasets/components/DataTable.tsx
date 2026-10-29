@@ -24,6 +24,8 @@ import { summarizeNumericColumns } from "@/shared/services/stats/columnSummary";
 import { useImportStore } from "@/store/importStore";
 import { ImportIssuesDialog } from "@/features/upload/components/ImportDialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/components/ui/popover";
+import { ColumnQualityBadges, DataQualityPanel } from "./DataQualityPanel";
+import { formatCurrency } from "@/shared/utils/numberFormats";
 
 interface DataTableProps {
   customDataset?: Dataset | null;
@@ -63,6 +65,7 @@ export function DataTable({
     columnTypes: Record<string, "numeric" | "categorical" | "date">;
     metadata?: DatasetMetadata;
     dateSourceValues?: Dataset["dateSourceValues"];
+    fixSourceValues?: Dataset["fixSourceValues"];
   } | null>(null);
 
   const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -78,6 +81,7 @@ export function DataTable({
       columnTypes: processed.columnTypes,
       metadata: processed.metadata,
       dateSourceValues: processed.dateSourceValues,
+      fixSourceValues: processed.fixSourceValues,
     });
     setIsUpdateModalOpen(true);
   };
@@ -90,7 +94,8 @@ export function DataTable({
       newParsedData.metadata,
       newParsedData.columnTypes,
       newParsedData.columns,
-      newParsedData.dateSourceValues
+      newParsedData.dateSourceValues,
+      newParsedData.fixSourceValues
     );
     setNewParsedData(null);
   };
@@ -102,6 +107,15 @@ export function DataTable({
       data: storeData,
     };
   }, [activeDataset, storeData]);
+
+  // Columns converted from a currency show their values with the symbol from the file.
+  const currencySymbols = useMemo(() => {
+    const out: Record<string, string> = {};
+    for (const f of activeDataset?.metadata?.columnFixes ?? []) {
+      if (f.kind === 'currency' && f.currency) out[f.column] = f.currency.symbol;
+    }
+    return out;
+  }, [activeDataset]);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [sortColumn, setSortColumn] = useState<string | null>(null);
@@ -439,9 +453,11 @@ export function DataTable({
           <Button size="sm" variant="outline" onClick={() => setIsIssuesOpen(true)} data-testid="import-issues-open">
             View import summary
           </Button>
-          <ImportIssuesDialog issues={activeDataset.metadata!.importIssues!} open={isIssuesOpen} onOpenChange={setIsIssuesOpen} />
+          <ImportIssuesDialog issues={activeDataset.metadata!.importIssues!} duplicateRowCount={activeDataset.metadata!.quality?.duplicateRowCount} open={isIssuesOpen} onOpenChange={setIsIssuesOpen} />
         </div>
       )}
+
+      {activeDataset && customDataset === undefined && <DataQualityPanel dataset={activeDataset} />}
 
       {/* Summary Statistics */}
       {Object.keys(summaryStats).length > 0 && (
@@ -487,7 +503,6 @@ export function DataTable({
                     // Date columns (and text columns whose dates were ambiguous) get a details popover.
                     const dateInfo = colMeta && !overridden && !flagged
                       && (colMeta.inferredDataType === 'date' || colMeta.dateAmbiguity === 'ambiguous-mixed');
-                    const invalidDates = effectiveType === 'date' ? (colMeta?.invalidDateCount ?? 0) : 0;
 
                     const badge = (
                       <Badge
@@ -503,7 +518,6 @@ export function DataTable({
                       >
                         {effectiveType}
                         {overridden && " (override)"}
-                        {invalidDates > 0 && ` · ${invalidDates} invalid`}
                       </Badge>
                     );
 
@@ -609,6 +623,9 @@ export function DataTable({
                           ) : (
                             badge
                           )}
+                          {activeDataset && (
+                            <ColumnQualityBadges dataset={activeDataset} column={column} meta={colMeta} effectiveType={effectiveType} />
+                          )}
                         </div>
                       </TableHead>
                     );
@@ -646,6 +663,7 @@ export function DataTable({
                               column
                             );
                             const isNumeric = getEffectiveColumnType(dataset, column) === 'numeric';
+                            const currency = isNumeric ? currencySymbols[column] : undefined;
                             return (
                               <TableCell
                                 key={column}
@@ -662,6 +680,8 @@ export function DataTable({
                                 <div className={isNumeric ? "truncate text-right font-mono text-dataTable tabular-nums" : "truncate text-body"}>
                                   {row[column] === null || row[column] === undefined ? (
                                     <span className="text-muted-foreground italic font-sans">null</span>
+                                  ) : currency && typeof row[column] === 'number' ? (
+                                    formatCurrency(row[column] as number, currency)
                                   ) : (
                                     String(row[column])
                                   )}

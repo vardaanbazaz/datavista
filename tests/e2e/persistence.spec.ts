@@ -145,15 +145,17 @@ test("a dataset not open at startup keeps its rows through a rename and loads wh
   const regions = sidebar.getByRole("button", { name: /regions/ });
   await expect(regions).toContainText("4 rows");
   page.once("dialog", (dialog) => dialog.accept("Regions renamed"));
-  // The sidebar lists datasets in stored-id order: use the options button of the "regions" row.
-  const rows = await sidebar.getByRole("button", { name: / rows, / }).allTextContents();
-  const index = rows.findIndex((text) => text.startsWith("regions"));
-  expect(index).toBeGreaterThanOrEqual(0);
-  await sidebar.getByRole("button", { name: "Dataset options (rename, delete)" }).nth(index).click();
+  // The sidebar lists datasets in upload order, oldest first, on every load.
+  const datasetRows = sidebar.getByRole("button", { name: / rows, / });
+  await expect(datasetRows).toHaveText([/^regions/, /^other/]);
+  await sidebar.getByRole("button", { name: "Dataset options (rename, delete)" }).first().click();
   await page.getByRole("menuitem", { name: "Rename" }).click();
   await expect.poll(() => savedRowCounts(page), { timeout: 10_000 }).toEqual({ "Regions renamed": 4, other: 2 });
 
   await page.reload();
+  await expect(datasetRows).toHaveText([/^Regions renamed/, /^other/]);
+  await page.reload();
+  await expect(datasetRows).toHaveText([/^Regions renamed/, /^other/]);
   await sidebar.getByRole("button", { name: /Regions renamed/ }).click();
   await page.getByTestId("sidebar-nav-data").click();
   const table = page.getByTestId("data-table-container");

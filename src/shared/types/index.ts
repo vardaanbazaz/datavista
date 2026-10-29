@@ -5,6 +5,7 @@ import { WindowQuery } from "../services/window/types";
 import { ConditionalFormatRule } from "./formatting";
 import { ForecastConfig } from "../services/forecasting/types";
 import type { AggregationOperator } from "./query";
+import type { RemovedRow } from "./metadata";
 
 export interface DataRow {
   [key: string]: string | number | boolean | null;
@@ -27,6 +28,19 @@ export interface Dataset {
    */
   dateSourceValues?: Record<string, (string | null)[]>;
   /**
+   * Original cells of columns with column fixes (metadata.columnFixes), one entry per row of
+   * `data`, so undoing a fix restores them exactly (services/columnFixes.ts).
+   */
+  fixSourceValues?: Record<string, DataRow[string][]>;
+  /**
+   * Rows taken out by "Remove duplicates", with their per-row source cells, for undo. Stored
+   * in the `removedRows` table and written only when this array changes (remove / undo), so
+   * metadata saves (rename, overrides) never carry rows. Count in metadata.removedDuplicateCount.
+   */
+  removedDuplicates?: RemovedRow[];
+  /** Position in the sidebar (upload order, oldest first). Set on upload; backfilled by the Dexie v3 upgrade. */
+  order?: number;
+  /**
    * Bumped by every action that changes cell values (replace data, calculated/window
    * columns, day/month toggle). Persistence rewrites a dataset's rows only when this
    * differs from the revision on disk; metadata-only actions leave it alone.
@@ -38,7 +52,7 @@ export interface Dataset {
    * (datasetStore.loadRows). Carries the stored counts so saving the metadata of an
    * unloaded dataset never records it as empty.
    */
-  rowsPending?: { rowCount: number; chunkCount: number; dateSourceColumns?: string[] };
+  rowsPending?: { rowCount: number; chunkCount: number; dateSourceColumns?: string[]; fixSourceColumns?: string[] };
 }
 
 export interface ChartConfig {

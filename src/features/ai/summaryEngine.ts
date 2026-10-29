@@ -2,6 +2,7 @@ import { Dataset, ChartConfig, GlobalFilter, FilterState, DataRow } from "@/shar
 import { anomalyDetector, DetectedAnomaly } from "./anomalyDetector";
 import { callLLM } from "./llmService";
 import { useUiStore } from "@/store/uiStore";
+import { getEffectiveColumnType } from "@/shared/utils/columnType";
 
 export const summaryEngine = {
   /**
@@ -71,7 +72,7 @@ TASK: Generate a concise, professional 2 to 3 sentence executive summary describ
         {
           prompt: promptContext,
           datasetName,
-          columns: (dataset.metadata?.columns || []).map((c) => ({ name: c.name, type: c.inferredDataType }))
+          columns: (dataset.metadata?.columns || []).map((c) => ({ name: c.name, type: getEffectiveColumnType(dataset, c.name) }))
         }
       );
 

@@ -9,7 +9,7 @@ import { Plus, BarChart, LineChart, PieChart, ScatterChart, X, Palette, Gauge, T
 import { useMemo } from "react";
 import { AggregationOperator, ChartConfig, ConditionalFormatRule } from "@/shared/types";
 import { aggregationFlag, aggregationNote } from "@/shared/utils/columnRoles";
-import { getEffectiveColumnType } from "@/shared/utils/columnType";
+import { columnsOfType, getEffectiveColumnType } from "@/shared/utils/columnType";
 import { DATE_GRANULARITIES, DateGranularity, granularityName, TOP_N_DEFAULT } from "@/features/charts/lib/chartAggregation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/components/ui/dialog";
 import { useDatasetStore } from "@/store/datasetStore";
@@ -76,25 +76,10 @@ export function ChartBuilder() {
     return [...coreTypes, ...pluginTypes];
   }, []);
 
-  const numericColumns = useMemo(() => {
-    if (!dataset) return [];
-    if (dataset.metadata) {
-      return dataset.metadata.columns
-        .filter(c => c.inferredDataType === 'numeric')
-        .map(c => c.name);
-    }
-    return dataset.columns.filter(col => dataset.columnTypes[col] === 'numeric');
-  }, [dataset]);
-  
-  const categoricalColumns = useMemo(() => {
-    if (!dataset) return [];
-    if (dataset.metadata) {
-      return dataset.metadata.columns
-        .filter(c => c.inferredDataType === 'categorical')
-        .map(c => c.name);
-    }
-    return dataset.columns.filter(col => dataset.columnTypes[col] === 'categorical');
-  }, [dataset]);
+  // Effective types (user overrides and column fixes), not the auto-detected ones.
+  const numericColumns = useMemo(() => (dataset ? columnsOfType(dataset, 'numeric') : []), [dataset]);
+
+  const categoricalColumns = useMemo(() => (dataset ? columnsOfType(dataset, 'categorical') : []), [dataset]);
 
   const allColumns = useMemo(() => {
     if (!dataset) return [];
@@ -104,14 +89,7 @@ export function ChartBuilder() {
     return dataset.columns;
   }, [dataset]);
 
-  const getColumnType = (col: string): string => {
-    if (!dataset) return 'categorical';
-    if (dataset.metadata) {
-      const c = dataset.metadata.columns.find(x => x.name === col);
-      if (c) return c.inferredDataType;
-    }
-    return dataset.columnTypes[col] || 'categorical';
-  };
+  const getColumnType = (col: string): string => (dataset ? getEffectiveColumnType(dataset, col) : 'categorical');
 
   const reducesPerKey = (type: string, agg: AggregationOperator | 'none') =>
     type === 'bar' || type === 'pie' || ((type === 'line' || type === 'area') && agg !== 'none');

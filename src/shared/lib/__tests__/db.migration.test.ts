@@ -38,7 +38,7 @@ function dataset(id: string, rows: number, withDates: boolean): Dataset {
   };
 }
 
-describe("Dexie v1 → v2 upgrade", () => {
+describe("Dexie v1 → v3 upgrade", () => {
   it("moves dataset rows into chunks, drops chart rows, and loads everything back equal", async () => {
     const ds1 = dataset("ds1", 45_000, true); // three chunks, with day/month source text
     const ds2 = dataset("ds2", 10, false);
@@ -82,8 +82,8 @@ describe("Dexie v1 → v2 upgrade", () => {
     await persistenceService.hydrate();
     vi.unstubAllGlobals();
 
-    // On disk: v2, metadata records without rows, chunks, charts without rows.
-    expect(db.verno).toBe(2);
+    // On disk: v3, metadata records without rows, chunks, charts without rows.
+    expect(db.verno).toBe(4);
     for (const record of await db.datasets.toArray()) expect(record).not.toHaveProperty("data");
     expect(await db.datasetRows.where("datasetId").equals("ds1").count()).toBe(3);
     expect(await db.datasetRows.where("datasetId").equals("ds2").count()).toBe(1);
@@ -92,9 +92,10 @@ describe("Dexie v1 → v2 upgrade", () => {
     // Loaded: equal to what was saved (charts minus their rows). Only the active dataset's
     // rows are read at startup; ds2's come when it is loaded.
     const [loaded1, pending2] = useDatasetStore.getState().datasets;
-    expect(loaded1).toEqual(ds1);
+    // Same import time: numbered by id.
+    expect(loaded1).toEqual({ ...ds1, order: 0 });
     expect(pending2.rowsPending).toEqual({ rowCount: ds2.data.length, chunkCount: 1 });
-    expect(await useDatasetStore.getState().loadRows("ds2")).toEqual(ds2);
+    expect(await useDatasetStore.getState().loadRows("ds2")).toEqual({ ...ds2, order: 1 });
     expect(useDatasetStore.getState().activeDataset?.id).toBe("ds1");
     expect([...useChartStore.getState().charts].sort((a, b) => a.id.localeCompare(b.id))).toEqual(charts);
     expect(useDashboardStore.getState().dashboards).toEqual(dashboards);
@@ -104,6 +105,77 @@ describe("Dexie v1 → v2 upgrade", () => {
     expect(useUiStore.getState().activeView).toBe("charts");
     expect(await db.uiState.toArray()).toEqual(expect.arrayContaining(uiState));
 
+    db.close();
+  });
+});
+
+describe("Dexie v2 → v3 upgrade", () => {
+  it("numbers existing datasets by import time and loads them in that order on every reload", async () => {
+    await Dexie.delete("DataVistaDatabase");
+    vi.resetModules();
+    // v2 records: IndexedDB returns them by key (a, b, c), but they were imported b, c, a.
+    const stored = [
+      { id: "a", created: 300 },
+      { id: "b", created: 100 },
+      { id: "c", created: 200 },
+    ].map(({ id, created }) => {
+      const { data, ...rest } = dataset(id, 3, false);
+      return { ...rest, metadata: { ...rest.metadata!, createdAt: created }, rowCount: data.length, chunkCount: 1, _rows: data };
+    });
+    const old = new Dexie("DataVistaDatabase");
+    old.version(1).stores({ datasets: "id", charts: "id, datasetId", filters: "datasetId", uiState: "key", dashboards: "id" });
+    old.version(2).stores({ datasetRows: "[datasetId+index]" });
+    for (const { _rows, ...record } of stored) {
+      await old.table("datasets").add(record);
+      await old.table("datasetRows").add({ datasetId: record.id, index: 0, rows: _rows });
+    }
+    await old.table("uiState").add({ key: "activeDatasetId", value: "b" });
+    old.close();
+
+    const { db } = await import("@/shared/lib/db");
+    const { persistenceService } = await import("@/shared/services/persistenceService");
+    const { useDatasetStore } = await import("@/store/datasetStore");
+
+    vi.stubGlobal("document", { documentElement: { classList: { add: () => {}, remove: () => {} } } });
+    await persistenceService.hydrate();
+    vi.unstubAllGlobals();
+
+    expect(db.verno).toBe(4);
+    const orders = Object.fromEntries((await db.datasets.toArray()).map((d) => [d.id, d.order]));
+    expect(orders).toEqual({ b: 0, c: 1, a: 2 });
+    expect(useDatasetStore.getState().datasets.map((d) => d.id)).toEqual(["b", "c", "a"]);
+    db.close();
+  });
+});
+
+describe("Dexie v3 → v4 upgrade", () => {
+  it("moves removed duplicate rows out of the dataset record into removedRows", async () => {
+    await Dexie.delete("DataVistaDatabase");
+    vi.resetModules();
+    const { data, ...rest } = dataset("ds1", 5, false);
+    const removed = [{ index: 1, row: data[1] }, { index: 3, row: data[3], fixSource: { Sales: "$3" } }];
+    const old = new Dexie("DataVistaDatabase");
+    old.version(1).stores({ datasets: "id", charts: "id, datasetId", filters: "datasetId", uiState: "key", dashboards: "id" });
+    old.version(2).stores({ datasetRows: "[datasetId+index]" });
+    old.version(3).stores({ datasets: "id" });
+    await old.table("datasets").add({ ...rest, order: 0, metadata: { ...rest.metadata!, removedDuplicates: removed }, rowCount: data.length, chunkCount: 1 });
+    await old.table("datasetRows").add({ datasetId: "ds1", index: 0, rows: data });
+    await old.table("uiState").add({ key: "activeDatasetId", value: "ds1" });
+    old.close();
+
+    const { db } = await import("@/shared/lib/db");
+    const { persistenceService } = await import("@/shared/services/persistenceService");
+    const { useDatasetStore } = await import("@/store/datasetStore");
+    vi.stubGlobal("document", { documentElement: { classList: { add: () => {}, remove: () => {} } } });
+    await persistenceService.hydrate();
+    vi.unstubAllGlobals();
+
+    expect(db.verno).toBe(4);
+    const record = await db.datasets.get("ds1");
+    expect(record?.metadata).not.toHaveProperty("removedDuplicates");
+    expect(record?.metadata?.removedDuplicateCount).toBe(2);
+    expect((await db.removedRows.get("ds1"))?.rows).toEqual(removed);
+    expect(useDatasetStore.getState().datasets[0].removedDuplicates).toEqual(removed);
     db.close();
   });
 });

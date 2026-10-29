@@ -42,7 +42,7 @@ import { ThemeToggle } from "@/shared/components/ThemeToggle";
 import { Hint } from "@/shared/components/Hint";
 import { modKey, formatShortcut } from "@/shared/lib/platform";
 import { motion } from "framer-motion";
-import { Sparkles } from "lucide-react";
+import { Sparkles, ShieldCheck } from "lucide-react";
 import { datasetRowCount } from "@/shared/services/datasetRows";
 
 export function Sidebar({
@@ -55,6 +55,7 @@ export function Sidebar({
   const activeView = useUiStore((state) => state.activeView);
   const onViewChange = useUiStore((state) => state.setActiveView);
   const resetTour = useUiStore((state) => state.resetTour);
+  const openPrivacy = useUiStore((state) => state.setIsPrivacyOpen);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isInstantiateModalOpen, setIsInstantiateModalOpen] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -243,6 +244,18 @@ export function Sidebar({
               data-tour="header-copilot"
             >
               <Sparkles className="h-5 w-5" />
+            </Button>
+          </Hint>
+
+          <Hint label="Data & privacy (clear all local data)">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-zinc-900"
+              onClick={() => openPrivacy(true)}
+              data-testid="open-privacy"
+            >
+              <ShieldCheck className="h-5 w-5" />
             </Button>
           </Hint>
 

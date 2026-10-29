@@ -1,7 +1,8 @@
 import { useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { Button } from "@/shared/components/ui/button";
-import { Upload, FileText, AlertCircle, CheckCircle } from "lucide-react";
+import { Upload, FileText, AlertCircle, CheckCircle, ShieldCheck } from "lucide-react";
+import { useUiStore } from "@/store/uiStore";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/components/ui/tooltip";
 import { useImportStore } from "@/store/importStore";
 import { MAX_IMPORT_BYTES } from "@/features/upload/lib/importLimits";
@@ -10,6 +11,7 @@ export function FileUpload() {
   const importForUpload = useImportStore((state) => state.importForUpload);
   const isImporting = useImportStore((state) => state.phase !== "idle");
   const [dragActive, setDragActive] = useState(false);
+  const openPrivacy = useUiStore((state) => state.setIsPrivacyOpen);
 
   // Size cap, format check, parsing and progress all live in the shared pipeline
   // (store/importStore.ts -> lib/importClient.ts -> worker/import.worker.ts).
@@ -127,6 +129,21 @@ export function FileUpload() {
               <p className="font-medium">Data Requirements</p>
               <p className="text-muted-foreground">
                 First row should contain column headers. Missing values will be handled automatically.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3 text-sm" data-testid="upload-privacy-notice">
+            <ShieldCheck className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-medium">Your data stays in this browser</p>
+              <p className="text-muted-foreground">
+                Files are read and stored here, not uploaded, and kept until you delete them: one dataset from its
+                menu in the sidebar, or everything with{" "}
+                <button type="button" className="underline underline-offset-2 hover:text-foreground" onClick={() => openPrivacy(true)}>
+                  Data &amp; privacy → Clear all local data
+                </button>
+                . AI features, if you add your own key, send some of it to the AI provider.
               </p>
             </div>
           </div>

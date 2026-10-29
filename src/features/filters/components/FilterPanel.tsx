@@ -18,47 +18,19 @@ import { queryEngine } from "@/shared/services/queryEngine";
 import { useFilterStore } from "@/store/filterStore";
 import { useDatasetStore } from "@/store/datasetStore";
 import { buildFilterQuery } from "@/features/dashboards/store/dashboardStore";
+import { columnsOfType, getEffectiveColumnType } from "@/shared/utils/columnType";
 
 export function FilterPanel() {
   const dataset = useDatasetStore((state) => state.activeDataset);
   const filters = useFilterStore((state) => state.activeFilters);
   const setFiltersChange = useFilterStore((state) => state.setFiltersChange);
 
-  const categoricalColumns = useMemo(() => {
-    if (!dataset) return [];
-    if (dataset.metadata) {
-      return dataset.metadata.columns
-        .filter(col => col.inferredDataType === 'categorical')
-        .map(col => col.name);
-    }
-    return dataset.columns.filter(col => 
-      dataset.columnTypes[col] === 'categorical'
-    );
-  }, [dataset]);
-  
-  const dateColumns = useMemo(() => {
-    if (!dataset) return [];
-    if (dataset.metadata) {
-      return dataset.metadata.columns
-        .filter(col => col.inferredDataType === 'date')
-        .map(col => col.name);
-    }
-    return dataset.columns.filter(col => 
-      dataset.columnTypes[col] === 'date'
-    );
-  }, [dataset]);
+  // Effective types (user overrides and column fixes), not the auto-detected ones.
+  const categoricalColumns = useMemo(() => (dataset ? columnsOfType(dataset, 'categorical') : []), [dataset]);
 
-  const numericColumns = useMemo(() => {
-    if (!dataset) return [];
-    if (dataset.metadata) {
-      return dataset.metadata.columns
-        .filter(col => col.inferredDataType === 'numeric')
-        .map(col => col.name);
-    }
-    return dataset.columns.filter(col => 
-      dataset.columnTypes[col] === 'numeric'
-    );
-  }, [dataset]);
+  const dateColumns = useMemo(() => (dataset ? columnsOfType(dataset, 'date') : []), [dataset]);
+
+  const numericColumns = useMemo(() => (dataset ? columnsOfType(dataset, 'numeric') : []), [dataset]);
 
   const setFilters = (newFilters: FilterState | ((prev: FilterState) => FilterState)) => {
     if (typeof newFilters === 'function') {
@@ -439,7 +411,7 @@ export function FilterPanel() {
                 </SelectContent>
               </Select>
               
-              {filters.groupByColumn && dataset.columnTypes[filters.groupByColumn] === 'date' && (
+              {filters.groupByColumn && getEffectiveColumnType(dataset, filters.groupByColumn) === 'date' && (
                 <Select 
                   value={filters.groupByPeriod || 'month'} 
                   onValueChange={(value) => setFilters(prev => ({

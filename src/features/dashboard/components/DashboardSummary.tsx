@@ -21,7 +21,7 @@ import { SnapshotManager } from "@/features/dashboards/components/SnapshotManage
 import { useTemplateStore } from "@/features/dashboards/store/templateStore";
 import { templateEngine } from "@/features/dashboards/services/templateEngine";
 import { getEffectiveColumnTypes } from "@/shared/utils/columnType";
-import { summarizeNumericColumns } from "@/shared/services/stats/columnSummary";
+import { summarizeCategoricalColumns, summarizeNumericColumns } from "@/shared/services/stats/columnSummary";
 import { useUiStore } from "@/store/uiStore";
 import { Hint } from "@/shared/components/Hint";
 import { modKey } from "@/shared/lib/platform";
@@ -103,7 +103,10 @@ export function DashboardSummary() {
       count: s.count
     }));
 
+    const categoryStats = summarizeCategoricalColumns(filteredData, categoricalColumns, dataset);
+
     return {
+      categoryStats,
       totalRows,
       filteredRows,
       filterProgress,
@@ -395,6 +398,49 @@ export function DashboardSummary() {
           </Card>
         </motion.div>
       </div>
+
+      {/* Categorical columns: distinct, missing, top values */}
+      {insights.categoryStats.length > 0 && (
+        <Card className="glass" data-testid="category-tiles">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              Categories
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {insights.categoryStats.map((c) => (
+                <div key={c.column} className="p-4 rounded-lg border border-border/50 bg-muted/30 min-w-0" data-testid={`category-tile-${c.column}`}>
+                  <h4 className="text-caption uppercase text-muted-foreground mb-2 truncate">{c.column}</h4>
+                  <div className="flex justify-between text-body">
+                    <span>Distinct:</span>
+                    <span className="font-mono text-dataTable">{c.distinct.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-body">
+                    <span>Missing:</span>
+                    <span className="font-mono text-dataTable">{c.missing.toLocaleString()}</span>
+                  </div>
+                  {c.highCardinality ? (
+                    <p className="mt-2 text-xs text-muted-foreground">Mostly unique values (names, IDs or text): no top list.</p>
+                  ) : (
+                    <ul className="mt-2 space-y-1 text-body" aria-label={`Most common values of ${c.column}`}>
+                      {c.top.map((t) => (
+                        <li key={t.value} className="flex justify-between gap-2">
+                          <span className="truncate" title={t.value}>{t.value}</span>
+                          <span className="font-mono text-dataTable shrink-0">
+                            {t.count.toLocaleString()} · {c.rows ? ((t.count / c.rows) * 100).toFixed(1) : "0.0"}%
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Numeric Insights */}
       {insights.numericStats.length > 0 && (

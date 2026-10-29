@@ -5,6 +5,7 @@ import { InstantiateTemplateModal } from "@/features/dashboards/components/Insta
 import { MainContent } from "@/app/layout/MainContent";
 import { FileUpload } from "@/features/upload/components/FileUpload";
 import { ImportDialog } from "@/features/upload/components/ImportDialog";
+import { DataPrivacyDialog } from "@/features/privacy/components/DataPrivacyDialog";
 import { ChartBuilder } from "@/features/charts/components/ChartBuilder";
 import { DataTable } from "@/features/datasets/components/DataTable";
 import { FilterPanel } from "@/features/filters/components/FilterPanel";
@@ -517,6 +518,7 @@ export function Dashboard() {
         onClose={() => setIsTemplateModalOpen(false)}
       />
       <ImportDialog />
+      <DataPrivacyDialog />
     </div>
   );
 }

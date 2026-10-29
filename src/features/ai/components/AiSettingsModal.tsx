@@ -14,7 +14,7 @@ import { Label } from "@/shared/components/ui/label";
 import { Badge } from "@/shared/components/ui/badge";
 import { Hint } from "@/shared/components/Hint";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/components/ui/tooltip";
-import { Sparkles, Key, Eye, EyeOff, Check, Cpu, HelpCircle, CloudOff } from "lucide-react";
+import { Sparkles, Key, Eye, EyeOff, Check, Cpu, HelpCircle, CloudOff, ShieldCheck } from "lucide-react";
 import { useUiStore, LlmProvider } from "@/store/uiStore";
 import { toast } from "@/shared/hooks/use-toast";
 import { providerDisplayName } from "@/features/ai/providerDisplayName";
@@ -46,6 +46,7 @@ export function AiSettingsModal({ isOpen: externalIsOpen, onClose: externalOnClo
     }))
   );
 
+  const setIsPrivacyOpen = useUiStore((state) => state.setIsPrivacyOpen);
   const [apiKeyInput, setApiKeyInput] = useState(llmApiKey);
   const [providerInput, setProviderInput] = useState<LlmProvider>(llmProvider);
   const [showKey, setShowKey] = useState(false);
@@ -187,7 +188,7 @@ export function AiSettingsModal({ isOpen: externalIsOpen, onClose: externalOnClo
             <p className="text-[11px] text-muted-foreground">
               {apiKeyInput ? (
                 <span className="text-emerald-500 font-medium flex items-center gap-1">
-                  <Check className="h-3 w-3" /> Key saved locally in offline browser storage.
+                  <Check className="h-3 w-3" /> Saved in this browser&apos;s localStorage (not encrypted). Empty the field and save to remove it.
                 </span>
               ) : (
                 "Leave blank to use the built-in offline smart heuristic engine."
@@ -197,15 +198,43 @@ export function AiSettingsModal({ isOpen: externalIsOpen, onClose: externalOnClo
 
           {/* Data Disclosure */}
           <div className="rounded-md border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-3">
-            <p className="text-[11px] leading-relaxed text-amber-900 dark:text-amber-200">
-              <span className="font-semibold">Data sent to your provider:</span> when you run a
-              natural-language query or generate an AI formula, DataVista sends sample values from
-              your dataset&apos;s columns to the selected provider (Google or OpenAI) so it can
-              respond — including from any column, so avoid AI features on datasets containing
-              names, emails, or other sensitive personal data you don&apos;t want to share with
-              that provider. This is separate from your API key, which stays in this browser.
-            </p>
+            <div className="text-[11px] leading-relaxed text-amber-900 dark:text-amber-200 space-y-1" data-testid="ai-data-disclosure">
+              <p>
+                <span className="font-semibold">Sent to the provider (Google or OpenAI), only when you use an AI feature:</span>
+              </p>
+              <ul className="list-disc pl-4 space-y-0.5">
+                <li>
+                  AI query or formula: what you typed, the dataset name, every column&apos;s name and type, the
+                  first 5 rows&apos; values of every column, each column&apos;s min/max and distinct count, and your
+                  calculated fields&apos; names and formulas.
+                </li>
+                <li>
+                  Executive summary: the dataset name, row and chart counts, column names and types, the active
+                  filters (including the category values you filtered on) and the anomaly descriptions (column,
+                  category and value).
+                </li>
+              </ul>
+              <p>
+                Values can come from any column, so avoid AI features on datasets with names, contact details,
+                health or other personal data. Your API key is stored in this browser&apos;s localStorage and
+                sent only to that provider.
+              </p>
+            </div>
           </div>
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="w-full gap-1.5 text-xs"
+            onClick={() => {
+              setIsOpen(false);
+              setIsPrivacyOpen(true);
+            }}
+            data-testid="settings-open-privacy"
+          >
+            <ShieldCheck className="h-3.5 w-3.5" /> Data &amp; privacy: clear all local data…
+          </Button>
 
           {/* Action Buttons */}
           <div className="flex items-center gap-2 justify-between pt-2">

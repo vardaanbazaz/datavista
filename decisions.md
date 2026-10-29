@@ -2,6 +2,112 @@
 
 Newest first. Entries marked `Source: inferred` were reconstructed from existing code; their "Why" is a guess and should be corrected by the author.
 
+### 2026-10-29 — ID columns with letter codes import as categorical; "invoice" is an ID word
+- **Decision:** `columnRoles.ts` adds "invoice" to the ID words and exports `isIdName`. In `processRawData`, a column the type vote makes numeric becomes categorical when `isIdName` is true and at least one of its cells is a letter code (letters and digits only, both present: "C570867", "85123A"; `parsingService.ts:hasLetterCodes`). Junk without a digit ("ERROR") or with punctuation doesn't count; non-ID names keep the numeric vote.
+- **Why:** Audit A8 and user request: retail `Invoice` (19,500 "C…" cancellations) and `StockCode` (134,986 "85123A"-style codes) were numeric with "invalid" badges, dropping real codes from stats. Run over the 6 local CSVs + HR fixture, the only type changes are retail Invoice numeric → categorical (53,628 distinct) and StockCode numeric → categorical (5,304 distinct). Customer ID (5,942 distinct, numbers and blanks) and HR EmployeeNumber stay numeric (Count by default).
+- **Alternatives considered:** Any non-numeric value in an ID column → categorical — rejected: a junk token ("ERROR") in a numeric ID column would flip it.
+- **Tradeoff accepted:** Numbers in those columns are stored as JS numbers inside a categorical column (as for any mixed text column); a numeric-looking ID column with an unlisted name ("Ref") isn't covered.
+- **Source:** `made-now`
+
+### 2026-10-29 — Removed duplicate rows live in their own table (`removedRows`, Dexie v4)
+- **Decision:** The rows "Remove duplicates" takes out are `Dataset.removedDuplicates` (with their `dateSourceValues`/`fixSourceValues` cells), stored in a new table `removedRows` (key `datasetId`, one record per dataset); the metadata keeps only `removedDuplicateCount`. The row save writes or deletes that record inside its transaction only when the array changed since the last write (by reference: remove / undo), so calculated-column row saves and metadata saves (rename, override, dismiss) never carry it. Loading reads it with the chunks; a count with no matching record fails the load like a missing chunk. Deleting a dataset deletes the record. `upgradeToV4` moves existing `metadata.removedDuplicates` into the table.
+- **Why:** User fix: batch 4c.1 made metadata writes cheap, and 34,335 retail rows in the metadata record undid that. Measured (retail CSV, Node + fake-indexeddb, rename after removing duplicates, main-thread part of the `datasets.put`): before 250–407 ms, 7.55 MB record; after 2–7 ms, 0.25 MB (mostly the 34,335 duplicate indices).
+- **Alternatives considered:** Putting removed rows in the row chunks — rejected: every row save would rewrite them.
+- **Tradeoff accepted:** One more table and version. The duplicate indices stay in metadata (0.2 MB at retail size).
+- **Source:** `made-now`
+
+### 2026-10-29 — Column fixes are applied to the rows, originals kept per column (`services/columnFixes.ts`)
+- **Decision:** One model for every value change from batch 4d-2: `metadata.columnFixes: ColumnFix[]` (kinds `sentinel`, `currency`, `thousands`, `numberSuffix`, `mergeLabels`; each with `previousType`, `changedCount`, `auto`) plus `Dataset.fixSourceValues[column]`, the column's original cells, one per row. `addColumnFix` / `removeColumnFix` replay all of a column's remaining fixes from the originals in order (`columnFixTransforms.ts:transformColumn`), so undo is exact for stacked fixes (currency then -1). The fixed values are written into `dataset.data`, so stats, query/KPI, charts, pivot, filters, window functions, export and AI read them with no engine change; formula/window columns are re-evaluated after (`applyActiveDatasetUpdate`). Converting fixes set the column numeric; removing the last fix restores the first fix's `previousType` and drops the originals. `fixSourceValues` travel in the row chunks like `dateSourceValues` (`StoredDataset.fixSourceColumns`, no schema change), so applying or undoing a fix is one debounced row save; "Don't ask again" is a metadata-only write. Replacing data takes the new file's fixes and originals (old ones would misalign, as for `dateSourceValues`).
+- **Why:** User principle: never change data silently, every conversion undoable from stored original text, all engines see the same values.
+- **Alternatives considered:** Keeping raw rows and computing effective values at read time — rejected: dozens of `dataset.data` readers, each a chance to drift (the 4a problem). Undo by re-deriving text from numbers — rejected: "ksh 6976" vs "Ksh6976" can't be rebuilt.
+- **Tradeoff accepted:** A fixed column stores its cells twice (originals + values). Rows of a fixed column are copied only where the cell changed.
+- **Source:** `made-now`
+
+### 2026-10-29 — Currency and comma-grouped columns convert on import; mixed ones stay text with a warning
+- **Decision:** `dataQuality.ts:detectImportConversion` runs in the worker (`processRawData`) on each column's cleaned cells. Currency: ≥ 80% of non-blank cells are numbers with one currency mark before/after (`$`, `₹`, `€`, `£`, `¥`, `Rs`, `Rs.`, `INR`, `USD`, `KES`, `ksh`, `kshs`…, case-insensitive, optional space; `numberFormats.ts:parseCurrency`) or plain numbers, and every mark maps to one code ($/USD, ₹/Rs/INR, ksh/KES…). Then the column converts (fix `auto: true`, `currency: { code, symbol }`, symbol = the most common mark as written), is typed numeric even when it sits exactly on the 80% type-vote line, and the Data view shows values with the symbol (`formatCurrency`) and a "converted from $ — undo" badge. Two or more codes: no conversion, `quality.currencyWarnings[col]`. Thousands: same 80% share with plain numbers + values whose grouping is valid for the whole value (western 1,234,567 or Indian 12,34,567, optional decimals; "1,2,3" and "12,3456" rejected); a comma-decimal value (1.234,56 / 12,5) or both western-only and Indian-only values in the column → no conversion, `quality.groupingWarnings[col]`. Plain-text cells are skipped without regexes and the scan stops once 20% of cells can't be numbers.
+- **Why:** Approved items 3 and 4. Full files: Play Store Price → USD, mean 1.027368, max 400 (pandas); Lab price → KES, mean 4,846.34.
+- **Alternatives considered:** A currency badge without converting — rejected by the spec. Treating western and Indian values in one column as consistent — rejected: "1,234,567" and "12,34,567" in one column means mixed sources.
+- **Tradeoff accepted:** "$" is read as USD (could be AUD/CAD). Retail 1M CSV: detection adds ~3.5 s to the worker import (no main-thread cost).
+- **Source:** `made-now`
+
+### 2026-10-29 — Missing-value codes (-1, -99, 9999) are offered, never applied; "No" is for the session
+- **Decision:** `dataQuality.ts:detectSentinel` (numeric columns, from the metadata value counts): one negative value that is the column's only negative and > 5% of its numbers; -1 in a column whose other values are all whole numbers 1800–2100 (any share); an all-nines value ≥ 999 that is the column's maximum and > 5%. The Data view asks "-1 appears 118 times in Founded. Treat -1 as missing?" — Yes adds a `sentinel` fix (cells → null for every engine, originals kept); No hides it until the page reloads (module state); "Don't ask again for this column" stores the key in `metadata.quality.dismissed` (metadata write).
+- **Why:** Approved item 2; "No" vs "Don't ask again" had to differ. Full Glassdoor: Founded 1,635.53 → 1,984.104693, Rating 3.518601 → 3.881833 (pandas).
+- **Alternatives considered:** Persisting "No" — rejected: then it is the same as "Don't ask again".
+- **Tradeoff accepted:** Glassdoor's text columns holding the number -1 (Competitors, 74.5%) are not prompted: the rule is numeric columns only.
+- **Source:** `made-now`
+
+### 2026-10-29 — "Convert to number…" for "10,000+", "19M", "512k": offered with a preview, never automatic
+- **Decision:** Offered on a non-date column when ≥ 50% of non-blank cells read with `numberFormats.ts:parseSuffixNumber` (optional grouping, k/M/G ×1e3/1e6/1e9 case-insensitive, "+" = lower bound) and ≥ 10% need that reader. The dialog shows the first 10 distinct values before → after and how many can't be read ("Varies with device" → missing); the fix records `unconvertible` and `lowerBound` for the badge.
+- **Why:** Approved item 5. The 10% floor: retail `StockCode` has a few "85049G"-style codes that would read as 85,049 × 10⁹; without it the column was offered.
+- **Alternatives considered:** Offering whenever any value needs the reader — rejected (StockCode, and Play Store Reviews for one "3.0M" cell).
+- **Tradeoff accepted:** "19M" in Play Store Size means megabytes; the conversion gives 19,000,000, as specified.
+- **Source:** `made-now`
+
+### 2026-10-29 — Label variants: case and whitespace only, columns with ≤ 1,000 distinct values
+- **Decision:** In categorical columns, text values whose `labelKey` (whitespace runs → one space, trimmed, lower-case) is equal form a group (`quality.labelVariants`, most common first). Each group is a suggestion "Merge 'lab a' (1,689) into 'Lab A' (1,579)?" with the most common spelling preselected and a picker; Merge adds a `mergeLabels` fix. Columns with more than 1,000 distinct values are not scanned.
+- **Why:** Approved item 7. The distinct cap keeps names/IDs (Lab patient_name: 8,876) out of the list.
+- **Alternatives considered:** Unicode normalization or spelling distance — out of scope (Hematology/Haematology).
+- **Tradeoff accepted:** Case variants in high-cardinality columns aren't suggested.
+- **Source:** `made-now`
+
+### 2026-10-29 — Exact duplicate rows: counted on the imported text, removable and restorable
+- **Superseded in part by** "Removed duplicate rows live in their own table" (where the removed rows are stored).
+- **Decision:** `dataQuality.ts:findDuplicateRows` runs in the worker on the raw records (every column compared as text, like pandas `duplicated()` on a dtype=str frame; hashed, collisions checked exactly), after any "Exclude rows" choice. `metadata.quality.duplicateRowCount` / `duplicateIndices`. Shown in the import summary when it appears (parse problems: the review dialog counts duplicates among all rows read, before any exclusion, computed in the worker before the review; the reopened "View import summary" shows the stored count), in the success toast on every import ("… · 483 duplicate rows · converted to numbers: Price (see Data view)"), and in the Data view, which shows "483 duplicate rows" with "Remove duplicates" (first occurrences kept). Removed rows, with their `dateSourceValues`/`fixSourceValues` cells, are kept for undo; Undo puts them back at their indices and re-applies column fixes made since.
+- **Why:** Approved item 6 (Play Store full file: 483, pandas agrees; fixture: 8). The review dialog still appears only when rows have parse problems ("Parse problems are shown before analysis", unchanged), so a clean file's count is in the toast, not a dialog.
+- **Alternatives considered:** A summary dialog after every import — rejected: a modal on every clean upload. Recounting duplicates on processed cells — rejected: "1.0" and "1" would collide.
+- **Tradeoff accepted:** The count is from import time; merges or conversions that later make rows equal are not recounted.
+- **Source:** `made-now`
+
+### 2026-10-29 — Invalid-value badges and the other findings come from the metadata pass
+- **Decision:** `generateDatasetMetadata` collects, per numeric/date column, the non-blank cells that aren't valid (strict number rule / calendar date) by text, and `dataQuality.ts:columnQuality` turns its value counts into `ColumnMetadata.quality` (invalid count + top 5 samples, top 5 values, label variants, sentinel, suffix candidate). The Data view column header shows "329 invalid" with a popover (ERROR ×164, UNKNOWN ×165); the date type badge no longer appends "· N invalid". Datasets saved before this get their `quality` from the recount worker when the Data view opens (`datasetStore.ensureColumnQuality`, metadata-only write).
+- **Why:** Approved items 1 and 8: no extra pass over the rows at import; samples were already in the value map.
+- **Tradeoff accepted:** Old datasets show no badges for a moment after opening the Data view.
+- **Source:** `made-now`
+
+### 2026-10-29 — Column recounts after a fix run in a worker (`services/columnMeta/`)
+- **Decision:** The store applies a fix (or duplicate removal) to the rows synchronously with `deferMeta` (only the column's type is updated), then `recountColumns` sends each changed column to `columnMeta.worker.ts` in 100,000-cell slices (one setTimeout between slices) and merges the fresh metadata when it returns, unless `rowsRevision` moved on. Without `Worker` (unit tests, import worker) the recount is inline.
+- **Why:** At 1M rows (retail CSV, Node) a column recount takes 130–1,486 ms (date column the longest) and "Remove duplicates" recounted 8 columns in 4.2 s on the main thread; cloning one 1M-cell text column in one message is ~0.43 s. Budget: ~250 ms.
+- **Alternatives considered:** Incremental metadata updates — rejected: unique counts and min/max can't be decremented without the full value map.
+- **Tradeoff accepted:** Counts, badges and tiles of a fixed column show the old numbers for ~1–2 s at 1M rows. Measured main-thread parts at 1M rows (Node, machine under memory pressure, so browser numbers may differ): convert StockCode 256 ms, its undo 170 ms, -1 on Quantity 295 ms, merge Country 228 ms, remove duplicates 76 ms, restore 49 ms; plus the existing calculated/window re-evaluation.
+- **Source:** `made-now`
+
+### 2026-10-29 — Every view reads the effective column type
+- **Decision:** `columnType.ts:getEffectiveColumnType` (override, else `columnTypes`, which carries fix conversions, else metadata) and new `columnsOfType(dataset, type)` now back: `ChartBuilder` field lists and `getColumnType`, `FilterPanel` lists and its date group-by, `GlobalFilterBar`, `PivotBuilder` (no-metadata branch), `WindowExplorer`, `queryEngine.numericColumnSet` and the group-by/aggregation type map in `execute` (it read `inferredDataType`), `statsEngine`, `anomalyDetector` (numeric and category columns), `kpiEngine` trend date column, `exportUtils` PDF summary, `searchEngine`, `templateEngine`, `aiEngine` and `summaryEngine` (types sent to the AI).
+- **Why:** Approved item 8: the audit found FilterPanel and ChartBuilder reading raw types; a grep found 13 more readers bypassing overrides.
+- **Tradeoff accepted:** None.
+- **Source:** `made-now`
+
+### 2026-10-29 — Overview tiles for categorical columns
+- **Decision:** `stats/columnSummary.ts:summarizeCategoricalColumns`: distinct, missing, top 5 with count and share of the rows shown. Columns with distinct > 50% of non-blank cells get a compact tile with no list. With the whole dataset shown it reads `quality.topValues` and the metadata counts (exact, kept current by the recount); filtered, it counts the rows.
+- **Why:** Approved item 8. `categoryCardinality` is the first 100 values seen, not the most common, so it can't be used.
+- **Tradeoff accepted:** Metadata path and row path are two code paths; a unit test checks they agree.
+- **Source:** `made-now`
+
+### 2026-10-29 — "Clear all local data" deletes only DataVista's storage, after stopping writes
+- **Decision:** Sidebar "Data & privacy" (shield icon, `DataPrivacyDialog`, also linked from the upload notice) → confirm step listing what goes → `services/clearLocalData.ts`: `persistenceService.stopWriting()` (subscribers stop, waiting saves are flushed and awaited), `db.delete()` of `DataVistaDatabase`, removal of every `datavista*` localStorage key (UI prefs and AI key, templates, saved views, snapshots, first-visit flag), reload.
+- **Why:** Approved item 9. The app is served from `*.github.io`, an origin shared with other sites, so `localStorage.clear()` or deleting every database would touch other apps; a debounced row save landing after the delete would recreate the database.
+- **Tradeoff accepted:** After clearing, the onboarding tour shows again (its "seen" flag is a preference and is deleted).
+- **Source:** `made-now`
+
+### 2026-10-29 — Privacy notice on upload; AI disclosure lists what is sent
+- **Decision:** Upload panel: data is read and stored in this browser, kept until deleted (dataset menu, or Clear all local data), and AI features with your own key send some of it to the provider. AI settings list, from `llmService.ts` contextMessage and `summaryEngine.ts`: query/formula → prompt, dataset name, each column's name, type, first-5-row sample values, min/max, distinct count, calculated fields' names and formulas; executive summary → dataset name, row/chart counts, column names and types, active filters with their values, anomaly descriptions. `metadata` sits in the context object but is not serialized. The key is stored in this browser's localStorage, unencrypted, and sent only to that provider (Gemini: `x-goog-api-key` header).
+- **Why:** DPDP checklist: notice at the collection point, retention and deletion, and what leaves the device.
+- **Tradeoff accepted:** None.
+- **Source:** `made-now`
+
+### 2026-10-29 — Sidebar order is stored (`Dataset.order`, Dexie v3)
+- **Decision:** `uploadDataset` sets `order` = last + 1 (upload order, oldest first, as the list showed before a reload). Dexie v3 `upgradeToV3` numbers existing datasets by `metadata.createdAt`, then `lastUpdated`, ties by id; `loadDatasets` sorts with `db.ts:compareDatasetOrder`. No index (sorted in memory). Tests: v1 → v3 and v2 → v3 with fake-indexeddb; the persistence e2e asserts the order across two reloads instead of looking the row up.
+- **Why:** Approved item 10: rows came back in primary-key (random UUID) order.
+- **Tradeoff accepted:** None.
+- **Source:** `made-now`
+
+### 2026-10-29 — Messy golden: pandas computes the values after each approved fix
+- **Decision:** `generate_messy_golden.py` gains `AUTO_FIXES` (Play Store Price: "$" stripped — `numericStats` is what a plain import gives) and `USER_FIXES` → `fixedStats` (Glassdoor Rating/Founded -1 → NaN; Play Store rows with the wrong field count dropped, found with the `csv` module, and Installs through "Convert to number…"), plus `duplicateRows` (pandas `duplicated()`). `golden.messy.test.ts`: Play Store numeric columns now include Price; the three `it.todo`s are tests (sentinel Yes → every engine equals `fixedStats`, excluded short row → Rating equals the oracle, Price converted with a USD fix), plus Installs converted and duplicate counts per fixture.
+- **Why:** Approved golden requirement.
+- **Tradeoff accepted:** The oracle declares which fixture columns are fixed rather than re-implementing the detectors (they are unit-tested separately). Required full-file numbers (Founded 1,984.10, Price 1.027368 / 400, 483 duplicates) are checked by e2e tests that skip when `test-data-local/` is absent (CI), and in the detection run of this batch.
+- **Source:** `made-now`
+
 ### 2026-10-29 — CI: e2e in its own parallel job; deploy waits for both
 - **Decision:** `deploy.yml` has three jobs. `checks` (lint, typecheck, unit tests, time zone gate) and `e2e` (checkout, `npm ci`, Playwright Chromium, `test:e2e`) run in parallel; `deploy` (`needs: [checks, e2e]`) builds, installs Chromium, runs the production smoke gate on that build, uploads it and deploys.
 - **Why:** The last 5 runs took 3m33s–5m46s with e2e 197 s of the last one, and this batch adds 4 e2e tests (~40 s), so the single job would pass 6 min. In parallel, the run is about the e2e job plus the deploy job instead of the sum of everything.
@@ -17,6 +123,7 @@ Newest first. Entries marked `Source: inferred` were reconstructed from existing
 - **Source:** `made-now`
 
 ### 2026-10-29 — ID-like columns are flagged by name only
+- **Superseded in part by** "ID columns with letter codes import as categorical" ("invoice" added to the words; letter-code ID columns change type at import).
 - **Decision:** `columnRoles.ts` drops the "more than 95% distinct integers" rule. `id` = a name word in id, code, no, number, zip, pin, phone, index, or pandas' unnamed index column ("Unnamed: N", words `unnamed` + digits). The year rule is unchanged.
 - **Why:** The distinct rule flagged HR `MonthlyRate` (97% distinct), an amount; DailyRate, HourlyRate and MonthlyIncome were one threshold away. Keeping "index" and "Unnamed: N" covers the row-number columns it was catching (DS jobs `index`).
 - **Alternatives considered:** Raising the threshold or requiring consecutive values — rejected: still guesses from values; names are what people read.
@@ -271,6 +378,7 @@ Newest first. Entries marked `Source: inferred` were reconstructed from existing
 - **Source:** `made-now`
 
 ### 2026-10-28 — Messy-data golden fixtures with their own pandas oracle
+- **Superseded in part by** "Messy golden: pandas computes the values after each approved fix" (the deferred oracle checks and Play Store Price).
 - **Decision:** `tests/fixtures/messy/{cafe,playstore,netflix,glassdoor}.csv` (byte-exact subsets, rows from the audit's section C; licences in `tests/fixtures/README.md`; `.gitattributes` keeps them `-text`). `scripts/golden/generate_messy_golden.py` (`npm run golden:regen-messy`) re-implements the numeric rule in Python (reads `dtype=str, keep_default_na=False`) and writes `messy.golden.json`. `golden.messy.test.ts` loads each file through `parseCsvText` → `processRawData` and checks row/column counts, header names, the expected numeric-column set, and that statsEngine (full and filtered path), queryEngine/KPI, chart `aggregateValues`, Overview (`summarizeNumericColumns`) and group-by totals all equal the oracle. Glassdoor Rating/Founded (-1 sentinels) and Play Store Rating (shifted row 10473) are only checked for engine-vs-engine agreement; their oracle check, "$" prices and dates are `it.todo`.
 - **Why:** The HR fixture is clean, so it couldn't catch the junk/blank bugs. A separate script keeps the HR oracle unchanged in purpose.
 - **Alternatives considered:** Extending `generate_hr_golden.py` — rejected, different inputs and rules. Including the Lab file — rejected, licence unknown.

@@ -1,4 +1,7 @@
-import { Dataset, DataRow, DatasetMetadata, ColumnMetadata, ImportIssuesSummary } from "@/shared/types";
+import { Dataset, DataRow, DatasetMetadata, ColumnMetadata, ImportIssuesSummary, ColumnFix, DatasetQuality } from "@/shared/types";
+import { columnQuality, detectImportConversion, findDuplicateRows } from "./dataQuality";
+import { transformColumn } from "./columnFixTransforms";
+import { isIdName } from "@/shared/utils/columnRoles";
 import { parseStrictNumber, toNumberOrNull, trimAscii } from "@/shared/utils/numeric";
 import { analyzeDateColumn, DateColumnAnalysis, localeDayFirst, parseDateValue, parseStoredDate, partsToUtcMs } from "@/shared/utils/dates";
 
@@ -60,6 +63,24 @@ export const normalizeHeaders = (headers: string[]): string[] => {
     counts.set(name, cur + 1);
   }
   return names;
+};
+
+/** Letters and digits together, nothing else: "C570867", "85123A". */
+const LETTER_CODE = /^(?=[A-Za-z0-9]*[A-Za-z])(?=[A-Za-z0-9]*\d)[A-Za-z0-9]+$/;
+
+/**
+ * An ID column by name (columnRoles.isIdName: invoice, code, id, ...) whose non-numeric
+ * values are letter codes ("C570867" cancellations, "85123A" stock codes) holds codes, not
+ * numbers: it is typed categorical instead of numeric-with-invalid-values. Pure-number ID
+ * columns (HR EmployeeNumber) stay numeric.
+ */
+export const hasLetterCodes = (column: string, data: DataRow[]): boolean => {
+  if (!isIdName(column)) return false;
+  for (let i = 0; i < data.length; i++) {
+    const v = data[i][column];
+    if (typeof v === 'string' && LETTER_CODE.test(v)) return true;
+  }
+  return false;
 };
 
 export interface ColumnInference {
@@ -175,13 +196,50 @@ export const processRawData = (
     return processedRow;
   });
 
+  // Currency marks and thousands separators: a column written one way throughout becomes
+  // numbers, with its original cells kept in fixSourceValues so the fix can be undone.
+  const columnFixes: ColumnFix[] = [];
+  const fixSourceValues: Record<string, DataRow[string][]> = {};
+  const quality: DatasetQuality = { duplicateRowCount: 0, duplicateIndices: [] };
+  columns.forEach(col => {
+    const values = data.map(row => row[col] ?? null);
+    const found = detectImportConversion(values);
+    if (found.currencyWarning) (quality.currencyWarnings ??= {})[col] = found.currencyWarning;
+    if (found.groupingWarning) (quality.groupingWarnings ??= {})[col] = found.groupingWarning;
+    const conversion = found.conversion;
+    if (!conversion) return;
+    const fix: ColumnFix = {
+      id: `${conversion.kind}:${col}`,
+      column: col,
+      kind: conversion.kind,
+      auto: true,
+      previousType: inferColumn(values, dayFirstDefault).type,
+      changedCount: 0,
+      ...(conversion.currency ? { currency: conversion.currency } : {}),
+      ...(conversion.grouping ? { grouping: conversion.grouping } : {}),
+    };
+    const result = transformColumn(values, fix);
+    fix.changedCount = result.changed;
+    fixSourceValues[col] = values;
+    result.values.forEach((v, i) => { data[i][col] = v; });
+    columnFixes.push(fix);
+  });
+
+  // Exact duplicate rows, compared as imported text (like pandas on a dtype=str frame).
+  quality.duplicateIndices = findDuplicateRows(rawData, originalKeys);
+  quality.duplicateRowCount = quality.duplicateIndices.length;
+
   // Detect column types
   const columnTypes: Record<string, 'numeric' | 'categorical' | 'date'> = {};
   const dateInfo: Record<string, DateColumnAnalysis> = {};
   columns.forEach((col, colIndex) => {
     onProgress?.(0.5 + 0.4 * (colIndex / columns.length));
     const inference = inferColumn(data.map(row => row[col]), dayFirstDefault);
-    columnTypes[col] = inference.type;
+    // A converted column (currency, thousands) is numeric: ≥80% of its cells were numbers
+    // written one way, which can sit exactly on the type vote's 80% line.
+    columnTypes[col] = fixSourceValues[col] ? 'numeric'
+      : inference.type === 'numeric' && hasLetterCodes(col, data) ? 'categorical'
+      : inference.type;
     dateInfo[col] = inference.dates;
   });
 
@@ -223,6 +281,8 @@ export const processRawData = (
     metadata.parsingStatistics.errorCount = options.importIssues.issueCount;
     metadata.importIssues = options.importIssues;
   }
+  metadata.quality = quality;
+  if (columnFixes.length > 0) metadata.columnFixes = columnFixes;
   onProgress?.(1);
 
   return {
@@ -232,7 +292,8 @@ export const processRawData = (
     columns,
     columnTypes,
     metadata,
-    ...(Object.keys(dateSourceValues).length > 0 ? { dateSourceValues } : {})
+    ...(Object.keys(dateSourceValues).length > 0 ? { dateSourceValues } : {}),
+    ...(columnFixes.length > 0 ? { fixSourceValues } : {})
   };
 };
 
@@ -264,6 +325,8 @@ export const generateDatasetMetadata = (
     maxDateMs: number;
     invalidDateCount: number;
     allIntegers: boolean;
+    /** Non-blank cells that aren't valid for the column's type, by text. */
+    invalidValues: Map<string, number>;
   }
 
   // Pre-initialize stats objects for each column
@@ -281,6 +344,7 @@ export const generateDatasetMetadata = (
       maxDateMs: -Infinity,
       invalidDateCount: 0,
       allIntegers: true,
+      invalidValues: new Map<string, number>(),
     };
     return acc;
   }, {} as Record<string, ColStatAccumulator>);
@@ -311,6 +375,8 @@ export const generateDatasetMetadata = (
             if (num < stats.min) stats.min = num;
             if (num > stats.max) stats.max = num;
             if (!Number.isInteger(num)) stats.allIntegers = false;
+          } else {
+            stats.invalidValues.set(strVal, (stats.invalidValues.get(strVal) ?? 0) + 1);
           }
         } else if (type === 'date') {
           const parts = parseStoredDate(val);
@@ -320,6 +386,7 @@ export const generateDatasetMetadata = (
             if (ms > stats.maxDateMs) { stats.maxDateMs = ms; stats.maxDate = strVal; }
           } else {
             stats.invalidDateCount++;
+            stats.invalidValues.set(strVal, (stats.invalidValues.get(strVal) ?? 0) + 1);
           }
         }
       }
@@ -376,7 +443,8 @@ export const generateDatasetMetadata = (
       categoryCardinality,
       role,
       allIntegerValues: type === 'numeric' ? (stats.validNumCount > 0 && stats.allIntegers) : false,
-      userOverrideType: undefined
+      userOverrideType: undefined,
+      quality: columnQuality(type, stats.uniqueValuesMap, stats.invalidValues, rowCount - stats.missingCount)
     };
   });
 

@@ -185,6 +185,8 @@ function IssueReview() {
         <DialogDescription data-testid="import-summary-counts">
           {review.rowCount.toLocaleString()} rows and {review.columnCount} columns read from {review.fileName}.{" "}
           {issues.rowCount.toLocaleString()} {issues.rowCount === 1 ? "row has" : "rows have"} parse problems.
+          {review.duplicateRowCount > 0 &&
+            ` ${review.duplicateRowCount.toLocaleString()} duplicate ${review.duplicateRowCount === 1 ? "row" : "rows"} (every column equal to an earlier row; you can remove them in the Data view).`}
         </DialogDescription>
       </DialogHeader>
       <ImportIssueList issues={issues} />
@@ -232,8 +234,10 @@ export function ImportDialog() {
 }
 
 /** Reopens the summary stored in dataset metadata (read-only). */
-export function ImportIssuesDialog({ issues, open, onOpenChange }: {
+export function ImportIssuesDialog({ issues, duplicateRowCount = 0, open, onOpenChange }: {
   issues: ImportIssuesSummary;
+  /** metadata.quality.duplicateRowCount */
+  duplicateRowCount?: number;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -246,6 +250,7 @@ export function ImportIssuesDialog({ issues, open, onOpenChange }: {
             {issues.rowCount.toLocaleString()} of {issues.sourceRowCount.toLocaleString()} rows had parse problems and{" "}
             {issues.excluded ? "were excluded at import" : "were kept"}.
             {issues.excluded ? "" : " To exclude them, import the file again and choose Exclude."}
+            {duplicateRowCount > 0 && ` ${duplicateRowCount.toLocaleString()} duplicate ${duplicateRowCount === 1 ? "row" : "rows"}.`}
           </DialogDescription>
         </DialogHeader>
         <ImportIssueList issues={issues} />

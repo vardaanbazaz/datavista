@@ -4,6 +4,7 @@ import { executionPlanner, filterCache, processCache, queryCache } from "./optim
 import { aggregationsAdapter } from "./aggregations";
 import { columnNumbers, mean, median, minMax, sampleStdDev, sum, toNumberOrNull } from "@/shared/utils/numeric";
 import { calendarDay, calendarFromPickerDate, compareCells, isStoredDate, parseStoredDate, partsToUtcMs, periodKey, rangeBoundDay } from "@/shared/utils/dates";
+import { getEffectiveColumnType } from "@/shared/utils/columnType";
 
 /**
  * Resolves a filter operand (cell value or filter target) to a comparable number for
@@ -40,9 +41,7 @@ export function numericColumnSet(dataset: Dataset): Set<string> {
   const names = new Set([...dataset.columns, ...(dataset.metadata?.columns.map(c => c.name) ?? [])]);
   const numeric = new Set<string>();
   for (const col of names) {
-    const meta = dataset.metadata?.columns.find(c => c.name === col);
-    const type = meta?.userOverrideType ?? dataset.columnTypes[col] ?? meta?.inferredDataType;
-    if (type === 'numeric') numeric.add(col);
+    if (getEffectiveColumnType(dataset, col) === 'numeric') numeric.add(col);
   }
   return numeric;
 }
@@ -106,12 +105,11 @@ export const queryEngine = {
       ? dataset.metadata.columns.map(c => c.name)
       : dataset.columns;
 
-    const columnTypes = dataset.metadata
-      ? dataset.metadata.columns.reduce((acc, col) => {
-          acc[col.name] = col.inferredDataType;
-          return acc;
-        }, {} as Record<string, 'numeric' | 'categorical' | 'date'>)
-      : dataset.columnTypes;
+    // Effective types: user overrides and column fixes included.
+    const columnTypes = columns.reduce((acc, col) => {
+      acc[col] = getEffectiveColumnType(dataset, col);
+      return acc;
+    }, {} as Record<string, 'numeric' | 'categorical' | 'date'>);
 
     const numericColumns = numericColumnSet(dataset);
 

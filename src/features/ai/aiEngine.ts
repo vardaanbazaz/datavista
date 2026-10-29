@@ -6,6 +6,7 @@ import { queryEngine } from "@/shared/services/queryEngine";
 import { formulaEngine } from "@/shared/services/formulaEngine";
 import { useFilterStore } from "@/store/filterStore";
 import { useChartStore } from "@/store/chartStore";
+import { getEffectiveColumnType } from "@/shared/utils/columnType";
 
 export class AiEngineError extends Error {
   constructor(message: string) {
@@ -27,7 +28,7 @@ export const aiEngine = {
 
       return {
         name: c.name,
-        type: c.inferredDataType,
+        type: getEffectiveColumnType(dataset, c.name),
         sampleValues: sampleVals,
         minimumValue: c.minimumValue,
         maximumValue: c.maximumValue,
@@ -46,7 +47,7 @@ export const aiEngine = {
               .filter((v) => v !== "null" && v !== "undefined");
             return {
               name: col,
-              type: dataset.columnTypes[col] || "categorical",
+              type: getEffectiveColumnType(dataset, col),
               sampleValues: sampleVals,
             };
           });
