@@ -4,6 +4,7 @@ import { GlobalSearchModal } from "./GlobalSearchModal";
 import { InstantiateTemplateModal } from "@/features/dashboards/components/InstantiateTemplateModal";
 import { MainContent } from "@/app/layout/MainContent";
 import { FileUpload } from "@/features/upload/components/FileUpload";
+import { ImportDialog } from "@/features/upload/components/ImportDialog";
 import { ChartBuilder } from "@/features/charts/components/ChartBuilder";
 import { DataTable } from "@/features/datasets/components/DataTable";
 import { FilterPanel } from "@/features/filters/components/FilterPanel";
@@ -502,6 +503,7 @@ export function Dashboard() {
         isOpen={isTemplateModalOpen}
         onClose={() => setIsTemplateModalOpen(false)}
       />
+      <ImportDialog />
     </div>
   );
 }

@@ -1,139 +1,21 @@
 import { useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { Button } from "@/shared/components/ui/button";
-import { Progress } from "@/shared/components/ui/progress";
-import { useToast } from "@/shared/hooks/use-toast";
 import { Upload, FileText, AlertCircle, CheckCircle } from "lucide-react";
-import { parseCsvFile } from "@/shared/services/csvParse";
-import * as XLSX from "xlsx";
-import { readWorkbookWithCalendarDates } from "@/features/upload/lib/xlsxDates";
-import { useDatasetStore } from "@/store/datasetStore";
-import { processRawData } from "@/shared/services/parsingService";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/components/ui/tooltip";
+import { useImportStore } from "@/store/importStore";
+import { MAX_IMPORT_BYTES } from "@/features/upload/lib/importLimits";
 
 export function FileUpload() {
-  const onDatasetUpload = useDatasetStore((state) => state.uploadDataset);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
+  const importForUpload = useImportStore((state) => state.importForUpload);
+  const isImporting = useImportStore((state) => state.phase !== "idle");
   const [dragActive, setDragActive] = useState(false);
-  const { toast } = useToast();
 
-  const handleFile = useCallback(async (file: File) => {
-    setIsUploading(true);
-    setUploadProgress(0);
-
-    try {
-      const fileName = file.name;
-      const fileExtension = fileName.split('.').pop()?.toLowerCase();
-      
-      // File Size Validations (Soft warning > 50MB, Hard limit > 100MB)
-      const fileSizeMB = file.size / (1024 * 1024);
-      if (fileSizeMB > 100) {
-        toast({
-          title: "File rejected",
-          description: `File size is ${fileSizeMB.toFixed(1)}MB. The maximum supported size is 100MB to prevent browser instability.`,
-          variant: "destructive",
-        });
-        setIsUploading(false);
-        return;
-      }
-      
-      if (fileSizeMB > 50) {
-        toast({
-          title: "⚠️ Large file warning",
-          description: `The file size is ${fileSizeMB.toFixed(1)}MB. Processing this file might temporarily freeze or slow down the interface.`,
-        });
-      }
-
-      let rawData: Record<string, unknown>[] = [];
-
-      if (fileExtension === 'csv' || fileExtension === 'tsv') {
-        // Parse CSV/TSV with Papa Parse (shared path: pandas-style header names)
-        parseCsvFile(file, fileExtension === 'tsv' ? '\t' : undefined).then(
-          (results) => {
-            try {
-              if (results.errors.length > 0) {
-                console.warn('CSV parsing warnings:', results.errors);
-              }
-              
-              rawData = results.rows;
-              setUploadProgress(70);
-              
-              const dataset = processRawData(rawData, fileName);
-              setUploadProgress(100);
-              
-              setTimeout(() => {
-                onDatasetUpload(dataset);
-                setIsUploading(false);
-                setUploadProgress(0);
-              }, 500);
-            } catch (error: unknown) {
-              toast({
-                title: "Processing failed",
-                description: (error as Error)?.message || "An error occurred while cleaning dataset.",
-                variant: "destructive",
-              });
-              setIsUploading(false);
-              setUploadProgress(0);
-            }
-          },
-          (error: Error) => {
-            toast({
-              title: "Parse error",
-              description: `CSV parsing error: ${error.message}`,
-              variant: "destructive",
-            });
-            setIsUploading(false);
-            setUploadProgress(0);
-          }
-        );
-      } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
-        // Parse Excel files
-        const arrayBuffer = await file.arrayBuffer();
-        setUploadProgress(25);
-        
-        // Date cells become calendar strings, not serial numbers (lib/xlsxDates.ts).
-        const workbook = readWorkbookWithCalendarDates(arrayBuffer);
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        
-        setUploadProgress(50);
-        
-        rawData = XLSX.utils.sheet_to_json(worksheet, { defval: "" }); // Prevent missing properties
-        setUploadProgress(75);
-        
-        try {
-          const dataset = processRawData(rawData, fileName);
-          setUploadProgress(100);
-          
-          setTimeout(() => {
-            onDatasetUpload(dataset);
-            setIsUploading(false);
-            setUploadProgress(0);
-          }, 500);
-        } catch (error: unknown) {
-          toast({
-            title: "Processing failed",
-            description: (error as Error)?.message || "An error occurred while cleaning dataset.",
-            variant: "destructive",
-          });
-          setIsUploading(false);
-          setUploadProgress(0);
-        }
-      } else {
-        throw new Error("Unsupported file format. Please upload CSV, TSV, or XLSX files.");
-      }
-    } catch (error: unknown) {
-      console.error('File processing error:', error);
-      toast({
-        title: "Upload failed",
-        description: error instanceof Error ? error.message : "An error occurred while processing the file",
-        variant: "destructive",
-      });
-      setIsUploading(false);
-      setUploadProgress(0);
-    }
-  }, [onDatasetUpload, toast]);
+  // Size cap, format check, parsing and progress all live in the shared pipeline
+  // (store/importStore.ts -> lib/importClient.ts -> worker/import.worker.ts).
+  const handleFile = useCallback((file: File) => {
+    void importForUpload(file);
+  }, [importForUpload]);
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -159,6 +41,8 @@ export function FileUpload() {
     if (e.target.files && e.target.files[0]) {
       handleFile(e.target.files[0]);
     }
+    // Let the same file be chosen again (e.g. after cancelling).
+    e.target.value = "";
   }, [handleFile]);
 
   return (
@@ -180,19 +64,14 @@ export function FileUpload() {
           onDragLeave={handleDrag}
           onDragOver={handleDrag}
           onDrop={handleDrop}
+          data-testid="file-drop-zone"
         >
-          {isUploading ? (
+          {isImporting ? (
             <div className="space-y-4">
               <div className="w-16 h-16 mx-auto gradient-primary rounded-full flex items-center justify-center">
                 <Upload className="w-8 h-8 text-primary-foreground animate-pulse" />
               </div>
-              <div>
-                <p className="font-medium">Processing your data...</p>
-                <Progress value={uploadProgress} className="mt-2" />
-                <p className="text-sm text-muted-foreground mt-1">
-                  {uploadProgress}% complete
-                </p>
-              </div>
+              <p className="font-medium">Importing your data...</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -204,7 +83,7 @@ export function FileUpload() {
                   Drop your data file here, or click to browse
                 </p>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Supports CSV, TSV, and XLSX files up to 100MB
+                  Supports CSV, TSV, and XLSX files up to {MAX_IMPORT_BYTES / 1_000_000} MB
                 </p>
                 <input
                   type="file"

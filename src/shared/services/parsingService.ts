@@ -1,4 +1,4 @@
-import { Dataset, DataRow, DatasetMetadata, ColumnMetadata } from "@/shared/types";
+import { Dataset, DataRow, DatasetMetadata, ColumnMetadata, ImportIssuesSummary } from "@/shared/types";
 import { parseStrictNumber, toNumberOrNull, trimAscii } from "@/shared/utils/numeric";
 import { analyzeDateColumn, DateColumnAnalysis, localeDayFirst, parseDateValue, parseStoredDate, partsToUtcMs } from "@/shared/utils/dates";
 
@@ -11,6 +11,10 @@ export interface ProcessOptions {
    * Defaults to the browser locale (en-IN, en-GB: day first; en-US: month first).
    */
   dayFirstDefault?: boolean;
+  /** Parse problems from the import, stored in metadata (importIssues, parsingStatistics.errorCount). */
+  importIssues?: ImportIssuesSummary;
+  /** Called while the rows are cleaned and the columns analysed, with the share done (0..1). */
+  onProgress?: (fraction: number) => void;
 }
 
 /**
@@ -142,7 +146,10 @@ export const processRawData = (
     originalHeadersMap[columns[idx]] = key;
   });
 
-  const data: DataRow[] = rawData.map(row => {
+  const onProgress = options.onProgress;
+  const progressEvery = 50_000;
+  const data: DataRow[] = rawData.map((row, rowIndex) => {
+    if (onProgress && rowIndex % progressEvery === 0) onProgress(0.5 * (rowIndex / rawData.length));
     const processedRow: DataRow = {};
     Object.keys(row).forEach(originalCol => {
       const col = colMapping[originalCol];
@@ -171,7 +178,8 @@ export const processRawData = (
   // Detect column types
   const columnTypes: Record<string, 'numeric' | 'categorical' | 'date'> = {};
   const dateInfo: Record<string, DateColumnAnalysis> = {};
-  columns.forEach(col => {
+  columns.forEach((col, colIndex) => {
+    onProgress?.(0.5 + 0.4 * (colIndex / columns.length));
     const inference = inferColumn(data.map(row => row[col]), dayFirstDefault);
     columnTypes[col] = inference.type;
     dateInfo[col] = inference.dates;
@@ -194,6 +202,7 @@ export const processRawData = (
     });
   });
 
+  onProgress?.(0.9);
   const datasetId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9);
   const datasetName = fileName.replace(/\.[^/.]+$/, "").trim() || "Dataset";
   const processingTimeMs = performance.now() - startTime;
@@ -210,6 +219,11 @@ export const processRawData = (
     originalHeadersMap,
     dateInfo
   );
+  if (options.importIssues) {
+    metadata.parsingStatistics.errorCount = options.importIssues.issueCount;
+    metadata.importIssues = options.importIssues;
+  }
+  onProgress?.(1);
 
   return {
     id: datasetId,

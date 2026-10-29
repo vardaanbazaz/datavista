@@ -9,22 +9,20 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/compo
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/components/ui/tooltip";
 import { Search, ArrowUpDown, Download, Palette, RefreshCw } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import * as XLSX from "xlsx";
-import { readWorkbookWithCalendarDates } from "@/features/upload/lib/xlsxDates";
 import { Dataset, Query, DataRow, ConditionalFormatRule, DatasetMetadata } from "@/shared/types";
 import { queryEngine } from "@/shared/services/queryEngine";
 import { formattingEngine } from "@/shared/services/formattingEngine";
-import { needsDateReimportNotice, processRawData } from "@/shared/services/parsingService";
+import { needsDateReimportNotice } from "@/shared/services/parsingService";
 import { useDatasetStore } from "@/store/datasetStore";
 import { useFilterStore } from "@/store/filterStore";
-import { toast } from "@/shared/hooks/use-toast";
 import { CalculatedFieldsManager } from "./CalculatedFieldsManager";
 import { QueryPerformanceBadge } from "@/features/dashboard/components/QueryPerformanceBadge";
 import { ConditionalFormattingBuilder } from "@/features/dashboards/components/ConditionalFormattingBuilder";
 import { DatasetUpdateModal } from "./DatasetUpdateModal";
 import { getEffectiveColumnType, mightBeCategorical } from "@/shared/utils/columnType";
 import { summarizeNumericColumns } from "@/shared/services/stats/columnSummary";
-import { parseCsvFile } from "@/shared/services/csvParse";
+import { useImportStore } from "@/store/importStore";
+import { ImportIssuesDialog } from "@/features/upload/components/ImportDialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/components/ui/popover";
 
 interface DataTableProps {
@@ -55,6 +53,8 @@ export function DataTable({
   const activeDataset = customDataset !== undefined ? customDataset : activeDatasetStore;
   const storeData = customData !== undefined ? customData : storeFilteredData;
 
+  const importForReplace = useImportStore((state) => state.importForReplace);
+  const [isIssuesOpen, setIsIssuesOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
   const [newParsedData, setNewParsedData] = useState<{
@@ -67,65 +67,19 @@ export function DataTable({
 
   const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file || !activeDataset) return;
-
-    const fileName = file.name;
-    const ext = fileName.split(".").pop()?.toLowerCase();
-
-    try {
-      let rawData: Record<string, unknown>[] = [];
-
-      if (ext === "csv" || ext === "tsv") {
-        const parsed = await parseCsvFile(file, ext === "tsv" ? "\t" : undefined);
-        try {
-          rawData = parsed.rows;
-          const processed = processRawData(rawData, fileName);
-          setNewParsedData({
-            data: processed.data,
-            columns: processed.columns,
-            columnTypes: processed.columnTypes,
-            metadata: processed.metadata,
-            dateSourceValues: processed.dateSourceValues,
-          });
-          setIsUpdateModalOpen(true);
-        } catch (err: unknown) {
-          toast({
-            title: "Processing Failed",
-            description: (err as Error)?.message || "Failed to process raw CSV data.",
-            variant: "destructive",
-          });
-        }
-      } else if (ext === "xlsx" || ext === "xls") {
-        const buffer = await file.arrayBuffer();
-        // Date cells become calendar strings, not serial numbers (same reader as FileUpload).
-        const workbook = readWorkbookWithCalendarDates(buffer);
-        const firstSheet = workbook.SheetNames[0];
-        rawData = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheet]);
-        const processed = processRawData(rawData, fileName);
-        setNewParsedData({
-          data: processed.data,
-          columns: processed.columns,
-          columnTypes: processed.columnTypes,
-          metadata: processed.metadata,
-          dateSourceValues: processed.dateSourceValues,
-        });
-        setIsUpdateModalOpen(true);
-      } else {
-        toast({
-          title: "Unsupported Format",
-          description: "Please select a valid .csv, .tsv, or .xlsx file.",
-          variant: "destructive",
-        });
-      }
-    } catch (err: unknown) {
-      toast({
-        title: "File Parse Error",
-        description: (err as Error)?.message || "An error occurred while reading the file.",
-        variant: "destructive",
-      });
-    } finally {
-      if (e.target) e.target.value = "";
-    }
+    // Same pipeline as the upload panel: size cap first, then the import worker.
+    const processed = await importForReplace(file);
+    if (!processed) return;
+    setNewParsedData({
+      data: processed.data,
+      columns: processed.columns,
+      columnTypes: processed.columnTypes,
+      metadata: processed.metadata,
+      dateSourceValues: processed.dateSourceValues,
+    });
+    setIsUpdateModalOpen(true);
   };
 
   const handleConfirmVersionUpdate = () => {
@@ -316,6 +270,7 @@ export function DataTable({
                     type="file"
                     ref={fileInputRef}
                     onChange={handleFileSelected}
+                    data-testid="replace-data-input"
                     accept=".csv,.tsv,.xlsx,.xls"
                     className="hidden"
                   />
@@ -473,6 +428,21 @@ export function DataTable({
         </div>
       )}
 
+      {/* Rows the parser had problems with at import; reopens the import summary */}
+      {activeDataset && customDataset === undefined && (activeDataset.metadata?.importIssues?.rowCount ?? 0) > 0 && (
+        <div role="status" data-testid="import-issues-notice" className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-lg border border-border text-body">
+          <p className="flex-1">
+            {activeDataset.metadata!.importIssues!.rowCount.toLocaleString()}{" "}
+            {activeDataset.metadata!.importIssues!.rowCount === 1 ? "row" : "rows"} had parse problems at import and{" "}
+            {activeDataset.metadata!.importIssues!.excluded ? "were excluded" : "were kept"}.
+          </p>
+          <Button size="sm" variant="outline" onClick={() => setIsIssuesOpen(true)} data-testid="import-issues-open">
+            View import summary
+          </Button>
+          <ImportIssuesDialog issues={activeDataset.metadata!.importIssues!} open={isIssuesOpen} onOpenChange={setIsIssuesOpen} />
+        </div>
+      )}
+
       {/* Summary Statistics */}
       {Object.keys(summaryStats).length > 0 && (
         <Card className="glass">
@@ -482,7 +452,7 @@ export function DataTable({
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {Object.entries(summaryStats).map(([column, stats]) => (
-                <div key={column} className="p-3 bg-muted/50 border border-border rounded-lg">
+                <div key={column} className="p-3 bg-muted/50 border border-border rounded-lg" data-testid={`column-stats-${column}`}>
                   <h4 className="text-caption uppercase text-textTertiary mb-2">{column}</h4>
                   <div className="space-y-1 text-body font-mono text-dataTable">
                     <div>Count: {stats.count}</div>

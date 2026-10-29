@@ -15,6 +15,7 @@
     "test:tz": "for tz in Asia/Kolkata America/New_York UTC; do echo \"TZ=$tz\"; TZ=$tz vitest run tz.test golden.messy || exit 1; done",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
+    "test:bigfiles": "node scripts/bigfiles/run.mjs",
     "golden:regen": "python3 scripts/golden/generate_hr_golden.py",
     "golden:regen-messy": "python3 scripts/golden/generate_messy_golden.py"
   },
