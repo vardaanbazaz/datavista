@@ -38,6 +38,11 @@ interface DatasetState {
   dismissDateReimportNotice: (datasetId: string) => void;
 }
 
+/** Marks a dataset's cell values as changed, so persistence rewrites its rows. */
+function withNewRows(dataset: Dataset): Dataset {
+  return { ...dataset, rowsRevision: (dataset.rowsRevision ?? 0) + 1 };
+}
+
 export const useDatasetStore = create<DatasetState>((set, get) => {
   /**
    * Shared commit path for actions that mutate the active dataset's calculatedFields or
@@ -54,12 +59,20 @@ export const useDatasetStore = create<DatasetState>((set, get) => {
    * 2026-09-14 comprehensive audit) inherited that staleness — window/calculated columns
    * silently zeroed out. Funneling all four through one function means there's only one
    * place left to get this right, instead of four.
+   *
+   * `changesRows: false` is for updates that leave every stored cell value as it was (type
+   * overrides): the re-evaluation may rebuild `data`, but with the same values, so
+   * `rowsRevision` stays and persistence writes only the metadata.
    */
-  function applyActiveDatasetUpdate(updater: (dataset: Dataset) => Dataset): Dataset | null {
+  function applyActiveDatasetUpdate(
+    updater: (dataset: Dataset) => Dataset,
+    { changesRows = true }: { changesRows?: boolean } = {}
+  ): Dataset | null {
     const { activeDataset, datasets } = get();
     if (!activeDataset) return null;
 
-    const updatedDataset = updater(activeDataset);
+    const updated = updater(activeDataset);
+    const updatedDataset = changesRows && updated !== activeDataset ? withNewRows(updated) : updated;
 
     queryCache.invalidate(activeDataset.id);
     const evaluated = windowEngine.evaluate(formulaEngine.evaluateCalculatedFields(updatedDataset));
@@ -164,7 +177,7 @@ export const useDatasetStore = create<DatasetState>((set, get) => {
       dateSourceValues: newDateSourceValues,
     };
 
-    const evaluated = windowEngine.evaluate(formulaEngine.evaluateCalculatedFields(updatedDataset));
+    const evaluated = windowEngine.evaluate(formulaEngine.evaluateCalculatedFields(withNewRows(updatedDataset)));
 
     const updatedDatasets = datasets.map((d) => (d.id === datasetId ? evaluated : d));
 
@@ -328,6 +341,7 @@ export const useDatasetStore = create<DatasetState>((set, get) => {
   },
 
   setColumnTypeOverride: (columnName, overrideType) => {
+    // Formula and window evaluation don't read userOverrideType, so no cell value changes.
     applyActiveDatasetUpdate((dataset) => {
       if (!dataset.metadata) return dataset;
       return {
@@ -339,7 +353,7 @@ export const useDatasetStore = create<DatasetState>((set, get) => {
           ),
         },
       };
-    });
+    }, { changesRows: false });
   },
 
   setDateDayFirst: (columnName, dayFirst) => {

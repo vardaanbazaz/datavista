@@ -142,7 +142,6 @@ export class TemplateEngine {
         ...widget,
         id: newChartId,
         datasetId: targetDataset.id,
-        data: targetDataset.data,
       };
     });
 

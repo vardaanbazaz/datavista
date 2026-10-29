@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { Dataset, ColumnMetadata, DatasetMetadata } from "@/shared/types";
 
 function legacyColumnMissingField(): ColumnMetadata {
@@ -24,22 +24,16 @@ const legacyDataset: Dataset = {
   columns: ['Education'], columnTypes: { Education: 'numeric' }, metadata,
 };
 
-vi.mock("@/shared/lib/db", () => ({
-  db: {
-    datasets: { toArray: () => Promise.resolve([legacyDataset]) },
-    charts: { toArray: () => Promise.resolve([]) },
-    filters: { toArray: () => Promise.resolve([]) },
-    uiState: { toArray: () => Promise.resolve([]) },
-    dashboards: { toArray: () => Promise.resolve([]) },
-  },
-}));
 
 import { persistenceService } from "../persistenceService";
+import { resetDb, seedDataset } from "@/test/fakeDb";
 import { useDatasetStore } from "@/store/datasetStore";
 import { useUiStore } from "@/store/uiStore";
 
 describe('persistenceService hydrate - allIntegerValues backfill', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    await resetDb();
+    await seedDataset(legacyDataset);
     useUiStore.setState({ isDataHydrated: false });
     useDatasetStore.setState({ datasets: [], activeDataset: null });
   });

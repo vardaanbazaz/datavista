@@ -10,7 +10,6 @@ import { useMemo } from "react";
 import { ChartConfig, ConditionalFormatRule } from "@/shared/types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/components/ui/dialog";
 import { useDatasetStore } from "@/store/datasetStore";
-import { useFilterStore } from "@/store/filterStore";
 import { useChartStore } from "@/store/chartStore";
 import { useDashboardStore } from "@/features/dashboards/store/dashboardStore";
 import { pluginRegistry } from "@/shared/services/pluginRegistry";
@@ -20,7 +19,6 @@ import { Hint } from "@/shared/components/Hint";
 
 export function ChartBuilder() {
   const activeDataset = useDatasetStore((state) => state.activeDataset);
-  const filteredData = useFilterStore((state) => state.filteredData);
   const createChart = useChartStore((state) => state.createChart);
 
   const activeDashboardId = useDashboardStore((state) => state.activeDashboardId);
@@ -31,13 +29,7 @@ export function ChartBuilder() {
     return dashboards.find(d => d.id === activeDashboardId) || null;
   }, [dashboards, activeDashboardId]);
 
-  const dataset = useMemo(() => {
-    if (!activeDataset) return null;
-    return {
-      ...activeDataset,
-      data: filteredData,
-    };
-  }, [activeDataset, filteredData]);
+  const dataset = activeDataset;
 
   const [chartType, setChartType] = useState<ChartConfig['type']>('bar');
   const [chartTitle, setChartTitle] = useState('');
@@ -135,7 +127,6 @@ export function ChartBuilder() {
       yAxis: yAxis || undefined,
       groupBy: groupBy && groupBy !== 'none' ? groupBy : undefined,
       sizeBy: sizeBy || undefined,
-      data: dataset.data,
       datasetId: activeDataset?.id || "",
       drillPath: xAxis ? [xAxis, ...drillPath] : undefined,
       formattingRules: formattingRules.length > 0 ? formattingRules : undefined,

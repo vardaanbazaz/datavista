@@ -84,11 +84,6 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
 
   const drillState = widgetDrillStates[chart.id];
 
-  // Detect statistical anomalies in widget data
-  const chartAnomalies = useMemo(() => {
-    return anomalyDetector.detectChartAnomalies(chart);
-  }, [chart]);
-
   // Resolve current active X-axis dimension based on drillState depth
   const currentDimension = useMemo(() => {
     if (chart.drillPath && chart.drillPath.length > 0 && drillState) {
@@ -103,7 +98,7 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
 
   // Dynamically calculate chart data using queryEngine, filterManager, and drillState
   const chartData = useMemo(() => {
-    if (!dataset) return chart.data;
+    if (!dataset) return [];
 
     const baseQuery: Query = {
       filters: {
@@ -133,7 +128,12 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
 
     const result = queryEngine.execute(dataset, mergedQuery);
     return result.rows;
-  }, [dataset, chart.data, activeFilters, activeGlobalFilters, chart.id, drillState]);
+  }, [dataset, activeFilters, activeGlobalFilters, chart.id, drillState]);
+
+  // Detect statistical anomalies in the rows this chart plots
+  const chartAnomalies = useMemo(() => {
+    return anomalyDetector.detectChartAnomalies(chart, chartData);
+  }, [chart, chartData]);
 
   // Apply forecasting engine if configured for line or area charts
   const processedChartData = useMemo(() => {

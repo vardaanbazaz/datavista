@@ -251,7 +251,6 @@ export const aiEngine = {
         xAxis: groupByCol || dataset.columns[0],
         yAxis: agg?.column || dataset.columns[1] || dataset.columns[0],
         aggregation: agg?.operator,
-        data: queryResult.rows,
         datasetId: dataset.id,
       });
     }

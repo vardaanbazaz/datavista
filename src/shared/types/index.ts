@@ -26,6 +26,12 @@ export interface Dataset {
    * row of `data` (null for blanks), so the day/month order can be switched later.
    */
   dateSourceValues?: Record<string, (string | null)[]>;
+  /**
+   * Bumped by every action that changes cell values (replace data, calculated/window
+   * columns, day/month toggle). Persistence rewrites a dataset's rows only when this
+   * differs from the revision on disk; metadata-only actions leave it alone.
+   */
+  rowsRevision?: number;
 }
 
 export interface ChartConfig {
@@ -38,7 +44,7 @@ export interface ChartConfig {
   sizeBy?: string; // For bubble charts
   /** How chartData rows sharing an x-axis (and groupBy) key are reduced into yAxis's plotted value. Defaults to 'sum'. */
   aggregation?: AggregationOperator;
-  data: DataRow[];
+  // No row copy: charts read their rows from the live dataset (ChartVisualization).
   datasetId: string; // Tracks which dataset the chart belongs to
   drillPath?: string[]; // Dimension hierarchy for drill-down
   formattingRules?: ConditionalFormatRule[];

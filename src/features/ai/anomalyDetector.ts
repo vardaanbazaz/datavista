@@ -17,18 +17,20 @@ export interface DetectedAnomaly {
 
 export const anomalyDetector = {
   /**
-   * Detects statistical outliers in a single chart's aggregated data
+   * Detects statistical outliers in the rows a chart plots. Charts keep no row copy, so the
+   * caller passes them: ChartVisualization its live query rows, the executive summary the
+   * active dataset's filtered rows.
    */
-  detectChartAnomalies(chart: ChartConfig): DetectedAnomaly[] {
-    if (!chart.data || chart.data.length < 3) return [];
+  detectChartAnomalies(chart: ChartConfig, rows: DataRow[]): DetectedAnomaly[] {
+    if (!rows || rows.length < 3) return [];
 
-    const valueCol = chart.yAxis || Object.keys(chart.data[0] || {}).find(
-      (k) => k !== chart.xAxis && typeof chart.data[0][k] === "number"
+    const valueCol = chart.yAxis || Object.keys(rows[0] || {}).find(
+      (k) => k !== chart.xAxis && typeof rows[0][k] === "number"
     );
     if (!valueCol) return [];
 
     const dimCol = chart.xAxis || chart.groupBy;
-    const rawValues = chart.data.map((r) => r[valueCol]);
+    const rawValues = rows.map((r) => r[valueCol]);
     const outlierResult = computeOutliers(rawValues, 'iqr', { threshold: 1.5 });
 
     if (outlierResult.count === 0) return [];
@@ -36,7 +38,7 @@ export const anomalyDetector = {
     const mean = meanOf(numericValues(rawValues));
 
     return outlierResult.outliers.map((outlier, idx) => {
-      const row = chart.data[outlier.index];
+      const row = rows[outlier.index];
       const dimensionKey = dimCol && row[dimCol] !== undefined ? String(row[dimCol]) : `Row ${outlier.index + 1}`;
       const isSpike = outlier.value > mean;
       const type = isSpike ? 'spike' : 'drop';
@@ -60,12 +62,12 @@ export const anomalyDetector = {
   },
 
   /**
-   * Detects anomalies across all active charts in a dashboard
+   * Detects anomalies across all active charts in a dashboard, over the same rows
    */
-  detectDashboardAnomalies(charts: ChartConfig[]): DetectedAnomaly[] {
+  detectDashboardAnomalies(charts: ChartConfig[], rows: DataRow[]): DetectedAnomaly[] {
     const allAnomalies: DetectedAnomaly[] = [];
     for (const chart of charts) {
-      const chartAnomalies = this.detectChartAnomalies(chart);
+      const chartAnomalies = this.detectChartAnomalies(chart, rows);
       allAnomalies.push(...chartAnomalies);
     }
     return allAnomalies;

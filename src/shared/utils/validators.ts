@@ -30,7 +30,6 @@ export function isValidChartConfig(obj: unknown): obj is ChartConfig {
   if (typeof c.id !== "string" || !c.id.trim()) return false;
   if (typeof c.title !== "string" || !c.title.trim()) return false;
   if (typeof c.datasetId !== "string" || !c.datasetId.trim()) return false;
-  if (!Array.isArray(c.data)) return false;
 
   const allowedTypes = [
     "bar",

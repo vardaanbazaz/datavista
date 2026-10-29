@@ -71,13 +71,31 @@ const DEFAULT_TEMPLATES: DashboardTemplate[] = [
  * v1 persisted the built-in templates with a malformed KPI shape (`metricColumn` instead
  * of `primaryMetric`), which crashed every KPI card they produced. Replace any persisted
  * copy of a built-in template with the current definition; user-made templates are kept.
+ * Before v3, templates saved from a dashboard copied each chart's rows (`widgets[].data`)
+ * into localStorage; charts no longer carry rows, so v3 drops them.
  */
 export const migrateTemplateState = (persistedState: unknown, version: number): TemplateStore => {
-  const state = persistedState as TemplateStore;
+  let state = persistedState as TemplateStore;
   if (version < 2 && Array.isArray(state?.templates)) {
-    return {
+    state = {
       ...state,
       templates: state.templates.map((t) => DEFAULT_TEMPLATES.find((d) => d.id === t.id) ?? t),
+    };
+  }
+  if (version < 3 && Array.isArray(state?.templates)) {
+    state = {
+      ...state,
+      templates: state.templates.map((t) =>
+        (t.widgets || []).some((w) => "data" in w)
+          ? {
+              ...t,
+              widgets: t.widgets.map((w) => {
+                const { data: _rows, ...widget } = w as typeof w & { data?: unknown };
+                return widget;
+              }),
+            }
+          : t
+      ),
     };
   }
   return state;
@@ -109,7 +127,7 @@ export const useTemplateStore = create<TemplateStore>()(
     }),
     {
       name: "datavista-dashboard-templates",
-      version: 2,
+      version: 3,
       migrate: migrateTemplateState,
     }
   )

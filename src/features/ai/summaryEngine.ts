@@ -1,16 +1,18 @@
-import { Dataset, ChartConfig, GlobalFilter, FilterState } from "@/shared/types";
+import { Dataset, ChartConfig, GlobalFilter, FilterState, DataRow } from "@/shared/types";
 import { anomalyDetector, DetectedAnomaly } from "./anomalyDetector";
 import { callLLM } from "./llmService";
 import { useUiStore } from "@/store/uiStore";
 
 export const summaryEngine = {
   /**
-   * Generates a 2-3 sentence executive summary of the dashboard's current state and detected anomalies
+   * Generates a 2-3 sentence executive summary of the dashboard's current state and detected anomalies.
+   * `rows` are the rows the charts currently plot (the filtered rows); defaults to all rows.
    */
   async generateExecutiveSummary(
     dataset: Dataset | null,
     charts: ChartConfig[],
-    filters?: FilterState | GlobalFilter[]
+    filters?: FilterState | GlobalFilter[],
+    rows?: DataRow[]
   ): Promise<{ summary: string; anomalies: DetectedAnomaly[]; source: 'ai' | 'offline' }> {
     if (!dataset) {
       return {
@@ -21,7 +23,7 @@ export const summaryEngine = {
     }
 
     // 1. Detect statistical anomalies
-    let anomalies = anomalyDetector.detectDashboardAnomalies(charts);
+    let anomalies = anomalyDetector.detectDashboardAnomalies(charts, rows ?? dataset.data);
     if (anomalies.length === 0) {
       anomalies = anomalyDetector.detectDatasetAnomalies(dataset);
     }

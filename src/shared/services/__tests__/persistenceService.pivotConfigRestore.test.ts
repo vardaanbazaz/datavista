@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
+import type { Dataset } from "@/shared/types";
 
 // Regression test for: pivotConfig (row/column dimensions, value fields, aggregation
 // operators) was never restored on page reload. `hydrate()` restored datasets, filters,
@@ -28,27 +29,19 @@ const uiStateRows = [
   { key: `pivotConfig::ds-1`, value: savedPivotConfig },
 ];
 
-vi.mock("@/shared/lib/db", () => ({
-  db: {
-    datasets: { toArray: () => Promise.resolve([dataset]) },
-    charts: { toArray: () => Promise.resolve([]) },
-    filters: { toArray: () => Promise.resolve([]) },
-    uiState: {
-      toArray: () => Promise.resolve(uiStateRows),
-      get: (key: string) => Promise.resolve(uiStateRows.find((r) => r.key === key)),
-      put: () => Promise.resolve(),
-    },
-    dashboards: { toArray: () => Promise.resolve([]) },
-  },
-}));
 
 import { persistenceService } from "../persistenceService";
+import { db } from "@/shared/lib/db";
+import { resetDb, seedDataset } from "@/test/fakeDb";
 import { useUiStore } from "@/store/uiStore";
 import { useDatasetStore } from "@/store/datasetStore";
 import { usePivotStore } from "@/store/pivotStore";
 
 describe("persistenceService.hydrate restores pivotConfig", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    await resetDb();
+    await seedDataset(dataset as Dataset);
+    await db.uiState.bulkPut(uiStateRows);
     useUiStore.setState({ isDataHydrated: false });
     useDatasetStore.setState({ activeDataset: null, datasets: [] });
     usePivotStore.setState({ pivotConfig: null, pivotResult: null });

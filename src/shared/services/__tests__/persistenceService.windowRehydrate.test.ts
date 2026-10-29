@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { Dataset } from "@/shared/types";
 
 // A dataset shaped exactly like the pre-item-6-fix persisted case: windowQueries defined,
@@ -25,22 +25,16 @@ const staleDataset: Dataset = {
   ],
 };
 
-vi.mock("@/shared/lib/db", () => ({
-  db: {
-    datasets: { toArray: () => Promise.resolve([staleDataset]) },
-    charts: { toArray: () => Promise.resolve([]) },
-    filters: { toArray: () => Promise.resolve([]) },
-    uiState: { toArray: () => Promise.resolve([]) },
-    dashboards: { toArray: () => Promise.resolve([]) },
-  },
-}));
 
 import { persistenceService } from "../persistenceService";
+import { resetDb, seedDataset } from "@/test/fakeDb";
 import { useDatasetStore } from "@/store/datasetStore";
 import { useUiStore } from "@/store/uiStore";
 
 describe("persistenceService.hydrate - windowEngine re-evaluation (item 6 fix)", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    await resetDb();
+    await seedDataset(staleDataset);
     useUiStore.setState({ isDataHydrated: false });
     useDatasetStore.setState({ datasets: [], activeDataset: null });
   });

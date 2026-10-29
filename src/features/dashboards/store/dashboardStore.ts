@@ -241,7 +241,8 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     const { summary, anomalies, source } = await summaryEngine.generateExecutiveSummary(
       dataset,
       charts,
-      get().activeGlobalFilters
+      get().activeGlobalFilters,
+      useFilterStore.getState().filteredData
     );
 
     // The active dataset may have changed while the request was in flight
