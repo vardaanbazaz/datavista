@@ -16,7 +16,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Fast gates; runs in parallel with e2e.
+  # Fast gates; runs in parallel with e2e and build.
   checks:
     runs-on: ubuntu-latest
     steps:
@@ -26,7 +26,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v7
         with:
-          node-version: '20.x'
+          node-version-file: '.nvmrc'
           cache: 'npm'
 
       - name: Install Dependencies
@@ -56,7 +56,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v7
         with:
-          node-version: '20.x'
+          node-version-file: '.nvmrc'
           cache: 'npm'
 
       - name: Install Dependencies
@@ -68,12 +68,9 @@ jobs:
       - name: End-to-End Gate (Playwright)
         run: npm run test:e2e
 
-  # Builds, smoke-tests the exact bundle it deploys, and deploys, once both gate jobs pass.
-  deploy:
-    needs: [checks, e2e]
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  # Builds the bundle, smoke-tests it and uploads that exact dist/ as the Pages artifact.
+  # Runs in parallel with checks and e2e; nothing is rebuilt after the smoke gate.
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -82,7 +79,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v7
         with:
-          node-version: '20.x'
+          node-version-file: '.nvmrc'
           cache: 'npm'
 
       - name: Install Dependencies
@@ -102,6 +99,14 @@ jobs:
         with:
           path: './dist'
 
+  # Deploys the artifact the build job smoke-tested, once all three jobs pass. No checkout, no build.
+  deploy:
+    needs: [checks, e2e, build]
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5

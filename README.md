@@ -137,7 +137,7 @@ Follow these simple steps to explore and analyze your datasets with DataVista:
 ## 🛠️ Local Development
 
 ### Prerequisites
-* **Node.js**: v18.x or higher
+* **Node.js**: 24 LTS (`.nvmrc`, used by CI); 22.13 or later also works
 * **npm**: v9.x or higher
 
 ### Steps to Run Locally

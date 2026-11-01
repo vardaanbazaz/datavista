@@ -132,124 +132,149 @@ export const exportDataAsCSV = async (data: DataRow[], filename: string): Promis
   }
 };
 
-export const generatePDFReport = async (
-  dataset: Dataset, 
-  filteredData: DataRow[], 
-  charts: ChartConfig[]
-): Promise<void> => {
-  try {
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    let yPosition = 20;
+/** A chart captured as a PNG data URL, with its pixel size. */
+export interface ChartImage {
+  dataUrl: string;
+  width: number;
+  height: number;
+}
 
-    // Title
-    pdf.setFontSize(20);
+/** Renders the chart's on-screen element with html2canvas; null when the chart isn't mounted. */
+const captureChart = async (chart: ChartConfig): Promise<ChartImage | null> => {
+  const chartElement = document.querySelector(`[data-chart-id="${chart.id}"]`) as HTMLElement;
+  if (!chartElement) return null;
+  const isDark = document.documentElement.classList.contains('dark');
+  const computedBg = window.getComputedStyle(chartElement).backgroundColor;
+  const bg = (computedBg && computedBg !== 'rgba(0, 0, 0, 0)' && computedBg !== 'transparent')
+    ? computedBg
+    : (isDark ? '#09090b' : '#ffffff');
+
+  const canvas = await html2canvas(chartElement, {
+    backgroundColor: bg,
+    scale: 2, // High resolution capture
+    logging: false,
+    useCORS: true,
+  });
+  return { dataUrl: canvas.toDataURL('image/png'), width: canvas.width, height: canvas.height };
+};
+
+/**
+ * Builds the report document without touching the DOM: chart images come from `capture`,
+ * so tests can pass a fixed PNG. `generatePDFReport` wires in html2canvas and saves it.
+ */
+export const buildPDFReport = async (
+  dataset: Dataset,
+  filteredData: DataRow[],
+  charts: ChartConfig[],
+  capture: (chart: ChartConfig) => Promise<ChartImage | null>,
+): Promise<jsPDF> => {
+  const pdf = new jsPDF('p', 'mm', 'a4');
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  let yPosition = 20;
+
+  // Title
+  pdf.setFontSize(20);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('DataVista Report', pageWidth / 2, yPosition, { align: 'center' });
+  
+  yPosition += 15;
+  
+  // Dataset info
+  pdf.setFontSize(12);
+  pdf.setFont('helvetica', 'normal');
+  pdf.text(`Dataset: ${dataset.name}`, 20, yPosition);
+  yPosition += 8;
+  pdf.text(`Total Records: ${dataset.data.length}`, 20, yPosition);
+  yPosition += 8;
+  pdf.text(`Filtered Records: ${filteredData.length}`, 20, yPosition);
+  yPosition += 8;
+  pdf.text(`Generated: ${new Date().toLocaleDateString()}`, 20, yPosition);
+  yPosition += 15;
+
+  // Data Summary
+  if (filteredData.length > 0) {
+    pdf.setFontSize(14);
     pdf.setFont('helvetica', 'bold');
-    pdf.text('DataVista Report', pageWidth / 2, yPosition, { align: 'center' });
+    pdf.text('Data Summary', 20, yPosition);
+    yPosition += 10;
     
-    yPosition += 15;
-    
-    // Dataset info
-    pdf.setFontSize(12);
+    pdf.setFontSize(10);
     pdf.setFont('helvetica', 'normal');
-    pdf.text(`Dataset: ${dataset.name}`, 20, yPosition);
-    yPosition += 8;
-    pdf.text(`Total Records: ${dataset.data.length}`, 20, yPosition);
-    yPosition += 8;
-    pdf.text(`Filtered Records: ${filteredData.length}`, 20, yPosition);
-    yPosition += 8;
-    pdf.text(`Generated: ${new Date().toLocaleDateString()}`, 20, yPosition);
-    yPosition += 15;
+    
+    // Calculate summary statistics for numeric columns
+    const numericColumns = columnsOfType(dataset, 'numeric');
 
-    // Data Summary
-    if (filteredData.length > 0) {
-      pdf.setFontSize(14);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text('Data Summary', 20, yPosition);
-      yPosition += 10;
-      
-      pdf.setFontSize(10);
-      pdf.setFont('helvetica', 'normal');
-      
-      // Calculate summary statistics for numeric columns
-      const numericColumns = columnsOfType(dataset, 'numeric');
+    summarizeNumericColumns(filteredData, numericColumns).forEach(({ column: col, min, max, mean: avg }) => {
+      pdf.text(`${col}: Min=${min.toFixed(2)}, Max=${max.toFixed(2)}, Avg=${avg.toFixed(2)}`, 20, yPosition);
+      yPosition += 6;
+    });
+    
+    yPosition += 10;
+  }
 
-      summarizeNumericColumns(filteredData, numericColumns).forEach(({ column: col, min, max, mean: avg }) => {
-        pdf.text(`${col}: Min=${min.toFixed(2)}, Max=${max.toFixed(2)}, Avg=${avg.toFixed(2)}`, 20, yPosition);
-        yPosition += 6;
-      });
-      
-      yPosition += 10;
+  // Charts
+  if (charts.length > 0) {
+    // Check if we need a new page for charts section header
+    if (yPosition > pageHeight - 40) {
+      pdf.addPage();
+      yPosition = 20;
     }
 
-    // Charts
-    if (charts.length > 0) {
-      // Check if we need a new page for charts section header
+    pdf.setFontSize(14);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Charts', 20, yPosition);
+    yPosition += 15;
+
+    for (const chart of charts) {
+      // Check if we need a new page for chart title
       if (yPosition > pageHeight - 40) {
         pdf.addPage();
         yPosition = 20;
       }
 
-      pdf.setFontSize(14);
+      // Chart title
+      pdf.setFontSize(12);
       pdf.setFont('helvetica', 'bold');
-      pdf.text('Charts', 20, yPosition);
-      yPosition += 15;
+      pdf.text(chart.title, 20, yPosition);
+      yPosition += 10;
 
-      for (const chart of charts) {
-        // Check if we need a new page for chart title
-        if (yPosition > pageHeight - 40) {
-          pdf.addPage();
-          yPosition = 20;
-        }
+      // Try to capture chart image
+      try {
+        const image = await capture(chart);
+        if (image) {
+          const imgWidth = 170; // standard width inside A4 printable area
+          const imgHeight = (image.height * imgWidth) / image.width;
 
-        // Chart title
-        pdf.setFontSize(12);
-        pdf.setFont('helvetica', 'bold');
-        pdf.text(chart.title, 20, yPosition);
-        yPosition += 10;
-
-        // Try to capture chart image
-        try {
-          const chartElement = document.querySelector(`[data-chart-id="${chart.id}"]`) as HTMLElement;
-          if (chartElement) {
-            const isDark = document.documentElement.classList.contains('dark');
-            const computedBg = window.getComputedStyle(chartElement).backgroundColor;
-            const bg = (computedBg && computedBg !== 'rgba(0, 0, 0, 0)' && computedBg !== 'transparent') 
-              ? computedBg 
-              : (isDark ? '#09090b' : '#ffffff');
-
-            const canvas = await html2canvas(chartElement, {
-              backgroundColor: bg,
-              scale: 2, // High resolution capture
-              logging: false,
-              useCORS: true,
-            });
-
-            const imgData = canvas.toDataURL('image/png');
-            const imgWidth = 170; // standard width inside A4 printable area
-            const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-            // Check if adding this image would overflow the page
-            if (yPosition + imgHeight > pageHeight - 20) {
-              pdf.addPage();
-              yPosition = 20;
-            }
-
-            pdf.addImage(imgData, 'PNG', 20, yPosition, imgWidth, imgHeight);
-            yPosition += imgHeight + 15;
+          // Check if adding this image would overflow the page
+          if (yPosition + imgHeight > pageHeight - 20) {
+            pdf.addPage();
+            yPosition = 20;
           }
-        } catch (error) {
-          console.warn(`Could not capture chart ${chart.title}:`, error);
-          pdf.setFontSize(10);
-          pdf.setFont('helvetica', 'italic');
-          pdf.text('Chart image could not be captured', 20, yPosition);
-          yPosition += 15;
+
+          pdf.addImage(image.dataUrl, 'PNG', 20, yPosition, imgWidth, imgHeight);
+          yPosition += imgHeight + 15;
         }
+      } catch (error) {
+        console.warn(`Could not capture chart ${chart.title}:`, error);
+        pdf.setFontSize(10);
+        pdf.setFont('helvetica', 'italic');
+        pdf.text('Chart image could not be captured', 20, yPosition);
+        yPosition += 15;
       }
     }
+  }
 
-    // Save the PDF
+  return pdf;
+};
+
+export const generatePDFReport = async (
+  dataset: Dataset,
+  filteredData: DataRow[],
+  charts: ChartConfig[]
+): Promise<void> => {
+  try {
+    const pdf = await buildPDFReport(dataset, filteredData, charts, captureChart);
     pdf.save(`${dataset.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_report.pdf`);
   } catch (error) {
     console.error('Error generating PDF report:', error);

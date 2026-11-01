@@ -48,6 +48,10 @@ export function readWorkbookWithCalendarDates(data: ArrayBuffer): XLSX.WorkBook 
       let text: string | null = null;
       if (cell.t === "n" && typeof cell.v === "number" && typeof cell.z === "string" && XLSX.SSF.is_date(cell.z)) {
         text = excelSerialToCalendar(cell.v, date1904, /s/i.test(cell.z.replace(/"[^"]*"|\[[^\]]*\]/g, "")));
+        // SheetJS 0.20's sheet_to_json turns any cell with a date format, text included, into a
+        // local-time JS Date. Drop the format so a converted cell stays our text and a serial
+        // that isn't a real date (60, negatives) stays a plain number.
+        delete cell.z;
       } else if (cell.t === "d" && typeof cell.v === "string") {
         const parts = parseStoredDate(cell.v);
         text = parts ? formatCalendar(parts) : null;
@@ -56,6 +60,7 @@ export function readWorkbookWithCalendarDates(data: ArrayBuffer): XLSX.WorkBook 
         cell.t = "s";
         cell.v = text;
         delete cell.w;
+        delete cell.z;
       }
     }
   }

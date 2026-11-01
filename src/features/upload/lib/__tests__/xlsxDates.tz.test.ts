@@ -59,4 +59,18 @@ describe("Excel date serials", () => {
     expect(rows[0].Day).toBe("2012-01-02");
     expect(rows[0].InvoiceDate).toBe("2013-12-02T07:40:48");
   });
+
+  it("keeps a date-formatted serial that isn't a real date as a number, never a JS Date", () => {
+    const ws: XLSX.WorkSheet = {
+      "!ref": "A1:A3",
+      A1: { t: "s", v: "Day" },
+      A2: { t: "n", v: 60, z: "yyyy-mm-dd" }, // Excel's fake 1900-02-29
+      A3: { t: "n", v: 39448, z: "yyyy-mm-dd" },
+    };
+    const book = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(book, ws, "S");
+    const wb = readWorkbookWithCalendarDates(XLSX.write(book, { type: "array", bookType: "xlsx" }) as ArrayBuffer);
+    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets.S);
+    expect(rows.map(r => r.Day)).toEqual([60, "2008-01-01"]);
+  });
 });

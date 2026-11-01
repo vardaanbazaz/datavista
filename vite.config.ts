@@ -2,20 +2,20 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
-import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
+export default defineConfig(() => ({
   base: process.env.VITE_BASE_PATH ?? "/datavista/",
   server: {
     host: "::",
     port: 8080,
   },
-  plugins: [
-    react(),
-    mode === 'development' &&
-    componentTagger(),
-  ].filter(Boolean),
+  plugins: [react()],
+  // The dev dep scan doesn't follow `new Worker(new URL(...))`, so the import worker's deps
+  // were found on the first import and Vite reloaded the page mid-upload. Pre-bundle them.
+  optimizeDeps: {
+    include: ["xlsx", "papaparse"],
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

@@ -2,6 +2,55 @@
 
 Newest first. Entries marked `Source: inferred` were reconstructed from existing code; their "Why" is a guess and should be corrected by the author.
 
+### 2026-10-29 — CI: build and production smoke run in parallel with checks and e2e; deploy ships only that artifact
+- **Decision:** `deploy.yml` has four jobs. `checks`, `e2e` and `build` run in parallel; `build` does `npm ci` → build → Playwright Chromium → production smoke gate → `upload-pages-artifact`. `deploy` (`needs: [checks, e2e, build]`) has one step, `actions/deploy-pages`: no checkout, no rebuild, so the bundle the smoke gate checked is the one that ships.
+- **Why:** User request: the run was ~6m15s because the build and smoke waited behind e2e. Now wall-clock is roughly the slowest of the three jobs (e2e) plus the deploy step. Estimate: ~4–4.5 min, not yet measured on GitHub.
+- **Alternatives considered:** Keep the build inside the deploy job — rejected: it is what serialised the run. Build in `checks` — rejected: keeps the smoke gate apart from the artifact upload.
+- **Tradeoff accepted:** An artifact is uploaded even on runs where checks or e2e then fail (it just isn't deployed). `npm ci` runs three times and Chromium is installed twice (runner time, not wall time).
+- **Source:** `made-now`
+
+### 2026-10-29 — Node 24 LTS for CI and the project (`.nvmrc`), `engines.node >=22.13.0`
+- **Decision:** `.nvmrc` = `24`; every CI job uses `setup-node` with `node-version-file: '.nvmrc'`; `package.json` `engines.node` is `>=22.13.0`; README prerequisite updated.
+- **Why:** Node 20 reached end of life on 2026-04-30. On 2026-10-29 the Node release schedule had 26 entering Active LTS on 2026-10-28 (one day old), 24 in Maintenance LTS until 2028-04-30 and 22 in Maintenance until 2027-04-30. 24 is supported for 18 more months. Checked locally on 24.22.2: typecheck, lint, test, test:tz, build and the prod smoke all pass. The floor of 22.13 keeps the author's Node 22 laptop working and is what `pdfjs-dist` 6 requires.
+- **Alternatives considered:** 26 — rejected for now: one day into Active LTS and not tried with this toolchain; revisit in 2027. 22 — rejected: maintenance ends in six months.
+- **Tradeoff accepted:** Laptop (22) and CI (24) run different majors until the laptop moves.
+- **Source:** `made-now`
+
+### 2026-10-29 — SheetJS 0.20.3 from the SheetJS CDN instead of npm `xlsx@0.18.5`
+- **Decision:** `"xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"` in `package.json`; the lockfile pins `resolved` and `integrity`. `xlsxDates.ts:readWorkbookWithCalendarDates` now also deletes `cell.z` from every date-formatted cell.
+- **Why:** npm `xlsx` stops at 0.18.5, which has GHSA-4r6h-8v6p-xvw6 (prototype pollution, fixed in 0.19.3) and GHSA-5pgg-2g8v-p4x9 (ReDoS, fixed in 0.20.2), and it parses user uploads. SheetJS's install docs name its CDN as the authoritative source; `cdn.sheetjs.com/xlsx.lst` lists 0.20.3 as the newest. 0.20's `sheet_to_json` turns any cell with a date number format (text included) into a local-time JS `Date`, which broke our rewritten calendar strings; dropping the format keeps them text and keeps unconvertible serials (60, negatives) as plain numbers, as with 0.18.5.
+- **Alternatives considered:** Vendoring the tarball in the repo (SheetJS's "recommended for stability" option) — rejected for now: adds a 2.4 MB binary to git; the CDN URL + lockfile integrity is reproducible while the CDN is up. Staying on 0.18.5 — rejected: known vulnerabilities.
+- **Tradeoff accepted:** `npm ci` depends on cdn.sheetjs.com being reachable. `npm audit` does not check URL dependencies, so future SheetJS advisories must be watched by hand (their advisories page / RSS).
+- **Source:** `made-now`
+
+### 2026-10-29 — jsPDF 4; the PDF report is built by a DOM-free `buildPDFReport` and tested with pdfjs-dist
+- **Decision:** `jspdf` ^3.0.1 → ^4.2.1. `exportUtils.ts` splits `generatePDFReport` into `buildPDFReport(dataset, rows, charts, capture)` (returns the jsPDF document) and `captureChart` (html2canvas). `pdfjs-dist` (devDependency) parses the output in `exportUtils.pdf.test.ts` (page count, text, one image per chart, failed-capture note).
+- **Why:** jsPDF ≤4.2.0 has several advisories (AcroForm/addJS injection, GIF/BMP DoS, HTML injection in output). The only breaking change in 4.0 is that the Node build no longer reads the file system by default; none of the APIs the report uses (constructor, `internal.pageSize`, `setFont`, `setFontSize`, `text` with `align`, `addPage`, `addImage`, `save`, `output`) changed. The split makes the report testable in vitest's node environment.
+- **Alternatives considered:** Checking only the `%PDF-` header — rejected: wouldn't catch lost text or pages. A jsdom test of the whole flow — rejected: html2canvas needs a real layout.
+- **Tradeoff accepted:** pdfjs-dist is a large dev-only dependency. The html2canvas capture is still only checked by hand.
+- **Source:** `made-now`
+
+### 2026-10-29 — Dependency cleanup
+- **Decision:** Removed `@tanstack/react-query` (and `QueryClientProvider` in `App.tsx`; nothing used queries), `lovable-tagger` (and its dev-mode plugin in `vite.config.ts`), `@types/react-grid-layout` (RGL 2 ships types). Moved all `@types/*` and `tailwindcss-animate` (used only by `tailwind.config.ts`) to devDependencies. Package name `datavista`, version `1.0.0`.
+- **Why:** User request. knip reported exactly the three removed packages; depcheck's other hits (`@fontsource/*` used in `index.css`, `postcss`/`autoprefixer` in `postcss.config.js`, `fake-indexeddb` in vitest setup) were checked by grep and are false positives. `tailwindcss-animate` in `dependencies` pulled the whole Tailwind/PostCSS toolchain into the runtime audit although none of it ships in `dist/`.
+- **Alternatives considered:** None.
+- **Tradeoff accepted:** None.
+- **Source:** `made-now`
+
+### 2026-10-29 — Dev server pre-bundles the import worker's deps (`optimizeDeps.include: ["xlsx", "papaparse"]`)
+- **Decision:** `vite.config.ts` lists `xlsx` and `papaparse` in `optimizeDeps.include`.
+- **Why:** Vite's dependency scan doesn't follow `new Worker(new URL(...))`. On a cold cache (every CI run) the first import found both packages, re-optimised them and reloaded the page mid-test: the first e2e test timed out (30 s) and passed only on CI's retry. Reproduced on HEAD as well as on this branch; with the include, two cold runs and the full cold suite pass.
+- **Alternatives considered:** `optimizeDeps.entries` with the worker file — not tried; the explicit list is shorter and names exactly what was being found late.
+- **Tradeoff accepted:** A new worker-only dependency must be added to the list by hand.
+- **Source:** `made-now`
+
+### 2026-10-29 — Remaining audit findings accepted (react-router 6, dev-only vitest/vite/esbuild)
+- **Decision:** After `npm audit fix` (non-breaking only), keep `react-router-dom` 6.30.6 and vitest 2 / Vite 5.
+- **Why:** The two react-router advisories (GHSA-wrjc-x8rr-h8h6 open redirect via backslash in `<Link>`/`useNavigate`; GHSA-337j-9hxr-rhxg SSR `deserializeErrors`) have no 6.x fix and aren't reachable: the app has no `<Link>` or `useNavigate`, only `/` and `*` routes, and no SSR/hydration. The rest (tinypool, vitest, @vitest/mocker, vite-node, vite, esbuild dev-server advisory, and the minimatch GHSA-g3hv-75wg-m249 ReDoS reached through eslint/typescript-eslint, published 2026-10-30/31) are dev/test tooling that doesn't ship in `dist/`; their only fixes are breaking (vitest 5, Vite 8, a forced typescript-eslint change).
+- **Alternatives considered:** `npm audit fix --force` — rejected: breaking majors, out of scope for this batch.
+- **Tradeoff accepted:** The esbuild dev-server advisory applies while `npm run dev` is running on a reachable host (`server.host: "::"`); keep the dev server off untrusted networks until Vite is upgraded.
+- **Source:** `made-now`
+
 ### 2026-10-29 — ID columns with letter codes import as categorical; "invoice" is an ID word
 - **Decision:** `columnRoles.ts` adds "invoice" to the ID words and exports `isIdName`. In `processRawData`, a column the type vote makes numeric becomes categorical when `isIdName` is true and at least one of its cells is a letter code (letters and digits only, both present: "C570867", "85123A"; `parsingService.ts:hasLetterCodes`). Junk without a digit ("ERROR") or with punctuation doesn't count; non-ID names keep the numeric vote.
 - **Why:** Audit A8 and user request: retail `Invoice` (19,500 "C…" cancellations) and `StockCode` (134,986 "85123A"-style codes) were numeric with "invalid" badges, dropping real codes from stats. Run over the 6 local CSVs + HR fixture, the only type changes are retail Invoice numeric → categorical (53,628 distinct) and StockCode numeric → categorical (5,304 distinct). Customer ID (5,942 distinct, numbers and blanks) and HR EmployeeNumber stay numeric (Count by default).
@@ -109,6 +158,7 @@ Newest first. Entries marked `Source: inferred` were reconstructed from existing
 - **Source:** `made-now`
 
 ### 2026-10-29 — CI: e2e in its own parallel job; deploy waits for both
+- **Superseded by** "CI: build and production smoke run in parallel with checks and e2e; deploy ships only that artifact".
 - **Decision:** `deploy.yml` has three jobs. `checks` (lint, typecheck, unit tests, time zone gate) and `e2e` (checkout, `npm ci`, Playwright Chromium, `test:e2e`) run in parallel; `deploy` (`needs: [checks, e2e]`) builds, installs Chromium, runs the production smoke gate on that build, uploads it and deploys.
 - **Why:** The last 5 runs took 3m33s–5m46s with e2e 197 s of the last one, and this batch adds 4 e2e tests (~40 s), so the single job would pass 6 min. In parallel, the run is about the e2e job plus the deploy job instead of the sum of everything.
 - **Alternatives considered:** Build and smoke in the `checks` job with `deploy` only deploying — rejected: the smoke gate is meant to sit with the deploy, checking the exact bundle that goes out.
@@ -530,7 +580,7 @@ Newest first. Entries marked `Source: inferred` were reconstructed from existing
 - **Source:** `inferred`
 
 ### PapaParse + SheetJS for file import, D3 for charts, jsPDF/html2canvas for export
-- **Decision:** CSV/TSV via `papaparse`, XLSX via `xlsx`, chart rendering via `d3`, PDF/image export via `jspdf` + `html2canvas`.
+- **Decision:** CSV/TSV via `papaparse`, XLSX via `xlsx` (from the SheetJS CDN since "SheetJS 0.20.3 from the SheetJS CDN instead of npm `xlsx@0.18.5`"), chart rendering via `d3`, PDF/image export via `jspdf` + `html2canvas`.
 - **Why:** Likely: mature, widely used client-side libraries for each job.
 - **Alternatives considered:** Unknown.
 - **Tradeoff accepted:** Large bundle contributions (hence the vendor-export chunk).
