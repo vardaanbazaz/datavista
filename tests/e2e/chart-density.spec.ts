@@ -77,7 +77,7 @@ test("date X axis bucketed by year: Count of a year column per year, labelled wi
   expect(titles.find((t) => t.startsWith("date_added (Year): 2014\n"))).toContain("Count of release_year: 1");
   expect(titles.find((t) => t.startsWith("date_added (Year): 2021\n"))).toContain("Count of release_year: 26");
   // A year column's count gets no outlier badge.
-  await expect(page.getByTestId("chart-card").getByText(/Outliers?$/)).toHaveCount(0);
+  await expect(page.getByTestId("chart-card").getByText(/unusual values?$/)).toHaveCount(0);
 });
 
 test("choosing Sum on a year column shows the note, and doesn't block creating the chart", async ({ page }) => {

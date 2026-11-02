@@ -21,22 +21,22 @@ export const QueryPerformanceBadge: React.FC<QueryPerformanceBadgeProps> = ({
       {cacheHit ? (
         <Badge
           variant="outline"
-          className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 text-[10px] font-bold px-2 py-0.5 h-6 flex items-center gap-1 shadow-sm"
+          className="bg-card text-foreground border-success/60 text-xs font-semibold px-2 py-0.5 h-6 flex items-center gap-1"
         >
-          <Zap className="w-3 h-3 text-emerald-500 animate-pulse" />
+          <Zap className="w-3 h-3 text-success" aria-hidden />
           <span>Cache Hit</span>
           {optimizerTimeSavedMs && optimizerTimeSavedMs > 0 ? (
-            <span className="text-[9px] opacity-80 font-normal">
+            <span className="text-xs text-muted-foreground font-normal">
               (saved {optimizerTimeSavedMs.toFixed(1)}ms)
             </span>
           ) : (
-            <span className="text-[9px] opacity-80 font-normal">(&lt; 1ms)</span>
+            <span className="text-xs text-muted-foreground font-normal">(&lt; 1ms)</span>
           )}
         </Badge>
       ) : (
         <Badge
           variant="outline"
-          className="bg-muted/40 text-muted-foreground border-border text-[10px] font-medium px-2 py-0.5 h-6 flex items-center gap-1"
+          className="bg-muted/40 text-muted-foreground border-border text-xs font-medium px-2 py-0.5 h-6 flex items-center gap-1"
         >
           <Clock className="w-3 h-3 text-muted-foreground" />
           <span>Query: {executionTimeMs.toFixed(1)}ms</span>

@@ -27,8 +27,8 @@ export function MainContent({ children }: MainContentProps) {
   }, [activeView]);
 
   return (
-    <div className="flex-1 flex flex-col min-h-screen">
-      <main ref={mainRef} id="main-content" className="flex-1 p-8 overflow-auto">
+    <div className="flex-1 min-w-0 flex flex-col min-h-screen">
+      <main ref={mainRef} id="main-content" className="flex-1 p-4 sm:p-8 overflow-auto">
         {rowsLoading ? (
           <LoadingProgress
             title={`Loading “${rowsLoading.name}”`}

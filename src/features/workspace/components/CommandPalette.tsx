@@ -47,6 +47,7 @@ import { AIResponse } from "@/features/ai/types";
 import { QueryResult } from "@/shared/types";
 import { toast } from "@/shared/hooks/use-toast";
 import { Hint } from "@/shared/components/Hint";
+import { formatShortcut, modKey } from "@/shared/lib/platform";
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -304,29 +305,29 @@ export function CommandPalette({
   const renderCommandIcon = (iconName?: string) => {
     switch (iconName) {
       case "Sun":
-        return <Sun className="h-4 w-4 text-amber-500" />;
+        return <Sun className="h-4 w-4 text-tertiary" />;
       case "RotateCcw":
-        return <RotateCcw className="h-4 w-4 text-primary" />;
+        return <RotateCcw className="h-4 w-4 text-primary-ink" />;
       case "RotateCw":
-        return <RotateCw className="h-4 w-4 text-primary" />;
+        return <RotateCw className="h-4 w-4 text-primary-ink" />;
       case "Camera":
-        return <Camera className="h-4 w-4 text-purple-500" />;
+        return <Camera className="h-4 w-4 text-primary-ink" />;
       case "FileDown":
-        return <FileDown className="h-4 w-4 text-green-500" />;
+        return <FileDown className="h-4 w-4 text-success" />;
       case "FilterX":
         return <FilterX className="h-4 w-4 text-destructive" />;
       case "BarChart3":
-        return <BarChart3 className="h-4 w-4 text-blue-500" />;
+        return <BarChart3 className="h-4 w-4 text-primary-ink" />;
       case "TrendingUp":
-        return <TrendingUp className="h-4 w-4 text-indigo-500" />;
+        return <TrendingUp className="h-4 w-4 text-primary-ink" />;
       case "Table":
         return <TableIcon className="h-4 w-4 text-cyan-500" />;
       case "Calculator":
-        return <Calculator className="h-4 w-4 text-emerald-500" />;
+        return <Calculator className="h-4 w-4 text-success" />;
       case "Database":
-        return <Database className="h-4 w-4 text-sky-500" />;
+        return <Database className="h-4 w-4 text-primary-ink" />;
       default:
-        return <Terminal className="h-4 w-4 text-primary" />;
+        return <Terminal className="h-4 w-4 text-primary-ink" />;
     }
   };
 
@@ -335,11 +336,11 @@ export function CommandPalette({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-        <DialogContent className="max-w-2xl max-h-[85vh] p-0 overflow-hidden bg-white dark:bg-zinc-950 border border-gray-200 dark:border-zinc-800 shadow-2xl gap-0 text-zinc-900 dark:text-zinc-100">
-          <DialogHeader className="p-4 pb-2 border-b border-gray-200 dark:border-zinc-800 flex flex-row items-center justify-between">
+        <DialogContent corners={false} className="max-w-2xl max-h-[85vh] p-0 overflow-hidden bg-card border border-border shadow-2xl gap-0 text-foreground">
+          <DialogHeader className="p-4 pr-14 pb-2 border-b border-border flex flex-row items-center justify-between">
             <DialogTitle className="sr-only">Command Palette</DialogTitle>
             <div className="relative flex-1 flex items-center pr-2">
-              <Search className="absolute left-3 h-4 w-4 text-zinc-400" />
+              <Search className="absolute left-3 h-4 w-4 text-muted-foreground" />
               <Input
                 ref={inputRef}
                 placeholder="Type '/ai ...' for AI Co-Pilot, or search commands, datasets..."
@@ -347,23 +348,29 @@ export function CommandPalette({
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={handleKeyDown}
                 disabled={isAiExecuting || !!aiPreview}
-                className="pl-9 pr-36 h-11 bg-gray-100 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 text-sm text-zinc-900 dark:text-zinc-100 focus-visible:ring-primary"
+                role="combobox"
+                aria-label="Search commands, datasets and charts, or type /ai for the AI Co-Pilot"
+                aria-expanded={flatUnifiedItems.length > 0}
+                aria-controls="command-palette-options"
+                aria-autocomplete="list"
+                aria-activedescendant={flatUnifiedItems.length > 0 ? `command-option-${selectedIndex}` : undefined}
+                className="pl-9 pr-36 h-11 bg-muted border border-border text-sm text-foreground focus-visible:ring-primary"
               />
               <div className="absolute right-3 flex items-center gap-1.5">
-                <kbd className="hidden sm:inline-block border border-gray-300 dark:border-zinc-700 bg-gray-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 text-[10px] rounded px-1.5 py-0.5 font-mono">⌘K</kbd>
+                <kbd className="hidden sm:inline-block border border-borderStrong bg-muted text-muted-foreground text-xs rounded px-1.5 py-0.5 font-mono">{formatShortcut([modKey, "K"])}</kbd>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 text-[11px] px-2 gap-1 text-zinc-600 dark:text-zinc-300 hover:bg-gray-200 dark:hover:bg-zinc-800"
+                  className="h-8 text-xs px-2 gap-1 text-muted-foreground hover:bg-accent"
                   onClick={() => setQuery("/ai ")}
                 >
-                  <Sparkles className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-300" /> /ai
+                  <Sparkles className="h-3.5 w-3.5 text-muted-foreground" /> /ai
                 </Button>
                 <Hint label="AI Co-Pilot settings (provider and API key)">
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
                     onClick={() => setIsSettingsOpen(true)}
                   >
                     <Settings className="h-3.5 w-3.5" />
@@ -382,8 +389,8 @@ export function CommandPalette({
 
           {isAiExecuting && (
             <div className="p-8 text-center space-y-3">
-              <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-              <p className="text-sm font-semibold gradient-primary bg-clip-text text-transparent">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary-ink" />
+              <p className="text-sm font-semibold">
                 Translating natural language with AI Co-Pilot...
               </p>
               <p className="text-xs text-muted-foreground">Generating AST-compatible query JSON</p>
@@ -394,7 +401,7 @@ export function CommandPalette({
             <div className="p-4 space-y-3">
               <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-2">
                 <div className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-primary shrink-0" />
+                  <Sparkles className="h-4 w-4 text-primary-ink shrink-0" />
                   <p className="text-sm font-semibold text-foreground truncate">
                     {aiPreview.response.title || "AI Query Result"}
                   </p>
@@ -403,11 +410,11 @@ export function CommandPalette({
                   <p className="text-xs text-muted-foreground">{aiPreview.response.explanation}</p>
                 )}
                 <div className="flex items-center gap-2 flex-wrap">
-                  <Badge variant="outline" className="text-[10px]">
+                  <Badge variant="outline" className="text-xs">
                     {aiPreview.queryResult.rows.length} row{aiPreview.queryResult.rows.length === 1 ? "" : "s"}
                   </Badge>
                   {aiPreview.response.chartType && (
-                    <Badge variant="outline" className="text-[10px] gap-1">
+                    <Badge variant="outline" className="text-xs gap-1">
                       <BarChart3 className="h-3 w-3" /> Will create a {aiPreview.response.chartType} chart
                     </Badge>
                   )}
@@ -439,15 +446,15 @@ export function CommandPalette({
                   </p>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-4" role="listbox" id="command-palette-options" aria-label="Results">
                   {/* AI Co-Pilot Special Prompt Option */}
                   {query.trim().length > 0 && (
-                    <div className="space-y-1">
-                      <div className="px-2 py-1 text-[11px] font-semibold text-primary uppercase tracking-wider flex items-center gap-1.5">
-                        <Sparkles className="h-3.5 w-3.5 text-primary" /> AI Natural Language Query
+                    <div className="space-y-1" role="group" aria-labelledby="command-group-1">
+                      <div id="command-group-1" className="px-2 py-1 catalogue-label text-primary-ink flex items-center gap-1.5">
+                        <Sparkles className="h-3.5 w-3.5 text-primary-ink" /> AI Natural Language Query
                       </div>
                       {llmApiKey && llmApiKey.trim() !== "" && (
-                        <p className="px-2 pb-1 text-[10px] text-muted-foreground">
+                        <p className="px-2 pb-1 text-xs text-muted-foreground">
                           Sends this dataset's column names and sample values to {providerDisplayName(llmProvider)}.
                         </p>
                       )}
@@ -457,7 +464,12 @@ export function CommandPalette({
                         return (
                           <div
                             ref={(el) => { if (isSelected && el) el.scrollIntoView({ block: "nearest" }); }}
+                            id={`command-option-${currentIndex}`}
+                            role="option"
+                            aria-selected={isSelected}
+                            tabIndex={-1}
                             onClick={() => handleRunAiQuery(aiPromptText)}
+                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); (() => handleRunAiQuery(aiPromptText))(); } }}
                             className={`p-3 rounded-lg flex items-center justify-between cursor-pointer transition-colors text-sm ${
                               isSelected
                                 ? "bg-primary/20 border border-primary/50 font-medium"
@@ -466,7 +478,7 @@ export function CommandPalette({
                           >
                             <div className="flex items-center gap-3 min-w-0">
                               <div className="p-1.5 rounded-md bg-primary/20 shrink-0">
-                                <Sparkles className="h-4 w-4 text-primary" />
+                                <Sparkles className="h-4 w-4 text-primary-ink" />
                               </div>
                               <div className="min-w-0">
                                 <p className="truncate font-semibold text-foreground">
@@ -477,7 +489,7 @@ export function CommandPalette({
                                 </p>
                               </div>
                             </div>
-                            <Badge variant="default" className="text-[10px] shrink-0">
+                            <Badge variant="default" className="text-xs shrink-0">
                               Press ↵ Enter
                             </Badge>
                           </div>
@@ -488,9 +500,9 @@ export function CommandPalette({
 
                   {/* Registered Executable Commands Section */}
                   {filteredCommands.length > 0 && (
-                    <div className="space-y-1">
-                      <div className="px-2 py-1 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                        <Terminal className="h-3.5 w-3.5 text-primary" /> Workspace Commands ({filteredCommands.length})
+                    <div className="space-y-1" role="group" aria-labelledby="command-group-2">
+                      <div id="command-group-2" className="px-2 py-1 catalogue-label text-muted-foreground flex items-center gap-1.5">
+                        <Terminal className="h-3.5 w-3.5 text-primary-ink" /> Workspace Commands ({filteredCommands.length})
                       </div>
                       {filteredCommands.map((cmd) => {
                         const currentIndex = globalItemCounter++;
@@ -500,7 +512,12 @@ export function CommandPalette({
                           <div
                             key={cmd.id}
                             ref={(el) => { if (isSelected && el) el.scrollIntoView({ block: "nearest" }); }}
+                            id={`command-option-${currentIndex}`}
+                            role="option"
+                            aria-selected={isSelected}
+                            tabIndex={-1}
                             onClick={() => handleExecuteCommand(cmd)}
+                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); (() => handleExecuteCommand(cmd))(); } }}
                             className={`p-2.5 rounded-lg flex items-center justify-between cursor-pointer transition-colors text-sm ${
                               isSelected
                                 ? "bg-primary/15 border border-primary/40 font-medium"
@@ -514,7 +531,7 @@ export function CommandPalette({
                               <div className="min-w-0">
                                 <div className="flex items-center gap-2">
                                   <span className="truncate">{cmd.label}</span>
-                                  <Badge variant="outline" className="text-[10px] py-0 px-1.5 font-normal">
+                                  <Badge variant="outline" className="text-xs py-0 px-1.5 font-normal">
                                     {cmd.category}
                                   </Badge>
                                 </div>
@@ -530,7 +547,7 @@ export function CommandPalette({
                                 {cmd.shortcut.map((sc, idx) => (
                                   <kbd
                                     key={idx}
-                                    className="px-1.5 py-0.5 text-[10px] font-mono font-semibold bg-muted border border-border/80 rounded shadow-xs text-muted-foreground"
+                                    className="px-1.5 py-0.5 text-xs font-mono font-semibold bg-muted border border-border/80 rounded shadow-xs text-muted-foreground"
                                   >
                                     {sc}
                                   </kbd>
@@ -545,9 +562,9 @@ export function CommandPalette({
 
                   {/* Dashboards Search Results */}
                   {searchResults.dashboards.length > 0 && (
-                    <div className="space-y-1">
-                      <div className="px-2 py-1 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                        <LayoutDashboard className="h-3.5 w-3.5 text-primary" /> Dashboards ({searchResults.dashboards.length})
+                    <div className="space-y-1" role="group" aria-labelledby="command-group-3">
+                      <div id="command-group-3" className="px-2 py-1 catalogue-label text-muted-foreground flex items-center gap-1.5">
+                        <LayoutDashboard className="h-3.5 w-3.5 text-primary-ink" /> Dashboards ({searchResults.dashboards.length})
                       </div>
                       {searchResults.dashboards.map((item) => {
                         const currentIndex = globalItemCounter++;
@@ -556,7 +573,12 @@ export function CommandPalette({
                           <div
                             key={item.id}
                             ref={(el) => { if (isSelected && el) el.scrollIntoView({ block: "nearest" }); }}
+                            id={`command-option-${currentIndex}`}
+                            role="option"
+                            aria-selected={isSelected}
+                            tabIndex={-1}
                             onClick={() => handleSelectSearchResult(item)}
+                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); (() => handleSelectSearchResult(item))(); } }}
                             className={`p-2.5 rounded-lg flex items-center justify-between cursor-pointer transition-colors text-sm ${
                               isSelected
                                 ? "bg-primary/15 border border-primary/40 font-medium"
@@ -564,7 +586,7 @@ export function CommandPalette({
                             }`}
                           >
                             <div className="flex items-center gap-2.5 min-w-0">
-                              <LayoutDashboard className="h-4 w-4 text-primary shrink-0" />
+                              <LayoutDashboard className="h-4 w-4 text-primary-ink shrink-0" />
                               <div className="min-w-0">
                                 <p className="truncate font-medium">{item.title}</p>
                                 <p className="text-xs text-muted-foreground truncate">{item.subtitle}</p>
@@ -579,9 +601,9 @@ export function CommandPalette({
 
                   {/* Datasets Search Results */}
                   {searchResults.datasets.length > 0 && (
-                    <div className="space-y-1">
-                      <div className="px-2 py-1 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                        <Database className="h-3.5 w-3.5 text-primary" /> Datasets ({searchResults.datasets.length})
+                    <div className="space-y-1" role="group" aria-labelledby="command-group-4">
+                      <div id="command-group-4" className="px-2 py-1 catalogue-label text-muted-foreground flex items-center gap-1.5">
+                        <Database className="h-3.5 w-3.5 text-primary-ink" /> Datasets ({searchResults.datasets.length})
                       </div>
                       {searchResults.datasets.map((item) => {
                         const currentIndex = globalItemCounter++;
@@ -590,7 +612,12 @@ export function CommandPalette({
                           <div
                             key={item.id}
                             ref={(el) => { if (isSelected && el) el.scrollIntoView({ block: "nearest" }); }}
+                            id={`command-option-${currentIndex}`}
+                            role="option"
+                            aria-selected={isSelected}
+                            tabIndex={-1}
                             onClick={() => handleSelectSearchResult(item)}
+                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); (() => handleSelectSearchResult(item))(); } }}
                             className={`p-2.5 rounded-lg flex items-center justify-between cursor-pointer transition-colors text-sm ${
                               isSelected
                                 ? "bg-primary/15 border border-primary/40 font-medium"
@@ -598,7 +625,7 @@ export function CommandPalette({
                             }`}
                           >
                             <div className="flex items-center gap-2.5 min-w-0">
-                              <Database className="h-4 w-4 text-sky-500 shrink-0" />
+                              <Database className="h-4 w-4 text-primary-ink shrink-0" />
                               <div className="min-w-0">
                                 <p className="truncate font-medium">{item.title}</p>
                                 <p className="text-xs text-muted-foreground truncate">{item.subtitle}</p>
@@ -613,9 +640,9 @@ export function CommandPalette({
 
                   {/* Columns Search Results */}
                   {searchResults.columns.length > 0 && (
-                    <div className="space-y-1">
-                      <div className="px-2 py-1 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                        <Columns className="h-3.5 w-3.5 text-primary" /> Columns ({searchResults.columns.length})
+                    <div className="space-y-1" role="group" aria-labelledby="command-group-5">
+                      <div id="command-group-5" className="px-2 py-1 catalogue-label text-muted-foreground flex items-center gap-1.5">
+                        <Columns className="h-3.5 w-3.5 text-primary-ink" /> Columns ({searchResults.columns.length})
                       </div>
                       {searchResults.columns.map((item) => {
                         const currentIndex = globalItemCounter++;
@@ -624,7 +651,12 @@ export function CommandPalette({
                           <div
                             key={item.id}
                             ref={(el) => { if (isSelected && el) el.scrollIntoView({ block: "nearest" }); }}
+                            id={`command-option-${currentIndex}`}
+                            role="option"
+                            aria-selected={isSelected}
+                            tabIndex={-1}
                             onClick={() => handleSelectSearchResult(item)}
+                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); (() => handleSelectSearchResult(item))(); } }}
                             className={`p-2.5 rounded-lg flex items-center justify-between cursor-pointer transition-colors text-sm ${
                               isSelected
                                 ? "bg-primary/15 border border-primary/40 font-medium"
@@ -632,7 +664,7 @@ export function CommandPalette({
                             }`}
                           >
                             <div className="flex items-center gap-2.5 min-w-0">
-                              <Columns className="h-4 w-4 text-indigo-500 shrink-0" />
+                              <Columns className="h-4 w-4 text-primary-ink shrink-0" />
                               <div className="min-w-0">
                                 <p className="truncate font-medium">{item.title}</p>
                                 <p className="text-xs text-muted-foreground truncate">{item.subtitle}</p>
@@ -647,9 +679,9 @@ export function CommandPalette({
 
                   {/* Templates Search Results */}
                   {searchResults.templates.length > 0 && (
-                    <div className="space-y-1">
-                      <div className="px-2 py-1 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                        <LayoutTemplate className="h-3.5 w-3.5 text-primary" /> Templates ({searchResults.templates.length})
+                    <div className="space-y-1" role="group" aria-labelledby="command-group-6">
+                      <div id="command-group-6" className="px-2 py-1 catalogue-label text-muted-foreground flex items-center gap-1.5">
+                        <LayoutTemplate className="h-3.5 w-3.5 text-primary-ink" /> Templates ({searchResults.templates.length})
                       </div>
                       {searchResults.templates.map((item) => {
                         const currentIndex = globalItemCounter++;
@@ -658,7 +690,12 @@ export function CommandPalette({
                           <div
                             key={item.id}
                             ref={(el) => { if (isSelected && el) el.scrollIntoView({ block: "nearest" }); }}
+                            id={`command-option-${currentIndex}`}
+                            role="option"
+                            aria-selected={isSelected}
+                            tabIndex={-1}
                             onClick={() => handleSelectSearchResult(item)}
+                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); (() => handleSelectSearchResult(item))(); } }}
                             className={`p-2.5 rounded-lg flex items-center justify-between cursor-pointer transition-colors text-sm ${
                               isSelected
                                 ? "bg-primary/15 border border-primary/40 font-medium"
@@ -666,7 +703,7 @@ export function CommandPalette({
                             }`}
                           >
                             <div className="flex items-center gap-2.5 min-w-0">
-                              <LayoutTemplate className="h-4 w-4 text-purple-500 shrink-0" />
+                              <LayoutTemplate className="h-4 w-4 text-primary-ink shrink-0" />
                               <div className="min-w-0">
                                 <p className="truncate font-medium">{item.title}</p>
                                 <p className="text-xs text-muted-foreground truncate">{item.subtitle}</p>
@@ -681,9 +718,9 @@ export function CommandPalette({
 
                   {/* Saved Views Search Results */}
                   {searchResults.views.length > 0 && (
-                    <div className="space-y-1">
-                      <div className="px-2 py-1 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                        <Bookmark className="h-3.5 w-3.5 text-primary" /> Saved Views ({searchResults.views.length})
+                    <div className="space-y-1" role="group" aria-labelledby="command-group-7">
+                      <div id="command-group-7" className="px-2 py-1 catalogue-label text-muted-foreground flex items-center gap-1.5">
+                        <Bookmark className="h-3.5 w-3.5 text-primary-ink" /> Saved Views ({searchResults.views.length})
                       </div>
                       {searchResults.views.map((item) => {
                         const currentIndex = globalItemCounter++;
@@ -692,7 +729,12 @@ export function CommandPalette({
                           <div
                             key={item.id}
                             ref={(el) => { if (isSelected && el) el.scrollIntoView({ block: "nearest" }); }}
+                            id={`command-option-${currentIndex}`}
+                            role="option"
+                            aria-selected={isSelected}
+                            tabIndex={-1}
                             onClick={() => handleSelectSearchResult(item)}
+                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); (() => handleSelectSearchResult(item))(); } }}
                             className={`p-2.5 rounded-lg flex items-center justify-between cursor-pointer transition-colors text-sm ${
                               isSelected
                                 ? "bg-primary/15 border border-primary/40 font-medium"
@@ -700,7 +742,7 @@ export function CommandPalette({
                             }`}
                           >
                             <div className="flex items-center gap-2.5 min-w-0">
-                              <Bookmark className="h-4 w-4 text-amber-500 shrink-0" />
+                              <Bookmark className="h-4 w-4 text-tertiary shrink-0" />
                               <div className="min-w-0">
                                 <p className="truncate font-medium">{item.title}</p>
                                 <p className="text-xs text-muted-foreground truncate">{item.subtitle}</p>

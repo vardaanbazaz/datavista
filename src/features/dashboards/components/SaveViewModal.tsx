@@ -31,10 +31,10 @@ export function SaveViewModal({ isOpen, onClose, onSave }: SaveViewModalProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md glass border-white/20 shadow-2xl p-6">
+      <DialogContent className="max-w-md glass border-border shadow-2xl p-6">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold flex items-center gap-2">
-            <Bookmark className="h-5 w-5 text-primary" />
+            <Bookmark className="h-5 w-5 text-primary-ink" />
             Bookmark Current View
           </DialogTitle>
           <DialogDescription>
@@ -50,7 +50,7 @@ export function SaveViewModal({ isOpen, onClose, onSave }: SaveViewModalProps) {
               placeholder="e.g. Q3 Sales & Region Focus"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              autoFocus
+             
               className="bg-background/50"
             />
           </div>

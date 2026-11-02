@@ -56,9 +56,9 @@ export const GaugeChartComponent: React.FC<GaugeComponentProps> = ({ chart, data
           />
           <defs>
             <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#3b82f6" />
-              <stop offset="50%" stopColor="#8b5cf6" />
-              <stop offset="100%" stopColor="#ec4899" />
+              <stop offset="0%" stopColor="hsl(var(--chart-1))" />
+              <stop offset="50%" stopColor="hsl(var(--chart-3))" />
+              <stop offset="100%" stopColor="hsl(var(--chart-5))" />
             </linearGradient>
           </defs>
         </svg>
@@ -68,7 +68,7 @@ export const GaugeChartComponent: React.FC<GaugeComponentProps> = ({ chart, data
           <span className="text-2xl font-bold tracking-tight">
             {totalValue.toLocaleString(undefined, { maximumFractionDigits: 1 })}
           </span>
-          <span className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">
+          <span className="text-sm text-muted-foreground font-medium">
             {yCol ? yCol : "Total Count"} ({percentage.toFixed(0)}%)
           </span>
         </div>

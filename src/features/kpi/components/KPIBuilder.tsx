@@ -195,7 +195,7 @@ export function KPIBuilder({ isOpen, onClose, onSave, editKpi = null }: KPIBuild
                   </SelectContent>
                 </Select>
                 {aggregationNote(aggregationFlag(dataset, metricCol), aggregation) && (
-                  <p className="text-xs text-amber-600 dark:text-amber-400" role="note" data-testid="aggregation-note">
+                  <p className="text-xs text-tertiary" role="note" data-testid="aggregation-note">
                     {aggregationNote(aggregationFlag(dataset, metricCol), aggregation)}
                   </p>
                 )}
@@ -290,7 +290,7 @@ export function KPIBuilder({ isOpen, onClose, onSave, editKpi = null }: KPIBuild
               <div className="flex items-center justify-between">
                 <Label className="text-sm font-semibold">Conditional Formatting</Label>
                 {formattingRules.length > 0 && (
-                  <span className="text-xs text-emerald-500 font-medium">
+                  <span className="text-xs text-success font-medium">
                     {formattingRules.length} rule(s) configured
                   </span>
                 )}
@@ -301,17 +301,17 @@ export function KPIBuilder({ isOpen, onClose, onSave, editKpi = null }: KPIBuild
                 onClick={() => setIsFormattingModalOpen(true)}
                 className="w-full justify-start gap-2"
               >
-                <Palette className="h-4 w-4 text-primary" />
+                <Palette className="h-4 w-4 text-primary-ink" />
                 {formattingRules.length > 0 ? "Edit Threshold Rules" : "Add Formatting Rules"}
               </Button>
             </div>
 
             {/* Nested Formatting Dialog */}
             <Dialog open={isFormattingModalOpen} onOpenChange={setIsFormattingModalOpen}>
-              <DialogContent className="max-w-3xl glass border-white/20 shadow-2xl p-6">
+              <DialogContent className="max-w-3xl glass border-border shadow-2xl p-6">
                 <DialogHeader>
                   <DialogTitle className="text-xl font-bold flex items-center gap-2">
-                    <Palette className="h-5 w-5 text-primary" />
+                    <Palette className="h-5 w-5 text-primary-ink" />
                     KPI Threshold Formatting Rules
                   </DialogTitle>
                 </DialogHeader>

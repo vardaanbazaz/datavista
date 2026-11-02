@@ -29,7 +29,7 @@ export function ColumnQualityBadges({ dataset, column, meta, effectiveType }: {
       {fixes.length > 0 && (
         <Popover>
           <PopoverTrigger asChild>
-            <Badge variant="outline" className="ml-1 text-[10px] normal-case font-normal cursor-pointer border-primary text-primary" data-testid={`fix-badge-${column}`}>
+            <Badge variant="outline" className="ml-1 text-xs normal-case font-normal cursor-pointer border-primary text-primary-ink" data-testid={`fix-badge-${column}`}>
               {fixes.length === 1 ? fixLabel(fixes[0]).split(" (")[0] : `${fixes.length} fixes`} — undo
             </Badge>
           </PopoverTrigger>
@@ -51,7 +51,7 @@ export function ColumnQualityBadges({ dataset, column, meta, effectiveType }: {
       {invalid > 0 && (
         <Popover>
           <PopoverTrigger asChild>
-            <Badge variant="outline" className="ml-1 text-[10px] normal-case font-normal cursor-pointer border-tertiary text-tertiary" data-testid={`invalid-badge-${column}`}>
+            <Badge variant="outline" className="ml-1 text-xs normal-case font-normal cursor-pointer border-tertiary text-tertiary" data-testid={`invalid-badge-${column}`}>
               {invalid.toLocaleString()} invalid
             </Badge>
           </PopoverTrigger>

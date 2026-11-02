@@ -76,10 +76,10 @@ export function InstantiateTemplateModal({ isOpen, onClose }: InstantiateTemplat
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-xl glass border-white/20 shadow-2xl p-6">
+      <DialogContent className="max-w-xl glass border-border shadow-2xl p-6">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold flex items-center gap-2">
-            <LayoutTemplate className="h-5 w-5 text-primary" />
+            <LayoutTemplate className="h-5 w-5 text-primary-ink" />
             Create Dashboard from Template
           </DialogTitle>
           <DialogDescription>
@@ -91,7 +91,7 @@ export function InstantiateTemplateModal({ isOpen, onClose }: InstantiateTemplat
           {/* Select Template */}
           <div className="space-y-2">
             <Label className="text-sm font-semibold flex items-center gap-2">
-              <Layers className="h-4 w-4 text-primary" />
+              <Layers className="h-4 w-4 text-primary-ink" />
               1. Select Dashboard Template
             </Label>
             <Select value={selectedTemplateId} onValueChange={(val) => {
@@ -113,7 +113,7 @@ export function InstantiateTemplateModal({ isOpen, onClose }: InstantiateTemplat
                       <div className="flex flex-col gap-0.5">
                         <span className="font-medium">{tpl.name}</span>
                         {tpl.description && (
-                          <span className="text-[10px] text-muted-foreground">{tpl.description}</span>
+                          <span className="text-xs text-muted-foreground">{tpl.description}</span>
                         )}
                       </div>
                     </SelectItem>
@@ -126,7 +126,7 @@ export function InstantiateTemplateModal({ isOpen, onClose }: InstantiateTemplat
           {/* Select Target Dataset */}
           <div className="space-y-2">
             <Label className="text-sm font-semibold flex items-center gap-2">
-              <Database className="h-4 w-4 text-primary" />
+              <Database className="h-4 w-4 text-primary-ink" />
               2. Select Target Dataset
             </Label>
             <Select value={selectedDatasetId} onValueChange={(val) => {
@@ -153,18 +153,18 @@ export function InstantiateTemplateModal({ isOpen, onClose }: InstantiateTemplat
           {selectedTemplate && targetDataset && schemaValidation && (
             <div className={`p-3 rounded-lg border text-xs space-y-2 ${
               schemaValidation.valid
-                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
-                : "bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400"
+                ? "bg-success/10 border-success/30 text-success "
+                : "bg-tertiary/10 border-tertiary/30 text-tertiary "
             }`}>
               <div className="flex items-center gap-2 font-medium">
                 {schemaValidation.valid ? (
                   <>
-                    <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                    <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
                     <span>Schema Compatible! All required columns are present in "{targetDataset.name}" with matching types.</span>
                   </>
                 ) : (
                   <>
-                    <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
+                    <AlertTriangle className="h-4 w-4 text-tertiary shrink-0" />
                     <span>Schema Incompatible!</span>
                   </>
                 )}
@@ -172,10 +172,10 @@ export function InstantiateTemplateModal({ isOpen, onClose }: InstantiateTemplat
 
               {schemaValidation.missingColumns.length > 0 && (
                 <div className="space-y-1 pl-6">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider opacity-80">Missing columns</p>
+                  <p className="catalogue-label">Missing columns</p>
                   <div className="flex flex-wrap gap-1">
                     {schemaValidation.missingColumns.map((col) => (
-                      <Badge key={col} variant="destructive" className="text-[10px]">
+                      <Badge key={col} variant="destructive" className="text-xs">
                         {col}
                       </Badge>
                     ))}
@@ -185,10 +185,10 @@ export function InstantiateTemplateModal({ isOpen, onClose }: InstantiateTemplat
 
               {schemaValidation.typeMismatches.length > 0 && (
                 <div className="space-y-1 pl-6">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider opacity-80">Wrong type</p>
+                  <p className="catalogue-label">Wrong type</p>
                   <div className="flex flex-wrap gap-1">
                     {schemaValidation.typeMismatches.map((m) => (
-                      <Badge key={m.name} variant="destructive" className="text-[10px]">
+                      <Badge key={m.name} variant="destructive" className="text-xs">
                         {m.name}: expected {m.expectedType}, found {m.actualType}
                       </Badge>
                     ))}
@@ -199,7 +199,7 @@ export function InstantiateTemplateModal({ isOpen, onClose }: InstantiateTemplat
               {schemaValidation.valid && (
                 <div className="flex flex-wrap gap-1 pl-6">
                   {selectedTemplate.requiredSchema.map((req) => (
-                    <Badge key={req.name} variant="outline" className="text-[10px] border-emerald-500/40">
+                    <Badge key={req.name} variant="outline" className="text-xs border-success/40">
                       {req.name} ({req.dataType})
                     </Badge>
                   ))}

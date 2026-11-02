@@ -17,6 +17,7 @@ import { getEffectiveColumnType } from "@/shared/utils/columnType";
 import { numericValues, toNumberOrNull } from "@/shared/utils/numeric";
 import { dateKeyMs, type DatePeriod } from "@/shared/utils/dates";
 import { useChartStore } from "@/store/chartStore";
+import { useUiStore } from "@/store/uiStore";
 import { layoutBottomAxisLabels } from "@/features/charts/lib/axisLabels";
 import {
   aggregateValues as aggregateRows,
@@ -81,6 +82,12 @@ const MIN_FIT_HEIGHT = 250;
 
 function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizationProps) {
   const svgRef = useRef<SVGSVGElement>(null);
+  // Reading comfort text size: chart text and margins scale with the root font size.
+  const textSize = useUiStore((state) => state.readingComfort.textSize);
+  // Extra left margin measured after a draw, so the Y title never overlaps the tick labels.
+  const [leftMargin, setLeftMargin] = useState(60);
+  // Legend for charts that colour marks by a group (rendered as HTML above the plot).
+  const [legend, setLegend] = useState<{ title: string; items: { label: string; color: string }[]; repeats: boolean } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const plotAreaRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(500);
@@ -224,7 +231,17 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
   };
 
   useEffect(() => {
+    // 1 at the default 16px root, 1.1875 at Large, 1.375 at Extra large (Reading comfort).
+    const fs = parseFloat(getComputedStyle(document.documentElement).fontSize) / 16 || 1;
+    const px = (n: number) => `${Math.round(n * fs * 10) / 10}px`;
+    let legendOut: { title: string; items: { label: string; color: string }[]; repeats: boolean } | null = null;
+    const PALETTE = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))"];
+    const publishLegend = (title: string, groups: string[]) => {
+      if (groups.length < 2) return;
+      legendOut = { title, items: groups.map((g, i) => ({ label: g, color: PALETTE[i % PALETTE.length] })), repeats: groups.length > PALETTE.length };
+    };
     if (!svgRef.current || !chartData.length || !currentDimension) {
+      setLegend(null);
       const svg = d3.select(svgRef.current);
       svg.selectAll("*").remove();
       const chartAreaError = svg
@@ -233,7 +250,7 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
         
       chartAreaError.append("text")
         .attr("text-anchor", "middle")
-        .style("font-size", "14px")
+        .style("font-size", px(14))
         .style("fill", "hsl(var(--muted-foreground))")
         .style("font-weight", "500")
         .text("No data matches current filters.");
@@ -271,7 +288,7 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
     svg.selectAll("*").remove();
 
     const height = fitHeight && plotHeight ? plotHeight : DEFAULT_CHART_HEIGHT;
-    const margin = { top: 20, right: 30, bottom: 75, left: 60 };
+    const margin = { top: 20 * fs, right: 30, bottom: 75 * fs, left: Math.max(60 * fs, leftMargin) };
 
     svg
       .attr("width", "100%")
@@ -534,6 +551,7 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
     );
 
     function renderErrorMessage(message: string) {
+      setLegend(null);
       svg.selectAll("*").remove();
       const chartAreaError = svg
         .append("g")
@@ -541,7 +559,7 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
         
       chartAreaError.append("text")
         .attr("text-anchor", "middle")
-        .style("font-size", "14px")
+        .style("font-size", px(14))
         .style("fill", "hsl(var(--muted-foreground))")
         .style("font-weight", "500")
         .text(message);
@@ -617,7 +635,7 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
         .attr("class", "grid-horizontal")
         .call(d3.axisLeft(yScale).tickSize(-chartWidth).tickFormat(() => ""))
         .selectAll("line")
-        .attr("stroke", "rgba(255, 255, 255, 0.05)")
+        .attr("stroke", "hsl(var(--border))")
         .attr("stroke-dasharray", "4 4");
       chartArea.selectAll(".grid-horizontal .domain").remove();
 
@@ -627,10 +645,11 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
 
       const colorScale = d3.scaleOrdinal()
         .domain(chart.groupBy ? Array.from(new Set(data.map(d => d.group!))) : [])
-        .range(["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))"]);
+        .range(PALETTE);
 
       if (chart.groupBy) {
         const groups = Array.from(new Set(data.map(d => d.group!)));
+        publishLegend(chart.groupBy, colorScale.domain() as string[]);
         const xSubScale = d3.scaleBand()
           .domain(groups)
           .range([0, xScale.bandwidth()])
@@ -651,7 +670,7 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
             const style = formattingEngine.evaluateCompiledRules(compiledFormattingRules, evalRow, chart.yAxis || currentDimension);
             return style?.fill || style?.textColor || style?.backgroundColor || (colorScale(d.group!) as string);
           })
-          .attr("opacity", d => opacityOf(d.key, 0.85))
+          .attr("opacity", d => opacityOf(d.key, 1))
           .style("cursor", "pointer")
           .call(bars => bars.append("title").text(d =>
             `${xLabel}: ${d.key}\n${chart.groupBy}: ${d.group}\n${yValueLabel}: ${formatChartValue(d.value)}\nClick to filter or drill down, right-click for raw rows`
@@ -695,7 +714,7 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
             const style = formattingEngine.evaluateCompiledRules(compiledFormattingRules, evalRow, chart.yAxis || currentDimension);
             return style?.fill || style?.textColor || style?.backgroundColor || "hsl(var(--chart-1))";
           })
-          .attr("opacity", d => opacityOf(d.key, 0.85))
+          .attr("opacity", d => opacityOf(d.key, 1))
           .style("cursor", "pointer")
           .call(bars => bars.append("title").text(d =>
             `${xLabel}: ${d.key}\n${yValueLabel}: ${formatChartValue(d.value)}\nClick to filter or drill down, right-click for raw rows`
@@ -706,19 +725,20 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
 
       // Axis labels
       chartArea.append("text")
+        .attr("class", "y-axis-title")
         .attr("transform", "rotate(-90)")
         .attr("y", 0 - margin.left)
         .attr("x", 0 - (chartHeight / 2))
         .attr("dy", "1em")
         .style("text-anchor", "middle")
-        .style("font-size", "11px")
+        .style("font-size", px(11))
         .style("fill", "hsl(var(--muted-foreground))")
         .text(yValueLabel);
 
       chartArea.append("text")
         .attr("transform", `translate(${chartWidth / 2}, ${chartHeight + margin.bottom - 5})`)
         .style("text-anchor", "middle")
-        .style("font-size", "11px")
+        .style("font-size", px(11))
         .style("fill", "hsl(var(--muted-foreground))")
         .text(xLabel);
     }
@@ -788,7 +808,7 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
         .attr("class", "grid-horizontal")
         .call(d3.axisLeft(yScale).tickSize(-chartWidth).tickFormat(() => ""))
         .selectAll("line")
-        .attr("stroke", "rgba(255, 255, 255, 0.05)")
+        .attr("stroke", "hsl(var(--border))")
         .attr("stroke-dasharray", "4 4");
       chartArea.selectAll(".grid-horizontal .domain").remove();
 
@@ -840,7 +860,7 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
           })
           .attr("stroke", ({ row: d }) => d.isForecast ? "hsl(var(--background))" : "none")
           .attr("stroke-width", ({ row: d }) => d.isForecast ? 2 : 0)
-          .attr("opacity", ({ row: d }) => opacityOf(String(d[currentDimension]), d.isForecast ? 0.9 : 0.75))
+          .attr("opacity", ({ row: d }) => opacityOf(String(d[currentDimension]), d.isForecast ? 0.9 : 1))
           .style("cursor", "pointer")
           .call(dots => dots.append("title").text(({ row: d, y }) =>
             `${xLabel}: ${d[currentDimension]}\n${d.isForecast ? "Forecast (projected) " : ""}${yValueLabel}: ${formatChartValue(y as number)}${d.isForecast ? "" : "\nClick to filter or drill down, right-click for raw rows"}`
@@ -851,19 +871,20 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
 
       // Labels
       chartArea.append("text")
+        .attr("class", "y-axis-title")
         .attr("transform", "rotate(-90)")
         .attr("y", 0 - margin.left)
         .attr("x", 0 - (chartHeight / 2))
         .attr("dy", "1em")
         .style("text-anchor", "middle")
-        .style("font-size", "11px")
+        .style("font-size", px(11))
         .style("fill", "hsl(var(--muted-foreground))")
         .text(yValueLabel);
 
       chartArea.append("text")
         .attr("transform", `translate(${chartWidth / 2}, ${chartHeight + margin.bottom - 5})`)
         .style("text-anchor", "middle")
-        .style("font-size", "11px")
+        .style("font-size", px(11))
         .style("fill", "hsl(var(--muted-foreground))")
         .text(xLabel);
     }
@@ -892,7 +913,7 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
 
       const colorScale = d3.scaleOrdinal()
         .domain(data.map(d => d.key))
-        .range(["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))"]);
+        .range(PALETTE);
 
       const pie = d3.pie<PieSlice>()
         .value(d => d.value)
@@ -915,7 +936,7 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
           const style = formattingEngine.evaluateCompiledRules(compiledFormattingRules, evalRow, chart.yAxis || currentDimension);
           return style?.fill || style?.textColor || style?.backgroundColor || (colorScale(d.data.key) as string);
         })
-        .attr("opacity", d => opacityOf(d.data.key, 0.85))
+        .attr("opacity", d => opacityOf(d.data.key, 1))
         .style("cursor", "pointer")
         .call(slices => slices.append("title").text(d =>
           `${xLabel}: ${d.data.key}\n${yValueLabel}: ${formatChartValue(d.data.value)}\nClick to filter or drill down, right-click for raw rows`
@@ -927,8 +948,11 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
         .attr("transform", d => `translate(${arc.centroid(d)})`)
         .attr("dy", ".35em")
         .style("text-anchor", "middle")
-        .style("font-size", "10px")
-        .style("fill", "hsl(var(--background))")
+        .style("font-size", px(11))
+        .style("fill", "hsl(var(--foreground))")
+        .style("paint-order", "stroke")
+        .style("stroke", "hsl(var(--background))")
+        .style("stroke-width", "3px")
         .style("font-weight", "500")
         .text(d => {
           const percent = ((d.endAngle - d.startAngle) / (2 * Math.PI) * 100).toFixed(1);
@@ -955,7 +979,8 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
 
       const colorScale = d3.scaleOrdinal()
         .domain(chart.groupBy ? Array.from(new Set(data.map(d => String(d[chart.groupBy!])))) : ['default'])
-        .range(["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))"]);
+        .range(PALETTE);
+      if (chart.groupBy) publishLegend(chart.groupBy, colorScale.domain() as string[]);
 
       chartArea.append("g")
         .attr("transform", `translate(0,${chartHeight})`)
@@ -986,19 +1011,20 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
         .on("contextmenu", (event, d) => handlePointRightClick(event, String(d[filterCol]), 'equals', filterCol));
 
       chartArea.append("text")
+        .attr("class", "y-axis-title")
         .attr("transform", "rotate(-90)")
         .attr("y", 0 - margin.left)
         .attr("x", 0 - (chartHeight / 2))
         .attr("dy", "1em")
         .style("text-anchor", "middle")
-        .style("font-size", "11px")
+        .style("font-size", px(11))
         .style("fill", "hsl(var(--muted-foreground))")
         .text(chart.yAxis);
 
       chartArea.append("text")
         .attr("transform", `translate(${chartWidth / 2}, ${chartHeight + margin.bottom - 5})`)
         .style("text-anchor", "middle")
-        .style("font-size", "11px")
+        .style("font-size", px(11))
         .style("fill", "hsl(var(--muted-foreground))")
         .text(xLabel);
     }
@@ -1053,19 +1079,20 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
         .on("contextmenu", (event, d) => handlePointRightClick(event, { start: d.x0, end: d.x1 }, 'between'));
 
       chartArea.append("text")
+        .attr("class", "y-axis-title")
         .attr("transform", "rotate(-90)")
         .attr("y", 0 - margin.left)
         .attr("x", 0 - (chartHeight / 2))
         .attr("dy", "1em")
         .style("text-anchor", "middle")
-        .style("font-size", "11px")
+        .style("font-size", px(11))
         .style("fill", "hsl(var(--muted-foreground))")
         .text("Count of rows");
 
       chartArea.append("text")
         .attr("transform", `translate(${chartWidth / 2}, ${chartHeight + margin.bottom - 5})`)
         .style("text-anchor", "middle")
-        .style("font-size", "11px")
+        .style("font-size", px(11))
         .style("fill", "hsl(var(--muted-foreground))")
         .text(xLabel);
     }
@@ -1136,19 +1163,20 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
         .call(d3.axisLeft(yScale));
 
       chartArea.append("text")
+        .attr("class", "y-axis-title")
         .attr("transform", "rotate(-90)")
         .attr("y", 0 - margin.left)
         .attr("x", 0 - (chartHeight / 2))
         .attr("dy", "1em")
         .style("text-anchor", "middle")
-        .style("font-size", "11px")
+        .style("font-size", px(11))
         .style("fill", "hsl(var(--muted-foreground))")
         .text(chart.yAxis);
 
       chartArea.append("text")
         .attr("transform", `translate(${chartWidth / 2}, ${chartHeight + margin.bottom - 5})`)
         .style("text-anchor", "middle")
-        .style("font-size", "11px")
+        .style("font-size", px(11))
         .style("fill", "hsl(var(--muted-foreground))")
         .text(xLabel);
     }
@@ -1275,7 +1303,7 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
           })
           .attr("stroke", ({ row: d }) => d.isForecast ? "hsl(var(--background))" : "none")
           .attr("stroke-width", ({ row: d }) => d.isForecast ? 2 : 0)
-          .attr("opacity", ({ row: d }) => opacityOf(String(d[currentDimension]), d.isForecast ? 0.9 : 0.75))
+          .attr("opacity", ({ row: d }) => opacityOf(String(d[currentDimension]), d.isForecast ? 0.9 : 1))
           .style("cursor", "pointer")
           .call(dots => dots.append("title").text(({ row: d, y }) =>
             `${xLabel}: ${d[currentDimension]}\n${d.isForecast ? "Forecast (projected) " : ""}${yValueLabel}: ${formatChartValue(y as number)}${d.isForecast ? "" : "\nClick to filter or drill down, right-click for raw rows"}`
@@ -1285,19 +1313,20 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
       }
 
       chartArea.append("text")
+        .attr("class", "y-axis-title")
         .attr("transform", "rotate(-90)")
         .attr("y", 0 - margin.left)
         .attr("x", 0 - (chartHeight / 2))
         .attr("dy", "1em")
         .style("text-anchor", "middle")
-        .style("font-size", "11px")
+        .style("font-size", px(11))
         .style("fill", "hsl(var(--muted-foreground))")
         .text(yValueLabel);
 
       chartArea.append("text")
         .attr("transform", `translate(${chartWidth / 2}, ${chartHeight + margin.bottom - 5})`)
         .style("text-anchor", "middle")
-        .style("font-size", "11px")
+        .style("font-size", px(11))
         .style("fill", "hsl(var(--muted-foreground))")
         .text(xLabel);
     }
@@ -1333,7 +1362,8 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
 
       const colorScale = d3.scaleOrdinal()
         .domain(chart.groupBy ? Array.from(new Set(data.map(d => String(d[chart.groupBy!])))) : ['default'])
-        .range(["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))"]);
+        .range(PALETTE);
+      if (chart.groupBy) publishLegend(chart.groupBy, colorScale.domain() as string[]);
 
       chartArea.append("g")
         .attr("transform", `translate(0,${chartHeight})`)
@@ -1363,25 +1393,39 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
         .text(d => `${currentDimension}: ${d[currentDimension]}, ${chart.yAxis}: ${d[chart.yAxis!]}, ${chart.sizeBy}: ${d[chart.sizeBy!]}`);
 
       chartArea.append("text")
+        .attr("class", "y-axis-title")
         .attr("transform", "rotate(-90)")
         .attr("y", 0 - margin.left)
         .attr("x", 0 - (chartHeight / 2))
         .attr("dy", "1em")
         .style("text-anchor", "middle")
-        .style("font-size", "11px")
+        .style("font-size", px(11))
         .style("fill", "hsl(var(--muted-foreground))")
         .text(chart.yAxis);
 
       chartArea.append("text")
         .attr("transform", `translate(${chartWidth / 2}, ${chartHeight + margin.bottom - 5})`)
         .style("text-anchor", "middle")
-        .style("font-size", "11px")
+        .style("font-size", px(11))
         .style("fill", "hsl(var(--muted-foreground))")
         .text(xLabel);
     }
 
+
+    // Y title clear of the tick labels: place it left of the widest label; if that needs
+    // more room than the margin, widen the margin and redraw once (leftMargin state).
+    const leftLabels = svg.selectAll<SVGTextElement, unknown>('g[text-anchor="end"] .tick text').nodes();
+    const widest = leftLabels.reduce((w, n) => Math.max(w, n.getBBox?.().width ?? 0), 0);
+    const titleGap = widest + 9 + 6;
+    svg.selectAll<SVGTextElement, unknown>(".y-axis-title").attr("y", -titleGap).attr("dy", "0");
+    const needed = Math.ceil(titleGap + 14 * fs);
+    if (needed > margin.left + 1) setLeftMargin(needed);
+
+    setLegend((prev) => (JSON.stringify(prev) === JSON.stringify(legendOut) ? prev : legendOut));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
+    textSize,
+    leftMargin,
     chart,
     width,
     fitHeight,
@@ -1420,7 +1464,7 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
               <Button
                 variant="outline"
                 size="sm"
-                className="h-7 px-2 text-[10px] gap-1 shrink-0"
+                className="h-7 px-2 text-xs gap-1 shrink-0"
                 onClick={handleDrillUp}
                 aria-label="Drill up to previous hierarchy level"
               >
@@ -1428,19 +1472,19 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
                 Up
               </Button>
             ) : (
-              <span className="text-muted-foreground italic truncate text-[10px]">
+              <span className="text-muted-foreground italic truncate text-xs">
                 Drill Down Hierarchy
               </span>
             )}
             
             {/* Breadcrumb list */}
             {drillState && drillState.currentDepth > 0 && (
-              <div className="flex items-center gap-1 min-w-0 text-[10px] text-muted-foreground overflow-hidden">
+              <div className="flex items-center gap-1 min-w-0 text-xs text-muted-foreground overflow-hidden">
                 <span className="shrink-0 font-semibold text-foreground">{chart.drillPath[0]}</span>
                 {drillState.activeFilters.map((f, idx) => (
                   <div key={idx} className="flex items-center gap-1 min-w-0">
                     <span>/</span>
-                    <span className="truncate font-medium text-primary max-w-[60px]" title={String(f.value)}>
+                    <span className="truncate font-medium text-primary-ink max-w-[60px]" title={String(f.value)}>
                       {String(f.value)}
                     </span>
                     <span>/</span>
@@ -1456,12 +1500,11 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
           {/* Drill Mode Toggle */}
           <div className="flex items-center gap-1">
             <Button
-              variant={isDrillMode ? "premium" : "ghost"}
+              variant={isDrillMode ? "default" : "ghost"}
               size="sm"
-              className="h-7 px-2 text-[10px] gap-1"
+              className="h-7 px-2 text-xs gap-1"
               onClick={() => setIsDrillMode(!isDrillMode)}
               title={isDrillMode ? "Clicking a point will drill down" : "Clicking a point will cross-filter"}
-              aria-label={`Toggle drill mode, currently ${isDrillMode ? "ON" : "OFF"}`}
               aria-pressed={isDrillMode}
             >
               <GitFork className="h-3.5 w-3.5 rotate-90" />
@@ -1471,20 +1514,37 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
         </div>
       )}
 
+      {legend && (
+        <div className="flex-shrink-0 px-1 pb-1 pt-1" data-testid="chart-legend">
+          <p className="sr-only">Legend, coloured by {legend.title}</p>
+          <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-foreground" aria-label={`Legend: ${legend.title}`}>
+            <li className="text-muted-foreground" aria-hidden>{legend.title}:</li>
+            {legend.items.map((item) => (
+              <li key={item.label} className="flex items-center gap-1.5">
+                <span className="inline-block h-3 w-3 shrink-0 rounded-sm" style={{ backgroundColor: item.color }} aria-hidden />
+                <span className="max-w-[12rem] truncate" title={item.label}>{item.label}</span>
+              </li>
+            ))}
+            {legend.repeats && <li className="text-muted-foreground">Colours repeat after 5 groups; hover a mark for its group.</li>}
+          </ul>
+        </div>
+      )}
+
       {/* SVG drawing area */}
       <div ref={plotAreaRef} className="flex-1 min-w-0 min-h-[250px] w-full relative overflow-hidden flex items-center justify-center">
         {chartAnomalies.length > 0 && (
+          // Warning = icon + words on the card surface; the bronze/gold edge is decoration only.
           <Badge
             variant="outline"
-            className="absolute top-1 right-2 z-10 text-[9px] px-1.5 py-0.5 bg-amber-500/10 text-amber-600 border-amber-500/40 gap-1 font-medium pointer-events-none"
+            className="absolute top-1 right-2 z-10 text-xs px-2 py-0.5 bg-card text-foreground border-tertiary/60 gap-1 font-medium pointer-events-none"
             title={chartAnomalies.map((a) => a.description).join("\n")}
           >
-            <AlertTriangle className="h-3 w-3 text-amber-500" />
-            {chartAnomalies.length} {chartAnomalies.length === 1 ? "Outlier" : "Outliers"}
+            <AlertTriangle className="h-3.5 w-3.5 text-tertiary" aria-hidden />
+            {chartAnomalies.length} unusual {chartAnomalies.length === 1 ? "value" : "values"}
           </Badge>
         )}
         {(barHint || (chart.type === 'bar' && chart.topN)) && (
-          <div className="absolute top-1 left-2 z-10 max-w-[80%] flex flex-wrap items-center gap-1 rounded-md border border-border bg-background/95 px-2 py-1 text-[10px] text-muted-foreground" data-testid="chart-density-hint">
+          <div className="absolute top-1 left-2 z-10 max-w-[80%] flex flex-wrap items-center gap-1 rounded-md border border-border bg-background/95 px-2 py-1 text-xs text-muted-foreground" data-testid="chart-density-hint">
             {barHint ? (
               <>
                 <span>{barHint.bars.toLocaleString()} bars is too many to read.</span>
@@ -1494,13 +1554,13 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
                     {(["month", "quarter", "year"] as const)
                       .filter(p => ["day", "week", "month", "quarter", "year"].indexOf(p) > ["day", "week", "month", "quarter", "year"].indexOf(barHint.period!))
                       .map(p => (
-                        <Button key={p} variant="outline" size="sm" className="h-5 px-1.5 text-[10px]" onClick={() => updateChart(chart.id, { dateGranularity: p })}>
+                        <Button key={p} variant="outline" size="sm" className="h-5 px-1.5 text-xs" onClick={() => updateChart(chart.id, { dateGranularity: p })}>
                           {granularityName(p)}
                         </Button>
                       ))}
                   </>
                 ) : chart.topN ? null : (
-                  <Button variant="outline" size="sm" className="h-5 px-1.5 text-[10px]" onClick={() => updateChart(chart.id, { topN: TOP_N_DEFAULT })}>
+                  <Button variant="outline" size="sm" className="h-5 px-1.5 text-xs" onClick={() => updateChart(chart.id, { topN: TOP_N_DEFAULT })}>
                     Show Top {TOP_N_DEFAULT} + Other
                   </Button>
                 )}
@@ -1508,7 +1568,7 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
             ) : (
               <>
                 <span>Top {chart.topN} + Other</span>
-                <Button variant="ghost" size="sm" className="h-5 px-1.5 text-[10px]" onClick={() => updateChart(chart.id, { topN: undefined })}>
+                <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs" onClick={() => updateChart(chart.id, { topN: undefined })}>
                   Show all
                 </Button>
               </>

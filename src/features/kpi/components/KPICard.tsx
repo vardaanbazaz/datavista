@@ -110,8 +110,8 @@ export function KPICard({ config, onRemove, onEdit, isMobile = false }: KPICardP
     let colorClass = "text-muted-foreground bg-muted";
     if (!isZero) {
       colorClass = isGood 
-        ? "text-emerald-500 bg-emerald-500/10 border-emerald-500/20" 
-        : "text-rose-500 bg-rose-500/10 border-rose-500/20";
+        ? "text-success bg-success/10 border-success/20" 
+        : "text-destructive bg-destructive/10 border-destructive/20";
     }
 
     return {
@@ -147,7 +147,7 @@ export function KPICard({ config, onRemove, onEdit, isMobile = false }: KPICardP
     if (kpiData.trendPercentage !== null) {
       const isGood = config.polarity === "negative" ? kpiData.trendPercentage < 0 : kpiData.trendPercentage > 0;
       if (kpiData.trendPercentage !== 0) {
-        lineColor = isGood ? "rgb(16 185 129)" : "rgb(244 63 94)"; // emerald vs rose
+        lineColor = isGood ? "hsl(var(--success))" : "hsl(var(--destructive))";
       }
     }
 
@@ -164,16 +164,16 @@ export function KPICard({ config, onRemove, onEdit, isMobile = false }: KPICardP
 
   return (
     <Card
-      className="h-full w-full bg-white dark:bg-zinc-900 border border-gray-200 dark:border-white/5 flex flex-col overflow-hidden shadow-none group transition-colors"
+      className="h-full w-full bg-card border border-border flex flex-col overflow-hidden shadow-none group transition-colors"
       style={formatStyle?.backgroundColor ? { backgroundColor: formatStyle.backgroundColor } : undefined}
     >
       {/* Header / Drag Handle */}
       <div className="p-3 pb-1 flex flex-row items-center justify-between drag-handle select-none flex-shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           {!isMobile && (
-            <GripVertical className="h-4 w-4 text-zinc-400 dark:text-zinc-500 cursor-grab active:cursor-grabbing shrink-0" />
+            <GripVertical className="h-4 w-4 text-muted-foreground dark:text-muted-foreground cursor-grab active:cursor-grabbing shrink-0" />
           )}
-          <span className="text-caption uppercase text-textTertiary truncate">
+          <span className="text-sm font-semibold text-muted-foreground truncate">
             {config.title}
           </span>
         </div>
@@ -182,7 +182,7 @@ export function KPICard({ config, onRemove, onEdit, isMobile = false }: KPICardP
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6 text-zinc-400 hover:text-zinc-900 dark:hover:text-white shrink-0"
+              className="h-6 w-6 text-muted-foreground hover:text-foreground shrink-0"
               onClick={onEdit}
             >
               <Edit2 className="h-3 w-3" />
@@ -192,7 +192,7 @@ export function KPICard({ config, onRemove, onEdit, isMobile = false }: KPICardP
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6 text-zinc-400 hover:text-rose-500 shrink-0"
+              className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
               onClick={onRemove}
             >
               <Trash2 className="h-3 w-3" />
@@ -203,13 +203,13 @@ export function KPICard({ config, onRemove, onEdit, isMobile = false }: KPICardP
 
       {/* Main Metric Content */}
       <CardContent 
-        className="p-4 pt-1 flex-1 flex flex-row items-center justify-between min-h-0 w-full relative bg-gray-50/50 dark:bg-zinc-900/50 cursor-context-menu"
+        className="p-4 pt-1 flex-1 flex flex-row items-center justify-between min-h-0 w-full relative bg-background cursor-context-menu"
         onContextMenu={handleContextMenu}
         title="Right-click to view raw data records"
       >
         <div className="flex flex-col justify-center min-w-0 pr-4">
           <span
-            className="font-mono text-kpi text-zinc-900 dark:text-white truncate leading-none mb-2"
+            className="font-mono text-kpi text-foreground truncate leading-none mb-2"
             style={formatStyle?.textColor ? { color: formatStyle.textColor } : undefined}
           >
             {formattedValue}
@@ -218,7 +218,7 @@ export function KPICard({ config, onRemove, onEdit, isMobile = false }: KPICardP
           {/* Trend Badge */}
           {trendInfo ? (
             <div className="flex items-center gap-1.5 flex-wrap">
-              <Badge variant="outline" className={`px-1.5 py-0 text-[10px] font-semibold flex items-center gap-0.5 border ${trendInfo.colorClass}`}>
+              <Badge variant="outline" className={`px-1.5 py-0 text-xs font-semibold flex items-center gap-0.5 border ${trendInfo.colorClass}`}>
                 {trendInfo.isZero ? (
                   <Minus className="h-3 w-3" />
                 ) : trendInfo.isPositive ? (
@@ -228,12 +228,12 @@ export function KPICard({ config, onRemove, onEdit, isMobile = false }: KPICardP
                 )}
                 <span>{trendInfo.percent}</span>
               </Badge>
-              <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+              <span className="text-xs text-muted-foreground whitespace-nowrap">
                 vs last {config.trendConfiguration?.comparisonPeriod || "period"}
               </span>
             </div>
           ) : (
-            <span className="text-[10px] text-muted-foreground">
+            <span className="text-xs text-muted-foreground">
               Overall aggregate
             </span>
           )}

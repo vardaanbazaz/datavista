@@ -79,10 +79,10 @@ export function AiSettingsModal({ isOpen: externalIsOpen, onClose: externalOnClo
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
 
-      <DialogContent className="max-w-md bg-white dark:bg-zinc-950 border border-gray-200 dark:border-zinc-800 shadow-2xl p-6 text-zinc-900 dark:text-zinc-100">
+      <DialogContent className="max-w-md bg-card border border-border shadow-2xl p-6 text-foreground">
         <DialogHeader className="space-y-2">
-          <DialogTitle className="text-xl font-bold flex items-center gap-2 bg-gradient-to-r from-zinc-900 to-zinc-600 dark:from-white dark:to-zinc-400 bg-clip-text text-transparent">
-            <Sparkles className="h-5 w-5 text-zinc-700 dark:text-zinc-300 animate-pulse" />
+          <DialogTitle className="text-xl font-bold flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-foreground animate-pulse" />
             AI Co-Pilot Settings
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground">
@@ -94,16 +94,16 @@ export function AiSettingsModal({ isOpen: externalIsOpen, onClose: externalOnClo
           {/* AI Active / Offline Status Banner — reflects the currently SAVED provider/key,
               not the unsaved draft inputs below, so it never claims AI is active mid-edit. */}
           {llmApiKey ? (
-            <div className="rounded-md border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 px-3 py-2 flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-              <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">
+            <div className="rounded-md border border-success/50 bg-success/10 px-3 py-2 flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-success shrink-0" />
+              <p className="text-xs font-semibold text-success">
                 AI Active — {providerDisplayName(llmProvider)}
               </p>
             </div>
           ) : (
-            <div className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/60 px-3 py-2 flex items-center gap-2">
-              <CloudOff className="h-4 w-4 text-zinc-500 dark:text-zinc-400 shrink-0" />
-              <p className="text-xs font-semibold text-zinc-600 dark:text-zinc-300">
+            <div className="rounded-md border border-border bg-muted px-3 py-2 flex items-center gap-2">
+              <CloudOff className="h-4 w-4 text-muted-foreground shrink-0" />
+              <p className="text-xs font-semibold text-muted-foreground">
                 Offline Mode — heuristic-based insights only
               </p>
             </div>
@@ -112,7 +112,7 @@ export function AiSettingsModal({ isOpen: externalIsOpen, onClose: externalOnClo
           {/* Provider Selector */}
           <div className="space-y-2">
             <Label className="text-xs font-semibold flex items-center gap-1.5">
-              <Cpu className="h-3.5 w-3.5 text-primary" /> LLM Provider
+              <Cpu className="h-3.5 w-3.5 text-primary-ink" /> LLM Provider
             </Label>
             <div className="grid grid-cols-2 gap-2">
               <Tooltip>
@@ -125,7 +125,7 @@ export function AiSettingsModal({ isOpen: externalIsOpen, onClose: externalOnClo
                   >
                     Google Gemini
                     {providerInput === "gemini" && (
-                      <Badge variant="secondary" className="text-[9px] px-1 py-0">
+                      <Badge variant="secondary" className="text-xs px-1 py-0">
                         {apiKeyInput.trim() ? "Active" : "Selected"}
                       </Badge>
                     )}
@@ -146,7 +146,7 @@ export function AiSettingsModal({ isOpen: externalIsOpen, onClose: externalOnClo
                   >
                     OpenAI GPT-4o
                     {providerInput === "openai" && (
-                      <Badge variant="secondary" className="text-[9px] px-1 py-0">
+                      <Badge variant="secondary" className="text-xs px-1 py-0">
                         {apiKeyInput.trim() ? "Active" : "Selected"}
                       </Badge>
                     )}
@@ -162,7 +162,7 @@ export function AiSettingsModal({ isOpen: externalIsOpen, onClose: externalOnClo
           {/* API Key Input */}
           <div className="space-y-2">
             <Label htmlFor="api-key" className="text-xs font-semibold flex items-center gap-1.5">
-              <Key className="h-3.5 w-3.5 text-primary" /> API Key
+              <Key className="h-3.5 w-3.5 text-primary-ink" /> API Key
             </Label>
             <div className="relative flex items-center">
               <Input
@@ -185,9 +185,9 @@ export function AiSettingsModal({ isOpen: externalIsOpen, onClose: externalOnClo
                 </Button>
               </Hint>
             </div>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               {apiKeyInput ? (
-                <span className="text-emerald-500 font-medium flex items-center gap-1">
+                <span className="text-success font-medium flex items-center gap-1">
                   <Check className="h-3 w-3" /> Saved in this browser&apos;s localStorage (not encrypted). Empty the field and save to remove it.
                 </span>
               ) : (
@@ -197,8 +197,8 @@ export function AiSettingsModal({ isOpen: externalIsOpen, onClose: externalOnClo
           </div>
 
           {/* Data Disclosure */}
-          <div className="rounded-md border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-3">
-            <div className="text-[11px] leading-relaxed text-amber-900 dark:text-amber-200 space-y-1" data-testid="ai-data-disclosure">
+          <div className="rounded-md border border-tertiary/50 bg-tertiary/10 p-3">
+            <div className="text-sm leading-relaxed text-foreground space-y-1" data-testid="ai-data-disclosure">
               <p>
                 <span className="font-semibold">Sent to the provider (Google or OpenAI), only when you use an AI feature:</span>
               </p>
@@ -248,7 +248,7 @@ export function AiSettingsModal({ isOpen: externalIsOpen, onClose: externalOnClo
                 resetTour();
               }}
             >
-              <HelpCircle className="h-3.5 w-3.5 text-primary" />
+              <HelpCircle className="h-3.5 w-3.5 text-primary-ink" />
               Restart Tutorial
             </Button>
             

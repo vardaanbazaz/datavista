@@ -59,7 +59,7 @@ test.describe("Mobile section menu", () => {
     await page.keyboard.press("Control+k");
     const palette = page.getByRole("dialog", { name: "Command Palette" });
     await expect(palette).toBeVisible();
-    await palette.getByRole("textbox").fill("Go to Data Explorer");
+    await palette.getByRole("combobox").fill("Go to Data Explorer");
     await palette.getByText("Go to Data Explorer", { exact: true }).click();
     await expect(page.getByTestId("sidebar-menu")).toBeHidden();
     await expect(page.getByTestId("mobile-menu-current")).toHaveText("Data Explorer");

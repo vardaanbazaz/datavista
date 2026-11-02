@@ -57,7 +57,7 @@ export function SnapshotManager({ isOpen, onClose }: SnapshotManagerProps) {
       <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col glass border-border">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
-            <Camera className="h-5 w-5 text-primary" />
+            <Camera className="h-5 w-5 text-primary-ink" />
             Workspace Snapshot & History Recovery
           </DialogTitle>
           <DialogDescription>
@@ -71,7 +71,7 @@ export function SnapshotManager({ isOpen, onClose }: SnapshotManagerProps) {
             type="button"
             className={`flex items-center gap-2 py-2 px-4 text-sm font-medium border-b-2 transition-colors ${
               activeTab === "snapshots"
-                ? "border-primary text-primary"
+                ? "border-primary text-primary-ink"
                 : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
             onClick={() => setActiveTab("snapshots")}
@@ -83,7 +83,7 @@ export function SnapshotManager({ isOpen, onClose }: SnapshotManagerProps) {
             type="button"
             className={`flex items-center gap-2 py-2 px-4 text-sm font-medium border-b-2 transition-colors ${
               activeTab === "history"
-                ? "border-primary text-primary"
+                ? "border-primary text-primary-ink"
                 : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
             onClick={() => setActiveTab("history")}
@@ -100,7 +100,7 @@ export function SnapshotManager({ isOpen, onClose }: SnapshotManagerProps) {
             <form onSubmit={handleSaveSnapshot} className="p-4 rounded-lg border border-border/60 bg-muted/20 space-y-3">
               <div className="flex items-center justify-between">
                 <h4 className="text-sm font-semibold flex items-center gap-1.5">
-                  <Save className="h-4 w-4 text-primary" /> Save Workspace Snapshot
+                  <Save className="h-4 w-4 text-primary-ink" /> Save Workspace Snapshot
                 </h4>
                 <Badge variant="outline" className="text-xs">
                   Persisted to browser storage
@@ -160,14 +160,14 @@ export function SnapshotManager({ isOpen, onClose }: SnapshotManagerProps) {
                       <div className="space-y-1 min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-semibold text-sm truncate">{snap.name}</span>
-                          <Badge variant="secondary" className="text-[10px]">
+                          <Badge variant="secondary" className="text-xs">
                             {new Date(snap.timestamp).toLocaleString()}
                           </Badge>
                         </div>
                         {snap.description && (
                           <p className="text-xs text-muted-foreground truncate">{snap.description}</p>
                         )}
-                        <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
                           <span>
                             {snap.dashboardState?.dashboards?.length || 0} dashboard(s)
                           </span>
@@ -182,7 +182,7 @@ export function SnapshotManager({ isOpen, onClose }: SnapshotManagerProps) {
                         <Button
                           variant="outline"
                           size="sm"
-                          className="h-8 gap-1.5 text-xs border-primary/30 text-primary hover:bg-primary/10"
+                          className="h-8 gap-1.5 text-xs border-primary/30 text-primary-ink hover:bg-primary/10"
                           onClick={() => handleRestoreSnapshot(snap.id)}
                         >
                           <RotateCcw className="h-3.5 w-3.5" /> Restore
@@ -249,7 +249,7 @@ export function SnapshotManager({ isOpen, onClose }: SnapshotManagerProps) {
                         className="p-2.5 rounded-lg border border-dashed border-muted-foreground/30 bg-muted/10 opacity-70 flex items-center justify-between gap-3 text-xs"
                       >
                         <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                          <Badge variant="outline" className="text-xs text-muted-foreground">
                             Future Step +{future.length - idx}
                           </Badge>
                           <span>
@@ -273,10 +273,10 @@ export function SnapshotManager({ isOpen, onClose }: SnapshotManagerProps) {
                     {/* Present active state */}
                     <div className="p-3 rounded-lg border-2 border-primary bg-primary/5 flex items-center justify-between gap-3 text-xs">
                       <div className="flex items-center gap-2">
-                        <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
-                        <span className="font-semibold text-primary">Current Active State</span>
+                        <CheckCircle2 className="h-4 w-4 text-primary-ink shrink-0" />
+                        <span className="font-semibold text-primary-ink">Current Active State</span>
                       </div>
-                      <Badge variant="default" className="text-[10px]">
+                      <Badge variant="default" className="text-xs">
                         Active Now
                       </Badge>
                     </div>
@@ -290,7 +290,7 @@ export function SnapshotManager({ isOpen, onClose }: SnapshotManagerProps) {
                           className="p-2.5 rounded-lg border border-border/60 bg-card hover:bg-accent/5 flex items-center justify-between gap-3 text-xs"
                         >
                           <div className="flex items-center gap-2 min-w-0">
-                            <Badge variant="secondary" className="text-[10px]">
+                            <Badge variant="secondary" className="text-xs">
                               Step -{idx + 1} (History #{stepNum})
                             </Badge>
                             <span className="truncate text-muted-foreground">
@@ -300,7 +300,7 @@ export function SnapshotManager({ isOpen, onClose }: SnapshotManagerProps) {
                           <Button
                             variant="outline"
                             size="sm"
-                            className="h-7 text-xs border-primary/20 hover:bg-primary/10 text-primary"
+                            className="h-7 text-xs border-primary/20 hover:bg-primary/10 text-primary-ink"
                             onClick={() => {
                               restoreSnapshotState(step);
                               onClose();

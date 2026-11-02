@@ -55,7 +55,7 @@ export function Hint({ label, shortcut, disabledReason, side = "top", children }
         {trigger}
       </TooltipTrigger>
       <TooltipContent side={side}>
-        <p className="text-xs">
+        <p className="text-sm">
           {text}
           {shortcut && shortcut.length > 0 && (
             <>

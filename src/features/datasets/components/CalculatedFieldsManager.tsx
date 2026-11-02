@@ -136,10 +136,10 @@ export function CalculatedFieldsManager({ trigger }: CalculatedFieldsManagerProp
         )}
       </DialogTrigger>
       
-      <DialogContent className="max-w-3xl glass border-white/20 shadow-2xl p-6">
+      <DialogContent className="max-w-3xl glass border-border shadow-2xl p-6">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold flex items-center gap-2 gradient-primary bg-clip-text text-transparent">
-            <Code className="h-6 w-6 text-primary" />
+          <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+            <Code className="h-6 w-6 text-primary-ink" />
             Calculated Fields & Formulas
           </DialogTitle>
         </DialogHeader>
@@ -149,7 +149,7 @@ export function CalculatedFieldsManager({ trigger }: CalculatedFieldsManagerProp
           <div className="md:col-span-3 space-y-4">
             {/* AI Generator Box */}
             <div className="p-3 rounded-lg bg-primary/10 border border-primary/30 space-y-2">
-              <Label className="text-xs font-semibold text-primary flex items-center gap-1.5">
+              <Label className="text-xs font-semibold text-primary-ink flex items-center gap-1.5">
                 <Sparkles className="h-3.5 w-3.5" /> Generate Formula with AI
               </Label>
               <div className="flex gap-2">
@@ -180,12 +180,12 @@ export function CalculatedFieldsManager({ trigger }: CalculatedFieldsManagerProp
                 </Tooltip>
               </div>
               {llmApiKey && llmApiKey.trim() !== "" && (
-                <p className="text-[10px] text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   Sends column names and sample data to {providerDisplayName(llmProvider)}.
                 </p>
               )}
               {aiError && (
-                <p className="text-[11px] text-destructive font-medium">{aiError}</p>
+                <p className="text-xs text-destructive font-medium">{aiError}</p>
               )}
             </div>
 
@@ -241,7 +241,7 @@ export function CalculatedFieldsManager({ trigger }: CalculatedFieldsManagerProp
             </Tooltip>
 
             {/* Existing Calculated Fields */}
-            <div className="pt-4 border-t border-white/10">
+            <div className="pt-4 border-t border-border">
               <h4 className="text-sm font-semibold mb-3">Calculated Fields in Dataset</h4>
               {calculatedFields.length === 0 ? (
                 <p className="text-xs text-muted-foreground italic">No calculated fields created yet.</p>
@@ -251,11 +251,11 @@ export function CalculatedFieldsManager({ trigger }: CalculatedFieldsManagerProp
                     {calculatedFields.map((field) => (
                       <div 
                         key={field.name} 
-                        className="flex items-center justify-between p-2 rounded bg-secondary/20 border border-white/5 text-xs"
+                        className="flex items-center justify-between p-2 rounded bg-secondary/20 border border-border text-xs"
                       >
                         <div className="space-y-1">
-                          <span className="font-semibold text-primary">{field.name}</span>
-                          <code className="block text-[10px] text-muted-foreground">{field.expression}</code>
+                          <span className="font-semibold text-primary-ink">{field.name}</span>
+                          <code className="block text-xs text-muted-foreground">{field.expression}</code>
                         </div>
                         <Hint label={`Delete calculated field ${field.name}`}>
                           <Button 
@@ -276,8 +276,8 @@ export function CalculatedFieldsManager({ trigger }: CalculatedFieldsManagerProp
           </div>
 
           {/* Reference Column */}
-          <div className="md:col-span-2 space-y-4 bg-secondary/10 p-4 rounded-lg border border-white/5 flex flex-col h-[520px]">
-            <div className="flex items-center gap-1.5 text-sm font-semibold border-b border-white/5 pb-2 text-primary">
+          <div className="md:col-span-2 space-y-4 bg-secondary/10 p-4 rounded-lg border border-border flex flex-col h-[520px]">
+            <div className="flex items-center gap-1.5 text-sm font-semibold border-b border-border pb-2 text-primary-ink">
               <HelpCircle className="h-4 w-4" />
               Formula Reference
             </div>
@@ -286,13 +286,13 @@ export function CalculatedFieldsManager({ trigger }: CalculatedFieldsManagerProp
               <div className="space-y-4">
                 {/* Columns */}
                 <div>
-                  <h5 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Columns (Double-click to insert)</h5>
+                  <h5 className="catalogue-label text-muted-foreground mb-2">Columns (Double-click to insert)</h5>
                   <div className="flex flex-wrap gap-1">
                     {existingColumns.map(col => (
                       <Badge
                         key={col}
                         variant="secondary"
-                        className="cursor-pointer hover:bg-primary hover:text-primary-foreground text-[10px] py-0.5 px-1.5 transition-colors"
+                        className="cursor-pointer hover:bg-primary hover:text-primary-foreground text-xs py-0.5 px-1.5 transition-colors"
                         onDoubleClick={() => handleInsert(`[${col}]`)}
                       >
                         {col}
@@ -303,17 +303,18 @@ export function CalculatedFieldsManager({ trigger }: CalculatedFieldsManagerProp
 
                 {/* Built-in Functions */}
                 <div>
-                  <h5 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Functions (Click to insert)</h5>
+                  <h5 className="catalogue-label text-muted-foreground mb-2">Functions (Click to insert)</h5>
                   <div className="space-y-2">
                     {functionsList.map(func => (
-                      <div 
+                      <button
+                        type="button"
                         key={func.name}
-                        className="text-[11px] p-1.5 rounded hover:bg-secondary/40 cursor-pointer transition-colors border border-transparent hover:border-white/5"
+                        className="block w-full text-left text-xs p-1.5 rounded hover:bg-accent cursor-pointer transition-colors border border-transparent hover:border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         onClick={() => handleInsert(func.insert)}
                       >
-                        <div className="font-mono font-bold text-primary">{func.name}</div>
-                        <div className="text-[10px] text-muted-foreground">{func.desc}</div>
-                      </div>
+                        <span className="block font-mono font-bold text-primary-ink">{func.name}</span>
+                        <span className="block text-xs text-muted-foreground">{func.desc}</span>
+                      </button>
                     ))}
                   </div>
                 </div>

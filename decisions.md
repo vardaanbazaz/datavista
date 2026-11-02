@@ -2,6 +2,76 @@
 
 Newest first. Entries marked `Source: inferred` were reconstructed from existing code; their "Why" is a guess and should be corrected by the author.
 
+### 2026-11-01 — Phase B rollout: defaults flipped, roles on stats, ledger Overview (batch 6)
+- **Decision:** `Button` default/premium = engraved oxblood, outline = embossed plate; `Card` = double rule; `DialogContent` ornate by default (`corners={false}` for edge-to-edge content such as the command palette). New `primary-ink` token (dark `#D97A8B`, light `#7C2438`) replaces `text-primary` for text and icons (Main was 1.8:1 on dark). Raw zinc/gray/status-hue literals moved to tokens; status keeps an icon + words, colour is never the only signal (gold included, per the user's answer). `services/stats/columnProfile.ts` gives every numeric column a role (constant / id / year / measure) used by the Overview ledger, Data view column stats and the PDF summary: ID/year columns get count, distinct, min and max (no sum or average), constant columns one line. Overview: one sortable numeric ledger (sticky header, double header rule, count/average/min/max/sum/missing/invalid) and a categorical ledger (chosen over compact tiles after comparing both: `docs/design/phase-b/compare-categories-*.png`). Offline AI summary names the grouping column and drops filler. Charts: HTML legend for grouped/multi-series charts, Y title placed from the measured tick width, chart text and margins scale with Reading comfort, theme-coloured outlier badge. Light chart gold `#8D6300` and forest `#1C5F31` (warmer gold, CVD kept). Column names are never uppercased; tracked capitals only on section labels. jsx-a11y recommended rules are errors.
+- **Why:** User review of phase A and the phase B brief.
+- **Alternatives considered:** Compact category tiles (kept as a screenshot only); per-call-site `text-primary` fixes (86 sites, a token is one place).
+- **Tradeoff accepted:** Ledger adds a Count column beyond the requested list (needed for ID/constant rows). Chart colours still repeat after 5 groups (legend says so).
+- **Source:** made-now
+
+### 2026-11-01 — `cn` knows the custom type scale (tailwind-merge config)
+- **Decision:** `src/shared/lib/utils.ts` builds `cn` from `extendTailwindMerge` with a `font-size` group for `text-display|h1|h2|h3|body|caption|kpi|dataTable`; `src/shared/lib/__tests__/cn.test.ts` covers it.
+- **Why:** Found while checking the phase A dialogs: tailwind-merge read `text-h2` as a text colour, so `cn("text-h2", "text-destructive")` silently dropped the size (e.g. `CardTitle` with a colour class) and `cn("text-lg", "text-h1")` kept both sizes.
+- **Alternatives considered:** Avoiding the combinations at call sites — rejected: the bug is in the merge, every caller would have to know.
+- **Tradeoff accepted:** Pre-existing elements on other pages that combined a custom size with a colour now get the size they were written with (slightly larger titles in places).
+- **Source:** made-now
+
+### 2026-11-01 — Chart marks draw at full opacity
+- **Decision:** `ChartVisualization` bar, pie and point marks default to opacity 1 (was 0.85 / 0.75); cross-filter dimming of unselected marks is unchanged; forecast points stay 0.9.
+- **Why:** At 0.85 on the plot background three palette slots composited below 3:1 (light ink-blue 2.70, light oxblood 2.78, dark oxblood 2.75); the validated contrast only holds for the colour as drawn.
+- **Alternatives considered:** Darker palette steps — they would fall out of the lightness band or lose CVD separation.
+- **Tradeoff accepted:** The selected-vs-default difference on a cross-filter is now carried by dimming the others only.
+- **Source:** made-now
+
+### 2026-11-01 — Chart categorical palette: ink-blue, aged gold, mulberry, forest, oxblood (batch 6)
+- **Decision:** `--chart-1..5` per theme, in this fixed order. Light (card `#FBF7EE`, plot background `#F2EADB`): `#4C82C6`, `#8A6E1F`, `#93398E`, `#036639`, `#C45F6A`. Dark (surface `#1E1814`): `#3986E4`, `#9B7802`, `#B873B2`, `#3FA66B`, `#A64B51`. High-contrast sets reuse them. Found by searching OKLCH steps per hue family with the dataviz skill's `validate_palette.js`: both modes pass lightness band, chroma floor, normal-vision floor and contrast ≥ 3:1; worst adjacent CVD ΔE 8.8 light / 10.0 dark (target ≥ 8), all-pairs 7.4 light / 7.8 dark (6–8 floor band: legal only with a legend or labels), including the wrap-around pair (d3's ordinal scale cycles).
+- **Why:** User direction for a theme palette (aged gold, oxblood, forest, ink-blue, ochre…) that stays colour-blind safe in both themes.
+- **Alternatives considered:** Ink-blue, gold, oxblood, forest, **ochre** — rejected: ochre vs oxblood and ochre vs gold collapse under deuteranopia (all-pairs ΔE 4.0 light, 5.7 dark); no ochre step fixed it inside the lightness band, so mulberry took its slot. Keeping the 2026-09 dataviz default (blue/orange/aqua/yellow/magenta) — rejected by the new direction.
+- **Tradeoff accepted:** Supersedes in part the 2026-09 redesign plan's Decision 4 ("series colour must not reuse Main or gold"): the oxblood and gold series are lighter/darker steps than the UI's Main `#7C2438` and gold `#D4AF37`, but the same families. Awaiting the user's confirmation at the phase A stop. Scatter/bubble (all pairs) need the legend.
+- **Source:** made-now
+
+### 2026-11-01 — Ornament is opt-in in phase A: new variants instead of changing primitives
+- **Decision:** `src/shared/components/ornament/` (`Ornament.Corner(s)`, `Ornament.Fleuron`, `Rule`, `Panel`, `SectionHeading`, `Bookplate`, `Seal`), inline SVG in `currentColor` of `--ornament`, `aria-hidden`, `focusable="false"`, `pointer-events: none`. New `Button` variants `engraved` (embossed oxblood, gilt edge) and `plate` (embossed card), and `DialogContent ornate` (double rule, corners except top-right where the close button sits). `card.tsx`/`dialog.tsx` defaults are unchanged; phase B flips them. "Simple frames" hides every ornament through one attribute (`html[data-frames="simple"]`), not a prop threaded through components. Data areas (category/numeric tiles, chart plots, numbers) get plain borders only.
+- **Why:** User rule: ornament on the frame, data clean; phase A must not restyle other pages yet.
+- **Alternatives considered:** Restyling `Card`/`DialogContent` defaults now — rejected: every page would change in phase A. Icon fonts or raster flourishes — excluded by the brief.
+- **Tradeoff accepted:** Two styles coexist until phase B (old `premium`/`outline` buttons and plain dialogs on other pages).
+- **Source:** made-now
+
+### 2026-11-01 — Reading comfort: text size, high contrast, motion, simple frames, theme in one panel
+- **Decision:** `uiStore.readingComfort` ({textSize default|large|xlarge, highContrast, motion system|reduce|full, simpleFrames}), persisted in localStorage with the other UI prefs; a custom `merge` fills missing fields from `DEFAULT_READING_COMFORT`. `shared/theme/displayPrefs.ts:applyDisplayPrefs` writes the theme class and `data-text-size`/`data-contrast`/`data-motion`/`data-frames` on `<html>` synchronously in `main.tsx` before the first render and on every change. Text size changes the root font size (100% / 118.75% / 137.5% = 16 / 19 / 22 px), so the rem-based type scale and spacing scale together; Overview grids use `repeat(auto-fit, minmax(<rem>, 1fr))` so columns drop as text grows. Reduced motion: CSS (both `prefers-reduced-motion` unless "Allow motion", and `data-motion="reduce"`) plus framer `MotionConfig` (`user`/`always`/`never`). The theme moved into the panel; the sidebar's theme dropdown (`ThemeToggle.tsx`, deleted) became the "Reading comfort and theme" button, keeping `data-tour="header-theme"`; Alt+T still toggles.
+- **Why:** User requirement for older users / poor eyesight. Applying before the first paint avoids a flash of default-size text for the people who need Extra large.
+- **Alternatives considered:** `useEffect` in `ThemeProvider` (old approach) — rejected: flashes. A fifth icon in the sidebar header — rejected: overflows at 390px and at Extra large.
+- **Tradeoff accepted:** framer-motion keeps opacity fades under reduced motion (only movement is removed). Chart SVG text uses fixed px sizes and does not scale with the setting until phase B.
+- **Source:** made-now
+
+### 2026-11-01 — Fonts: Source Serif 4 for UI and body, Cormorant Garamond for display, JetBrains Mono for data; Inter removed
+- **Decision:** Own `@font-face` rules in `src/index.css` pointing at `@fontsource/*/files/*.woff2` (no `.woff`, no unused subsets in `dist/`): Source Serif 4 400 (covers 100–500) and 600 (600–900), latin + latin-ext by `unicode-range`; Cormorant Garamond 600 latin (display only, never below 18px); JetBrains Mono 500 (100–600) and 700. The Tailwind key `sans` now resolves to Source Serif 4 so every component switches without a class change; `font-display` is Cormorant. Body text 14 → 16px, captions 11 → 12px tracked capitals. Section labels are tracked capitals (`.catalogue-label`), not `small-caps`. Seals use the 500 mono face so the 700 face is not on the first load.
+- **Why:** User direction (display serif + readable text serif, mono for numbers, offline). Source Serif 4 checked at 1× in dense controls (buttons, inputs, selects, 13–14px): legible, so it is used for UI too, not only prose; only the existing 10px helper texts read poorly (in any face) and go in phase B. fontTools shows the fontsource subsets have no `smcp` feature, so `font-variant: small-caps` would be synthesised.
+- **Alternatives considered:** EB Garamond for display — Cormorant chosen for the engraved, high-contrast look at heading sizes. Libre Baskerville for text — wider and heavier at 13px. Keeping Inter for controls — not needed after the specimen check.
+- **Tradeoff accepted:** Weight ranges map 500 onto the 400 face (no separate medium); serif UI is denser than Inter at equal size. Font bytes on first load 120,176 → 88,128.
+- **Source:** made-now
+
+### 2026-11-01 — Dark Academia tokens: four sets from one hex table, checked by a contrast test
+- **Decision:** `src/index.css` token blocks: `:root` (parchment `#F2EADB`, ivory card `#FBF7EE`, ink-brown `#2A1C13` text, oxblood Main `#7C2438`, bronze `#7D5F14` for gold text), `.dark` (ink `#15100C`, walnut card `#1E1814`, parchment text `#F2E9D8`, Main `#7C2438`, gold `#D4AF37`), `:root[data-contrast="high"]` and `html.dark[data-contrast="high"]`. New `--ornament` token. Values stay HSL (Tailwind `hsl(var(--x) / α)`, chart code uses `hsl(var(--chart-n))`) with the hex in a comment. `src/shared/theme/__tests__/tokens.contrast.test.ts` checks each HSL round-trips to its hex and every text pair ≥ 4.5:1 and UI pair (ring, input border, ornament, chart colours vs card) ≥ 3:1 in all four sets. Dark `--ring` is gold (oxblood on near-black was ~2:1). Tailwind `zinc` and `gray` scales are remapped to the same warm neutrals so pages not yet migrated don't sit cold beside the new shell (supersedes the 2026-09 zinc remap values); phase A files (sidebar, Dashboard shell, Overview, AI summary banner, privacy dialog) use tokens only.
+- **Why:** User direction: evolve Maroon/Black/Gold into Dark Academia, dark + light from one token set, WCAG AA in both and in high contrast. axe only sees rendered text, so non-text pairs need their own check.
+- **Alternatives considered:** Switching tokens to `rgb()` triplets — rejected: chart code and CSS reference `hsl(var(...))`. Leaving gold sparse/AI-only (2026-09 rule) — the new direction uses aged gold for the frame; gold stays off data.
+- **Tradeoff accepted:** Raw `bg-white`/`text-white` literals on other pages are still white until phase B. Active nav and buttons on oxblood rely on text plus the gilt bar, not on oxblood-vs-card contrast (1.8:1).
+- **Source:** made-now
+
+### 2026-11-01 — Accessibility gates: axe-core e2e, jsx-a11y as warnings until phase B
+- **Decision:** `tests/e2e/a11y.spec.ts` (`@axe-core/playwright`, WCAG 2.0/2.1/2.2 A+AA tags) on the empty Overview, Overview with the HR fixture, and the privacy and Reading comfort dialogs, in four themes; fails on any violation and prints `incomplete`. `eslint-plugin-jsx-a11y` recommended rules at `warn` (24 at the start, 22 now: the two `heading-has-content` in `ui/card.tsx`/`ui/alert.tsx` fixed). The sidebar search button's shortcut badge is CSS generated content so its accessible name contains its visible text (WCAG 2.5.3).
+- **Why:** User requirement. `error` would fail `npm run lint` until the remaining 22 (14 in `CommandPalette`) are fixed in phase B.
+- **Alternatives considered:** `aria-hidden` on the `<kbd>` — axe still counts its text; adding the shortcut into the name — axe joins flex children without a space, so it never matched.
+- **Tradeoff accepted:** Lint passes with 22 warnings in phase A.
+- **Source:** made-now
+
+### 2026-11-01 — First-load bench and design screenshots as local Playwright configs
+- **Decision:** `scripts/bench/startup/first-load.spec.ts` (under the existing startup bench config): new browser context per run, CDP `encodedDataLength` per response grouped JS/CSS/font, time to the sidebar and to `document.fonts.ready`, unthrottled and Slow 4G. `scripts/design/` (own config, dev server) writes the review screenshots to `docs/design/<phase>/`; vitest excludes `scripts/design/**`.
+- **Why:** User asked for before/after first-load cost and screenshots per theme; both should be re-runnable for phase B.
+- **Alternatives considered:** Lighthouse — not installed, and the app shell (sidebar) is the milestone asked for.
+- **Tradeoff accepted:** Times are noisy on a loaded machine: compare only runs taken under the same conditions (the phase A report re-measured HEAD in a worktree for that reason).
+- **Source:** made-now
+
 ### 2026-10-29 — CI: build and production smoke run in parallel with checks and e2e; deploy ships only that artifact
 - **Decision:** `deploy.yml` has four jobs. `checks`, `e2e` and `build` run in parallel; `build` does `npm ci` → build → Playwright Chromium → production smoke gate → `upload-pages-artifact`. `deploy` (`needs: [checks, e2e, build]`) has one step, `actions/deploy-pages`: no checkout, no rebuild, so the bundle the smoke gate checked is the one that ships.
 - **Why:** User request: the run was ~6m15s because the build and smoke waited behind e2e. Now wall-clock is roughly the slowest of the three jobs (e2e) plus the deploy step. Estimate: ~4–4.5 min, not yet measured on GitHub.

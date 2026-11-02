@@ -33,10 +33,10 @@ export function CreateTemplateModal({ isOpen, onClose, onSave }: CreateTemplateM
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md glass border-white/20 shadow-2xl p-6">
+      <DialogContent className="max-w-md glass border-border shadow-2xl p-6">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold flex items-center gap-2">
-            <LayoutTemplate className="h-5 w-5 text-primary" />
+            <LayoutTemplate className="h-5 w-5 text-primary-ink" />
             Save Dashboard as Template
           </DialogTitle>
           <DialogDescription>
@@ -52,7 +52,7 @@ export function CreateTemplateModal({ isOpen, onClose, onSave }: CreateTemplateM
               placeholder="e.g. Sales & Performance Executive Template"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              autoFocus
+             
               className="bg-background/50"
             />
           </div>

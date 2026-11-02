@@ -9,7 +9,7 @@ import { useDashboardStore } from "@/features/dashboards/store/dashboardStore";
 import { DashboardGrid } from "@/features/dashboards/components/DashboardGrid";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select";
 import { Button } from "@/shared/components/ui/button";
-import { BarChart3, Database, Filter, PieChart, TrendingUp, Users, LayoutDashboard, Calendar, AlertCircle, Plus, LayoutTemplate, RotateCcw, RotateCw, Camera } from "lucide-react";
+import { Database, Filter, PieChart, TrendingUp, Users, LayoutDashboard, Calendar, AlertCircle, Plus, LayoutTemplate, RotateCcw, RotateCw, Camera } from "lucide-react";
 import { GlobalFilterBar } from "@/features/dashboards/components/GlobalFilterBar";
 import { ExecutiveSummaryPanel } from "@/features/ai/components/ExecutiveSummaryPanel";
 import { DrillThroughModal } from "@/features/dashboards/components/DrillThroughModal";
@@ -21,9 +21,13 @@ import { SnapshotManager } from "@/features/dashboards/components/SnapshotManage
 import { useTemplateStore } from "@/features/dashboards/store/templateStore";
 import { templateEngine } from "@/features/dashboards/services/templateEngine";
 import { getEffectiveColumnTypes } from "@/shared/utils/columnType";
-import { summarizeCategoricalColumns, summarizeNumericColumns } from "@/shared/services/stats/columnSummary";
+import { summarizeCategoricalColumns } from "@/shared/services/stats/columnSummary";
+import { profileNumericColumns } from "@/shared/services/stats/columnProfile";
+import { NumericLedger } from "./NumericLedger";
+import { CategoryLedger } from "./CategorySummary";
 import { useUiStore } from "@/store/uiStore";
 import { Hint } from "@/shared/components/Hint";
+import { Panel, Rule, SectionHeading, Bookplate } from "@/shared/components/ornament";
 import { modKey } from "@/shared/lib/platform";
 
 export function DashboardSummary() {
@@ -94,14 +98,10 @@ export function DashboardSummary() {
     // Real count/sum/avg/min/max of the valid numbers in the rows shown (shared numeric rule).
     // No metadata shortcut: metadata has no valid-number count, and rowCount − missing
     // counted junk strings, which inflated count and sum.
-    const numericStats = summarizeNumericColumns(filteredData, numericColumns).map(s => ({
-      column: s.column,
-      sum: s.sum,
-      avg: Math.round(s.mean * 100) / 100,
-      max: s.max,
-      min: s.min,
-      count: s.count
-    }));
+    // Ledger rows: count/sum/mean/min/max of the valid numbers in the rows shown (shared
+    // numeric rule, via summarizeNumericColumns), plus missing/invalid and the column's
+    // display role (ID/year: no sum or average; constant: one line).
+    const numericStats = profileNumericColumns(filteredData, numericColumns, dataset);
 
     const categoryStats = summarizeCategoricalColumns(filteredData, categoricalColumns, dataset);
 
@@ -148,16 +148,14 @@ export function DashboardSummary() {
 
   if (!insights) {
     return (
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="text-center py-12"
+        className="py-12"
       >
-        <div className="w-16 h-16 rounded-2xl bg-muted/40 flex items-center justify-center mx-auto mb-4">
-          <Database className="w-8 h-8 text-muted-foreground" />
-        </div>
-        <h3 className="text-lg font-semibold mb-2">No Data Loaded</h3>
-        <p className="text-muted-foreground">Upload a dataset to see your dashboard summary</p>
+        <Bookplate inscription="Overview" title="No Data Loaded" emblem={<Database aria-hidden />}>
+          Upload a dataset to see your dashboard summary
+        </Bookplate>
       </motion.div>
     );
   }
@@ -167,21 +165,25 @@ export function DashboardSummary() {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="space-y-6"
+      className="flex flex-col gap-6"
     >
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-        <div className="flex items-center gap-3 bg-transparent">
+        <div className="flex items-center gap-3 min-w-0">
           {activeDashboard ? (
-            <LayoutDashboard className="h-6 w-6 text-muted-foreground" />
+            <LayoutDashboard className="hidden sm:block h-6 w-6 shrink-0 text-ornament" aria-hidden />
           ) : (
-            <TrendingUp className="h-6 w-6 text-muted-foreground" />
+            <TrendingUp className="hidden sm:block h-6 w-6 shrink-0 text-ornament" aria-hidden />
           )}
-          <div className="bg-transparent">
-            <h2 className="text-h1 text-transparent bg-clip-text bg-gradient-to-r from-foreground to-muted-foreground">
-              {activeDashboard ? activeDashboard.name : "Dashboard Overview"}
-            </h2>
+          <div className="min-w-0">
+            <SectionHeading
+              numeral="I"
+              label={activeDashboard ? "Dashboard" : "Overview"}
+              title={activeDashboard ? activeDashboard.name : "Dashboard Overview"}
+              level={2}
+              className="[&_h2]:text-h1"
+            />
             {activeDashboard ? (
-              <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
+              <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <Calendar className="h-3 w-3" />
                   Created {new Date(activeDashboard.createdAt).toLocaleDateString()}
@@ -192,7 +194,7 @@ export function DashboardSummary() {
                 </span>
               </div>
             ) : (
-              <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">
+              <p className="hidden sm:block text-body text-muted-foreground mt-0.5">
                 Executive summary and interactive analytics
               </p>
             )}
@@ -201,12 +203,12 @@ export function DashboardSummary() {
 
         <div className="flex items-center gap-3 flex-wrap">
           {/* Undo/Redo & Snapshot Toolbar Controls */}
-          <div className="flex items-center gap-1.5 border-r border-gray-200 dark:border-zinc-800 pr-3 mr-1">
+          <div className="flex items-center gap-1.5 border-r border-border pr-3 mr-1">
             <Hint label="Undo last change" disabledReason="nothing to undo yet" shortcut={[modKey, "Z"]}>
               <Button
-                variant="outline"
                 size="icon"
-                className="h-8 w-8 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 hover:bg-gray-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300"
+                variant="plate"
+                className="h-9 w-9"
                 onClick={undo}
                 disabled={past.length === 0}
               >
@@ -215,9 +217,9 @@ export function DashboardSummary() {
             </Hint>
             <Hint label="Redo last undone change" disabledReason="nothing to redo" shortcut={[modKey, "⇧", "Z"]}>
               <Button
-                variant="outline"
                 size="icon"
-                className="h-8 w-8 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 hover:bg-gray-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300"
+                variant="plate"
+                className="h-9 w-9"
                 onClick={redo}
                 disabled={future.length === 0}
               >
@@ -225,13 +227,13 @@ export function DashboardSummary() {
               </Button>
             </Hint>
             <Button
-              variant="outline"
+              variant="plate"
               size="sm"
-              className="gap-1.5 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 hover:bg-gray-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 ml-1"
+              className="gap-1.5 ml-1"
               onClick={() => setIsSnapshotManagerOpen(true)}
               title="Manage Workspace Snapshots & History"
             >
-              <Camera className="h-4 w-4 text-zinc-700 dark:text-zinc-300" />
+              <Camera className="h-4 w-4" />
               Snapshots
             </Button>
           </div>
@@ -239,25 +241,25 @@ export function DashboardSummary() {
           {activeDashboard && (
             <>
               <Button
-                variant="outline"
+                variant="plate"
                 size="sm"
-                className="gap-1.5 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 hover:bg-gray-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300"
+                className="gap-1.5"
                 onClick={() => setIsCreateTemplateOpen(true)}
               >
-                <LayoutTemplate className="h-4 w-4 text-zinc-700 dark:text-zinc-300" />
+                <LayoutTemplate className="h-4 w-4" />
                 Save as Template
               </Button>
 
               <Button
-                variant="outline"
+                variant="plate"
                 size="sm"
-                className="gap-1.5 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 hover:bg-gray-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300"
+                className="gap-1.5"
                 onClick={() => {
                   setEditKpi(null);
                   setIsKpiBuilderOpen(true);
                 }}
               >
-                <Plus className="h-4 w-4 text-zinc-700 dark:text-zinc-300" />
+                <Plus className="h-4 w-4" />
                 Add KPI Card
               </Button>
 
@@ -271,7 +273,7 @@ export function DashboardSummary() {
 
           {dashboards.length > 0 && (
             <div className="flex items-center gap-2">
-              <span className="text-sm text-zinc-500 dark:text-zinc-400 whitespace-nowrap">Switch Dashboard:</span>
+              <span id="switch-dashboard-label" className="text-sm text-muted-foreground whitespace-nowrap">Switch Dashboard:</span>
               <Select
                 value={activeDashboardId || "none"}
                 onValueChange={(val) => {
@@ -282,10 +284,10 @@ export function DashboardSummary() {
                   }
                 }}
               >
-                <SelectTrigger className="w-[200px] bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800">
+                <SelectTrigger className="w-[12.5rem] bg-card border border-borderStrong" aria-labelledby="switch-dashboard-label">
                   <SelectValue placeholder="Select dashboard" />
                 </SelectTrigger>
-                <SelectContent className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-200">
+                <SelectContent className="bg-popover border border-border text-popover-foreground">
                   <SelectItem value="none">None (Dataset Overview)</SelectItem>
                   {dashboards.map((d) => (
                     <SelectItem key={d.id} value={d.id}>
@@ -299,25 +301,29 @@ export function DashboardSummary() {
         </div>
       </div>
 
+      <Rule fleuron className="-mt-2 hidden sm:flex" />
+
       {/* AI Executive Summary Banner */}
-      <ExecutiveSummaryPanel />
+      <div className="order-4 lg:order-none">
+        <ExecutiveSummaryPanel />
+      </div>
 
       {/* Key Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="order-2 lg:order-none grid grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(min(100%,15rem),1fr))] gap-3 sm:gap-4">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.1 }}
         >
-          <Card className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-white/5 shadow-none transition-colors">
+          <Card className="frame-double h-full rounded-md bg-card shadow-none transition-colors">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-gray-100 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700/50">
-                  <Database className="h-5 w-5 text-zinc-700 dark:text-zinc-300" />
+                <div className="hidden sm:block p-2 rounded-full border border-ornament/50 text-ornament">
+                  <Database className="h-5 w-5" aria-hidden />
                 </div>
                 <div>
-                  <p className="text-caption uppercase text-textTertiary">Total Rows</p>
-                  <p className="font-mono text-kpi text-zinc-900 dark:text-white">{insights.totalRows.toLocaleString()}</p>
+                  <p className="catalogue-label text-muted-foreground">Total Rows</p>
+                  <p className="font-mono text-kpi text-foreground">{insights.totalRows.toLocaleString()}</p>
                 </div>
               </div>
             </CardContent>
@@ -329,23 +335,18 @@ export function DashboardSummary() {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.2 }}
         >
-          <Card className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-white/5 shadow-none transition-colors">
+          <Card className="frame-double h-full rounded-md bg-card shadow-none transition-colors">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-gray-100 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700/50">
-                  <Users className="h-5 w-5 text-zinc-700 dark:text-zinc-300" />
+                <div className="hidden sm:block p-2 rounded-full border border-ornament/50 text-ornament">
+                  <Users className="h-5 w-5" aria-hidden />
                 </div>
                 <div>
-                  <p className="text-caption uppercase text-textTertiary">Columns</p>
-                  <p className="font-mono text-kpi text-zinc-900 dark:text-white">{insights.totalColumns}</p>
-                  <div className="flex gap-1 mt-1">
-                    <Badge variant="outline" className="text-[10px] border-gray-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400">
-                      {insights.numericColumns} numeric
-                    </Badge>
-                    <Badge variant="outline" className="text-[10px] border-gray-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400">
-                      {insights.categoricalColumns} categorical
-                    </Badge>
-                  </div>
+                  <p className="catalogue-label text-muted-foreground">Columns</p>
+                  <p className="font-mono text-kpi text-foreground">{insights.totalColumns}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {insights.numericColumns} numeric · {insights.categoricalColumns} categorical
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -357,16 +358,16 @@ export function DashboardSummary() {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.3 }}
         >
-          <Card className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-white/5 shadow-none transition-colors">
+          <Card className="frame-double h-full rounded-md bg-card shadow-none transition-colors">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-gray-100 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700/50">
-                  <Filter className="h-5 w-5 text-zinc-700 dark:text-zinc-300" />
+                <div className="hidden sm:block p-2 rounded-full border border-ornament/50 text-ornament">
+                  <Filter className="h-5 w-5" aria-hidden />
                 </div>
                 <div>
-                  <p className="text-caption uppercase text-textTertiary">Filtered Rows</p>
-                  <p className="font-mono text-kpi text-zinc-900 dark:text-white">{insights.filteredRows.toLocaleString()}</p>
-                  <Progress value={insights.filterProgress} className="h-1 mt-2 bg-gray-200 dark:bg-zinc-800" />
+                  <p className="catalogue-label text-muted-foreground">Filtered Rows</p>
+                  <p className="font-mono text-kpi text-foreground">{insights.filteredRows.toLocaleString()}</p>
+                  <Progress value={insights.filterProgress} className="h-1 mt-2 bg-muted" aria-label="Share of rows shown after filters" />
                 </div>
               </div>
             </CardContent>
@@ -378,17 +379,17 @@ export function DashboardSummary() {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.4 }}
         >
-          <Card className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-white/5 shadow-none transition-colors">
+          <Card className="frame-double h-full rounded-md bg-card shadow-none transition-colors">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-gray-100 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700/50">
-                  <PieChart className="h-5 w-5 text-zinc-700 dark:text-zinc-300" />
+                <div className="hidden sm:block p-2 rounded-full border border-ornament/50 text-ornament">
+                  <PieChart className="h-5 w-5" aria-hidden />
                 </div>
                 <div>
-                  <p className="text-caption uppercase text-textTertiary">Charts Created</p>
-                  <p className="font-mono text-kpi text-zinc-900 dark:text-white">{insights.chartsCreated}</p>
+                  <p className="catalogue-label text-muted-foreground">Charts Created</p>
+                  <p className="font-mono text-kpi text-foreground">{insights.chartsCreated}</p>
                   {insights.activeFilterCount > 0 && (
-                    <Badge className="mt-1 text-[10px] bg-gray-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-gray-300 dark:border-zinc-700">
+                    <Badge className="mt-1 text-xs font-medium bg-muted text-foreground border border-border hover:bg-muted">
                       {insights.activeFilterCount} filters active
                     </Badge>
                   )}
@@ -399,100 +400,18 @@ export function DashboardSummary() {
         </motion.div>
       </div>
 
-      {/* Categorical columns: distinct, missing, top values */}
-      {insights.categoryStats.length > 0 && (
-        <Card className="glass" data-testid="category-tiles">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" />
-              Categories
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {insights.categoryStats.map((c) => (
-                <div key={c.column} className="p-4 rounded-lg border border-border/50 bg-muted/30 min-w-0" data-testid={`category-tile-${c.column}`}>
-                  <h4 className="text-caption uppercase text-muted-foreground mb-2 truncate">{c.column}</h4>
-                  <div className="flex justify-between text-body">
-                    <span>Distinct:</span>
-                    <span className="font-mono text-dataTable">{c.distinct.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between text-body">
-                    <span>Missing:</span>
-                    <span className="font-mono text-dataTable">{c.missing.toLocaleString()}</span>
-                  </div>
-                  {c.highCardinality ? (
-                    <p className="mt-2 text-xs text-muted-foreground">Mostly unique values (names, IDs or text): no top list.</p>
-                  ) : (
-                    <ul className="mt-2 space-y-1 text-body" aria-label={`Most common values of ${c.column}`}>
-                      {c.top.map((t) => (
-                        <li key={t.value} className="flex justify-between gap-2">
-                          <span className="truncate" title={t.value}>{t.value}</span>
-                          <span className="font-mono text-dataTable shrink-0">
-                            {t.count.toLocaleString()} · {c.rows ? ((t.count / c.rows) * 100).toFixed(1) : "0.0"}%
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+      {/* Numeric columns ledger. On phones the AI banner moves below it (order), so data is on the first screen. */}
+      {insights.numericStats.length > 0 && (
+        <Panel numeral="II" label="Numeric columns" title="Ledger" className="order-3 lg:order-none">
+          <NumericLedger profiles={insights.numericStats} />
+        </Panel>
       )}
 
-      {/* Numeric Insights */}
-      {insights.numericStats.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-        >
-          <Card className="glass">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5" />
-                Data Insights
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {insights.numericStats.map((stat, index) => (
-                  <motion.div
-                    key={stat.column}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.6 + index * 0.1 }}
-                    className="p-4 rounded-lg border border-border/50 bg-muted/30"
-                  >
-                    <h4 className="text-caption uppercase text-muted-foreground mb-2">
-                      {stat.column}
-                    </h4>
-                    <div className="space-y-2 text-body">
-                      <div className="flex justify-between">
-                        <span>Average:</span>
-                        <span className="font-mono text-dataTable">{stat.avg.toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Maximum:</span>
-                        <span className="font-mono text-dataTable text-success">{stat.max.toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Minimum:</span>
-                        <span className="font-mono text-dataTable text-muted-foreground">{stat.min.toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Total Sum:</span>
-                        <span className="font-mono text-dataTable">{stat.sum.toLocaleString()}</span>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
+      {/* Categorical columns: distinct, missing, top values */}
+      {insights.categoryStats.length > 0 && (
+        <Panel numeral="III" label="Categorical columns" title="Categories" data-testid="category-tiles" className="order-5 lg:order-none">
+          <CategoryLedger stats={insights.categoryStats} />
+        </Panel>
       )}
 
       {/* Dashboard Charts Grid */}
@@ -501,7 +420,7 @@ export function DashboardSummary() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.7 }}
-          className="mt-8 space-y-4"
+          className="order-6 lg:order-none mt-8 space-y-4"
         >
           <div className="border-t pt-6 space-y-4">
             <GlobalFilterBar />

@@ -8,6 +8,7 @@ import { PivotTable } from "./PivotTable";
 import { AlertCircle, Grid3X3, RefreshCw } from "lucide-react";
 import { Dataset } from "@/shared/types";
 import { getEffectiveColumnType } from "@/shared/utils/columnType";
+import { NoDatasetPlate } from "@/shared/components/NoDatasetPlate";
 import { aggregationFlag } from "@/shared/utils/columnRoles";
 
 export const PivotExplorer: React.FC = () => {
@@ -99,15 +100,9 @@ export const PivotExplorer: React.FC = () => {
 
   if (!activeDataset) {
     return (
-      <div className="flex flex-col items-center justify-center h-[60vh] text-center select-none animate-fade-in">
-        <div className="w-16 h-16 rounded-2xl bg-muted/40 flex items-center justify-center mb-4">
-          <Grid3X3 className="w-8 h-8 text-muted-foreground" />
-        </div>
-        <h3 className="text-lg font-semibold mb-1">No Active Dataset</h3>
-        <p className="text-sm text-muted-foreground max-w-sm">
-          Please upload or select a dataset first to begin multidimensional pivot analysis.
-        </p>
-      </div>
+      <NoDatasetPlate view="Pivot Table" emblem={<Grid3X3 aria-hidden />}>
+        Upload or pick a dataset to start a pivot analysis.
+      </NoDatasetPlate>
     );
   }
 
@@ -122,13 +117,13 @@ export const PivotExplorer: React.FC = () => {
           <div className="space-y-4">
             <div className="flex items-center justify-between select-none">
               <div className="flex items-center gap-2">
-                <Grid3X3 className="w-5 h-5 text-primary" />
+                <Grid3X3 className="w-5 h-5 text-primary-ink" />
                 <span className="text-sm font-medium text-muted-foreground">
                   Pivot Grid Visualization
                 </span>
               </div>
               {filteredData.length !== activeDataset.data.length && (
-                <div className="flex items-center gap-1.5 text-xs text-primary font-medium bg-primary/10 px-2.5 py-1 rounded-full border border-primary/20">
+                <div className="flex items-center gap-1.5 text-xs text-primary-ink font-medium bg-primary/10 px-2.5 py-1 rounded-full border border-primary/20">
                   <RefreshCw className="w-3 h-3 animate-spin-slow" />
                   <span>Filtered View Active ({filteredData.length} / {activeDataset.data.length} rows)</span>
                 </div>
@@ -149,14 +144,14 @@ export const PivotExplorer: React.FC = () => {
             <p className="text-xs text-muted-foreground max-w-xs px-4">
               This pivot configuration hit an error while computing results. Try adjusting the value fields or dimensions.
             </p>
-            <p className="text-[11px] text-destructive/70 max-w-sm px-4 mt-2 font-mono break-words">
+            <p className="text-xs text-destructive/70 max-w-sm px-4 mt-2 font-mono break-words">
               {pivotError}
             </p>
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center h-[50vh] border border-dashed border-border rounded-xl bg-muted/5 text-center select-none">
             <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
-              <Grid3X3 className="w-6 h-6 text-primary" />
+              <Grid3X3 className="w-6 h-6 text-primary-ink" />
             </div>
             <h4 className="text-sm font-semibold mb-1">Pivot Table Unconfigured</h4>
             <p className="text-xs text-muted-foreground max-w-xs px-4">

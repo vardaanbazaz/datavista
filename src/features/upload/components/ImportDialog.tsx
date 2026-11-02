@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/shared/components/ui/dialog";
 import { Button } from "@/shared/components/ui/button";
 import { Progress } from "@/shared/components/ui/progress";
@@ -176,12 +176,16 @@ function SheetPicker() {
 
 function IssueReview() {
   const { review, answerReview, cancel } = useImportStore();
+  // The summary replaces the progress view inside an already open dialog, so Radix moves no
+  // focus: put it on the default action ("Keep all rows") once, as the review appears.
+  const keepRef = useRef<HTMLButtonElement>(null);
   if (!review) return null;
   const { issues } = review;
   return (
     <>
       <DialogHeader>
         <DialogTitle>Import summary</DialogTitle>
+        <FocusOnMount target={keepRef} />
         <DialogDescription data-testid="import-summary-counts">
           {review.rowCount.toLocaleString()} rows and {review.columnCount} columns read from {review.fileName}.{" "}
           {issues.rowCount.toLocaleString()} {issues.rowCount === 1 ? "row has" : "rows have"} parse problems.
@@ -198,7 +202,7 @@ function IssueReview() {
         <Button variant="outline" onClick={() => answerReview({ exclude: true })} data-testid="issues-exclude">
           Exclude {issues.rowCount.toLocaleString()} {issues.rowCount === 1 ? "row" : "rows"}
         </Button>
-        <Button autoFocus onClick={() => answerReview({ exclude: false })} data-testid="issues-keep">
+        <Button ref={keepRef} onClick={() => answerReview({ exclude: false })} data-testid="issues-keep">
           Keep all rows
         </Button>
       </DialogFooter>
@@ -257,4 +261,12 @@ export function ImportIssuesDialog({ issues, duplicateRowCount = 0, open, onOpen
       </DialogContent>
     </Dialog>
   );
+}
+
+/** Focuses `target` once when mounted (in place of the autoFocus prop). */
+function FocusOnMount({ target }: { target: React.RefObject<HTMLElement> }) {
+  useEffect(() => {
+    target.current?.focus();
+  }, [target]);
+  return null;
 }

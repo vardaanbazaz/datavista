@@ -10,6 +10,7 @@ import { useFilterStore } from "@/store/filterStore";
 import { useChartStore } from "@/store/chartStore";
 import { exportChartAsPNG, exportChartAsSVG, exportDataAsCSV, generatePDFReport } from "@/shared/utils/exportUtils";
 import { useToast } from "@/shared/hooks/use-toast";
+import { NoDatasetPlate } from "@/shared/components/NoDatasetPlate";
 import { ChartVisualization } from "@/features/charts/components/ChartVisualization";
 
 export function ExportPanel() {
@@ -27,15 +28,9 @@ export function ExportPanel() {
 
   if (!dataset) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-center select-none">
-        <div className="w-16 h-16 rounded-2xl bg-muted/40 flex items-center justify-center mb-4">
-          <Download className="w-8 h-8 text-muted-foreground" />
-        </div>
-        <h3 className="text-lg font-semibold mb-1">No Active Dataset</h3>
-        <p className="text-sm text-muted-foreground max-w-sm">
-          Upload or select a dataset first to start exporting.
-        </p>
-      </div>
+      <NoDatasetPlate view="Export" emblem={<Download aria-hidden />}>
+        Upload or pick a dataset to export charts and data.
+      </NoDatasetPlate>
     );
   }
 
@@ -115,6 +110,8 @@ export function ExportPanel() {
           immediately — no waiting on async layout before it's capturable. */}
       <div
         aria-hidden="true"
+        // inert: nothing in the off-screen capture copies can take focus (axe aria-hidden-focus).
+        {...({ inert: "" } as Record<string, string>)}
         className="fixed top-0 left-0 pointer-events-none"
         style={{ transform: "translateX(-10000px)" }}
       >

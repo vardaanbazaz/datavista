@@ -5,9 +5,11 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ErrorBoundary, FullPageError } from "@/shared/components/ErrorBoundary";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
+import { MotionPreference } from "@/app/providers/MotionPreference";
 
 const App = () => (
   <ErrorBoundary fallback={(props) => <FullPageError {...props} />}>
+    <MotionPreference>
     <TooltipProvider delayDuration={200}>
       <Toaster />
       <Sonner />
@@ -19,6 +21,7 @@ const App = () => (
         </Routes>
       </BrowserRouter>
     </TooltipProvider>
+    </MotionPreference>
   </ErrorBoundary>
 );
 

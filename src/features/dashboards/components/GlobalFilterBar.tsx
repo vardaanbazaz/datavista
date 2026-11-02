@@ -183,7 +183,7 @@ export function GlobalFilterBar() {
     <div className="w-full glass border border-border/50 rounded-xl p-3 bg-card/20 shadow-sm flex flex-wrap items-center justify-between gap-4">
       <div className="flex items-center gap-3 flex-wrap flex-1 min-w-0">
         <div className="flex items-center gap-2 text-muted-foreground font-semibold shrink-0 text-sm">
-          <Filter className="h-4 w-4 text-primary" />
+          <Filter className="h-4 w-4 text-primary-ink" />
           <span>Dashboard Filters:</span>
         </div>
 
@@ -201,14 +201,14 @@ export function GlobalFilterBar() {
                   variant="outline"
                   className={`pl-2 pr-1 py-0.5 text-xs font-medium flex items-center gap-1.5 border rounded-full transition-all hover:bg-muted/50 ${
                     isCrossFilter
-                      ? "border-primary/30 bg-primary/5 text-primary"
+                      ? "border-primary/30 bg-primary/5 text-primary-ink"
                       : "border-accent/40 bg-accent/5 text-accent-foreground"
                   }`}
                 >
                   {isCrossFilter ? (
-                    <Tag className="h-3 w-3 text-primary shrink-0" />
+                    <Tag className="h-3 w-3 text-primary-ink shrink-0" />
                   ) : (
-                    <SlidersHorizontal className="h-3 w-3 text-primary shrink-0" />
+                    <SlidersHorizontal className="h-3 w-3 text-primary-ink shrink-0" />
                   )}
                   <span className="max-w-[200px] truncate" title={filter.label}>
                     {filter.label || `${filter.column} = ${String(filter.value)}`}
@@ -235,10 +235,10 @@ export function GlobalFilterBar() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5 glass">
-              <Bookmark className="h-3.5 w-3.5 text-primary" />
+              <Bookmark className="h-3.5 w-3.5 text-primary-ink" />
               <span>Views</span>
               {savedViews.length > 0 && (
-                <Badge variant="secondary" className="h-4 px-1 text-[10px]">
+                <Badge variant="secondary" className="h-4 px-1 text-xs">
                   {savedViews.length}
                 </Badge>
               )}
@@ -248,7 +248,7 @@ export function GlobalFilterBar() {
             <DropdownMenuLabel className="text-xs">Saved Interactive Views</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => setIsSaveModalOpen(true)} className="text-xs gap-2">
-              <Bookmark className="h-3.5 w-3.5 text-primary" />
+              <Bookmark className="h-3.5 w-3.5 text-primary-ink" />
               <span>Save Current View...</span>
             </DropdownMenuItem>
             <DropdownMenuItem onClick={handleResetToDefault} className="text-xs gap-2">
@@ -263,7 +263,7 @@ export function GlobalFilterBar() {
                 className="text-xs flex items-center justify-between group"
               >
                 <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <Bookmark className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                  <Bookmark className="h-3.5 w-3.5 text-success shrink-0" />
                   <span className="truncate font-medium">{view.name}</span>
                 </div>
                 {/* On touch the button itself is 44px, so its target stays inside this menu
@@ -314,7 +314,7 @@ export function GlobalFilterBar() {
           <PopoverContent className="w-80 p-4 border-border/80 glass shadow-xl" align="end">
             <div className="space-y-4">
               <h4 className="font-semibold text-sm flex items-center gap-1">
-                <Filter className="h-4 w-4 text-primary" />
+                <Filter className="h-4 w-4 text-primary-ink" />
                 Add Linked Filter
               </h4>
 
@@ -330,7 +330,7 @@ export function GlobalFilterBar() {
                       <SelectItem key={col} value={col} className="text-xs">
                         <div className="flex items-center justify-between gap-4 w-full">
                           <span>{col}</span>
-                          <span className="text-[10px] text-muted-foreground font-mono">
+                          <span className="text-xs text-muted-foreground font-mono">
                             {columnTypes[col] || "categorical"}
                           </span>
                         </div>
@@ -423,7 +423,7 @@ export function GlobalFilterBar() {
                       selectedOperator === "between" ? (
                         <div className="space-y-2">
                           <div className="flex flex-col gap-1.5">
-                            <span className="text-[10px] text-muted-foreground font-medium">Start Date</span>
+                            <span className="text-xs text-muted-foreground font-medium">Start Date</span>
                             <Popover>
                               <PopoverTrigger asChild>
                                 <Button
@@ -446,7 +446,7 @@ export function GlobalFilterBar() {
                             </Popover>
                           </div>
                           <div className="flex flex-col gap-1.5">
-                            <span className="text-[10px] text-muted-foreground font-medium">End Date</span>
+                            <span className="text-xs text-muted-foreground font-medium">End Date</span>
                             <Popover>
                               <PopoverTrigger asChild>
                                 <Button

@@ -2,12 +2,13 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { Input } from "@/shared/components/ui/input";
 import { Button } from "@/shared/components/ui/button";
-import { Badge } from "@/shared/components/ui/badge";
+import { Badge, badgeVariants } from "@/shared/components/ui/badge";
+import { cn } from "@/shared/lib/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/components/ui/dialog";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/components/ui/tooltip";
-import { Search, ArrowUpDown, Download, Palette, RefreshCw } from "lucide-react";
+import { Search, ArrowUpDown, Download, Palette, RefreshCw, Table2, AlertTriangle } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Dataset, Query, DataRow, ConditionalFormatRule, DatasetMetadata } from "@/shared/types";
 import { queryEngine } from "@/shared/services/queryEngine";
@@ -20,11 +21,13 @@ import { QueryPerformanceBadge } from "@/features/dashboard/components/QueryPerf
 import { ConditionalFormattingBuilder } from "@/features/dashboards/components/ConditionalFormattingBuilder";
 import { DatasetUpdateModal } from "./DatasetUpdateModal";
 import { getEffectiveColumnType, mightBeCategorical } from "@/shared/utils/columnType";
-import { summarizeNumericColumns } from "@/shared/services/stats/columnSummary";
+import { profileNumericColumns, roleLabel } from "@/shared/services/stats/columnProfile";
+import { Panel } from "@/shared/components/ornament";
 import { useImportStore } from "@/store/importStore";
 import { ImportIssuesDialog } from "@/features/upload/components/ImportDialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/components/ui/popover";
 import { ColumnQualityBadges, DataQualityPanel } from "./DataQualityPanel";
+import { NoDatasetPlate } from "@/shared/components/NoDatasetPlate";
 import { formatCurrency } from "@/shared/utils/numberFormats";
 
 interface DataTableProps {
@@ -224,25 +227,18 @@ export function DataTable({
 
   // Calculate summary statistics for numeric columns
   const summaryStats = useMemo(() => {
-    if (!dataset) return {};
-    const stats: Record<string, { min: number; max: number; mean: number; count: number }> = {};
-    // Computed from the shown rows with the shared numeric rule. The old unfiltered
-    // shortcut took count from metadata (rowCount − missing), which counted junk strings.
+    if (!dataset) return [];
+    // Computed from the shown rows with the shared numeric rule (via profileNumericColumns).
+    // ID/year columns get count/distinct/min/max (no mean); constant columns one line.
     const numericColumns = dataset.columns.filter(col => getEffectiveColumnType(dataset, col) === 'numeric');
-    for (const s of summarizeNumericColumns(filteredData, numericColumns)) {
-      stats[s.column] = { min: s.min, max: s.max, mean: s.mean, count: s.count };
-    }
-    
-    return stats;
+    return profileNumericColumns(filteredData, numericColumns, dataset).filter((p) => p.count > 0);
   }, [dataset, filteredData]);
 
   if (!dataset) {
     return (
-      <div className="text-center py-12">
-        <p className="text-muted-foreground">
-          No dataset selected. Upload data to explore.
-        </p>
-      </div>
+      <NoDatasetPlate view="Data Explorer" emblem={<Table2 aria-hidden />}>
+        Upload or pick a dataset to browse its rows.
+      </NoDatasetPlate>
     );
   }
 
@@ -267,10 +263,10 @@ export function DataTable({
                         variant="outline"
                         className="gap-2 glass border-primary/20 text-foreground hover:bg-primary/5"
                       >
-                        <RefreshCw className="w-4 h-4 text-primary" />
+                        <RefreshCw className="w-4 h-4 text-primary-ink" />
                         Update Version
                         {activeDataset.version && activeDataset.version > 1 && (
-                          <Badge variant="secondary" className="ml-0.5 text-[10px] px-1.5 py-0">
+                          <Badge variant="secondary" className="ml-0.5 text-xs px-1.5 py-0">
                             v{activeDataset.version}
                           </Badge>
                         )}
@@ -300,7 +296,7 @@ export function DataTable({
                     <Palette className="w-4 h-4" />
                     Conditional Formatting
                     {formattingRules.length > 0 && (
-                      <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">
+                      <Badge variant="secondary" className="ml-1 text-xs px-1.5 py-0">
                         {formattingRules.length}
                       </Badge>
                     )}
@@ -328,10 +324,10 @@ export function DataTable({
 
         {/* Conditional Formatting Dialog */}
         <Dialog open={isFormattingOpen} onOpenChange={setIsFormattingOpen}>
-          <DialogContent className="max-w-4xl glass border-white/20 shadow-2xl p-6">
+          <DialogContent className="max-w-4xl glass border-border shadow-2xl p-6">
             <DialogHeader>
               <DialogTitle className="text-h2 flex items-center gap-2">
-                <Palette className="h-5 w-5 text-primary" />
+                <Palette className="h-5 w-5 text-primary-ink" />
                 Data Table Conditional Formatting
               </DialogTitle>
             </DialogHeader>
@@ -359,7 +355,7 @@ export function DataTable({
             {/* Column Filter */}
             <div className="flex gap-2">
               <Select value={filterColumn} onValueChange={setFilterColumn}>
-                <SelectTrigger className="w-48">
+                <SelectTrigger aria-label="Filter by column" className="w-48">
                   <SelectValue placeholder="Filter by column" />
                 </SelectTrigger>
                 <SelectContent>
@@ -387,7 +383,7 @@ export function DataTable({
               setPageSize(value === 'all' ? 'all' : Number(value));
               setCurrentPage(1);
             }}>
-              <SelectTrigger className="w-24">
+              <SelectTrigger aria-label="Rows per page" className="w-24">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -460,27 +456,33 @@ export function DataTable({
       {activeDataset && customDataset === undefined && <DataQualityPanel dataset={activeDataset} />}
 
       {/* Summary Statistics */}
-      {Object.keys(summaryStats).length > 0 && (
-        <Card className="glass">
-          <CardHeader>
-            <CardTitle>Summary Statistics</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {Object.entries(summaryStats).map(([column, stats]) => (
-                <div key={column} className="p-3 bg-muted/50 border border-border rounded-lg" data-testid={`column-stats-${column}`}>
-                  <h4 className="text-caption uppercase text-textTertiary mb-2">{column}</h4>
-                  <div className="space-y-1 text-body font-mono text-dataTable">
-                    <div>Count: {stats.count}</div>
-                    <div>Min: {stats.min.toFixed(2)}</div>
-                    <div>Max: {stats.max.toFixed(2)}</div>
-                    <div>Mean: {stats.mean.toFixed(2)}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+      {summaryStats.length > 0 && (
+        <Panel numeral="II" label="Numeric columns" title="Summary Statistics">
+          <ul className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,15rem),1fr))] gap-3">
+            {summaryStats.map((stats) => {
+              const tag = roleLabel(stats.role);
+              return (
+                <li key={stats.column} className="p-3 bg-background/40 border border-border rounded-sm" data-testid={`column-stats-${stats.column}`}>
+                  <h3 className="font-semibold mb-1 truncate" title={stats.column}>
+                    {stats.column}
+                    {tag && <span className="ml-2 text-xs font-normal text-muted-foreground">{tag}</span>}
+                  </h3>
+                  {stats.role === 'constant' ? (
+                    <p className="font-mono text-dataTable">constant: {stats.min.toLocaleString()}</p>
+                  ) : (
+                    <div className="space-y-0.5 font-mono text-dataTable">
+                      <div>Count: {stats.count}</div>
+                      {stats.distinct !== null && <div>Distinct: {stats.distinct}</div>}
+                      <div>Min: {stats.min.toFixed(2)}</div>
+                      <div>Max: {stats.max.toFixed(2)}</div>
+                      {stats.role === 'measure' && <div>Mean: {stats.mean.toFixed(2)}</div>}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </Panel>
       )}
 
       {/* Data Table */}
@@ -504,33 +506,38 @@ export function DataTable({
                     const dateInfo = colMeta && !overridden && !flagged
                       && (colMeta.inferredDataType === 'date' || colMeta.dateAmbiguity === 'ambiguous-mixed');
 
+                    // A real <button>: it opens a popover (a div with aria-expanded isn't allowed).
+                    // "Might be categorical" is said with an icon and words, not only the gold edge.
                     const badge = (
-                      <Badge
-                        variant="outline"
-                        className={
-                          "ml-2 text-[10px] uppercase font-normal cursor-pointer " +
-                          (flagged
-                            ? "border-tertiary text-tertiary"
+                      <button
+                        type="button"
+                        className={cn(
+                          badgeVariants({ variant: "outline" }),
+                          "ml-2 gap-1 text-xs font-normal cursor-pointer",
+                          flagged
+                            ? "border-tertiary text-foreground"
                             : overridden
-                              ? "border-primary text-primary"
-                              : "border-border text-textTertiary")
-                        }
+                              ? "border-primary text-primary-ink"
+                              : "border-border text-textTertiary"
+                        )}
                       >
+                        {flagged && <AlertTriangle className="h-3 w-3 text-tertiary" aria-hidden />}
                         {effectiveType}
+                        {flagged && <span className="sr-only">, might be categorical</span>}
                         {overridden && " (override)"}
-                      </Badge>
+                      </button>
                     );
 
                     return (
                       <TableHead
                         key={column}
-                        className="bg-popover/95 backdrop-blur-sm text-caption uppercase text-textTertiary py-2"
+                        className="bg-card py-2"
                         aria-sort={sortColumn === column ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
                       >
                         <div className={"flex items-center" + (effectiveType === 'numeric' ? " justify-end" : "")}>
                           <Button
                             variant="ghost"
-                            className="h-auto p-2 justify-start text-caption uppercase text-muted-foreground hover:text-foreground"
+                            className="h-auto p-2 justify-start text-sm font-semibold text-muted-foreground hover:text-foreground"
                             onClick={() => handleSort(column)}
                             aria-label={`Sort by ${column}, currently ${sortColumn === column ? (sortDirection === 'asc' ? 'sorted ascending' : 'sorted descending') : 'unsorted'}`}
                           >

@@ -52,7 +52,7 @@ export function DatasetUpdateModal({
       <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col glass border-border">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
-            <RefreshCw className="h-5 w-5 text-primary" />
+            <RefreshCw className="h-5 w-5 text-primary-ink" />
             Dataset Schema Diffing & Version Upgrade
           </DialogTitle>
           <DialogDescription>
@@ -63,8 +63,8 @@ export function DatasetUpdateModal({
         <ScrollArea className="flex-1 max-h-[450px] pr-2 space-y-4">
           {/* Status Alert Banner */}
           {!diffReport.isBreaking ? (
-            <div className="p-3.5 rounded-lg border border-green-500/40 bg-green-500/10 text-green-700 dark:text-green-300 flex items-start gap-3">
-              <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
+            <div className="p-3.5 rounded-lg border border-success/40 bg-success/10 text-success flex items-start gap-3">
+              <CheckCircle2 className="h-5 w-5 text-success shrink-0 mt-0.5" />
               <div>
                 <h4 className="font-semibold text-sm">Safe to Update</h4>
                 <p className="text-xs opacity-90">
@@ -73,8 +73,8 @@ export function DatasetUpdateModal({
               </div>
             </div>
           ) : (
-            <div className="p-3.5 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300 flex items-start gap-3">
-              <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+            <div className="p-3.5 rounded-lg border border-tertiary/40 bg-tertiary/10 text-tertiary flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-tertiary shrink-0 mt-0.5" />
               <div>
                 <h4 className="font-semibold text-sm">Breaking Changes Detected</h4>
                 <p className="text-xs opacity-90">
@@ -86,7 +86,7 @@ export function DatasetUpdateModal({
 
           {/* Schema Diff Grid */}
           <div className="p-4 rounded-lg border border-border/60 bg-muted/20 space-y-3 mt-4">
-            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+            <h4 className="catalogue-label text-muted-foreground flex items-center gap-1.5">
               <Layers className="h-3.5 w-3.5" /> Schema Comparison Breakdown
             </h4>
 
@@ -109,12 +109,12 @@ export function DatasetUpdateModal({
             {/* Type Changes */}
             {diffReport.typeChanges.length > 0 && (
               <div className="space-y-1.5">
-                <span className="text-xs font-medium text-amber-600 dark:text-amber-400">
+                <span className="text-xs font-medium text-tertiary">
                   Modified Data Types ({diffReport.typeChanges.length}):
                 </span>
                 <div className="flex flex-wrap gap-1.5">
                   {diffReport.typeChanges.map((tc) => (
-                    <Badge key={tc.columnName} variant="outline" className="text-xs border-amber-500/50 text-amber-600 dark:text-amber-300">
+                    <Badge key={tc.columnName} variant="outline" className="text-xs border-tertiary/50 text-tertiary">
                       {tc.columnName}: {tc.oldType} &rarr; {tc.newType}
                     </Badge>
                   ))}
@@ -125,12 +125,12 @@ export function DatasetUpdateModal({
             {/* Added Columns */}
             {diffReport.addedColumns.length > 0 && (
               <div className="space-y-1.5">
-                <span className="text-xs font-medium text-green-600 dark:text-green-400">
+                <span className="text-xs font-medium text-success">
                   New Columns Added ({diffReport.addedColumns.length}):
                 </span>
                 <div className="flex flex-wrap gap-1.5">
                   {diffReport.addedColumns.map((col) => (
-                    <Badge key={col} variant="secondary" className="text-xs bg-green-500/10 text-green-700 dark:text-green-300 border-green-500/30">
+                    <Badge key={col} variant="secondary" className="text-xs bg-success/10 text-success border-success/30">
                       +{col}
                     </Badge>
                   ))}
@@ -150,7 +150,7 @@ export function DatasetUpdateModal({
           {/* Affected Charts Section */}
           {diffReport.affectedCharts.length > 0 && (
             <div className="space-y-2 pt-2">
-              <h4 className="text-xs font-semibold text-destructive uppercase tracking-wider flex items-center gap-1.5">
+              <h4 className="catalogue-label text-destructive flex items-center gap-1.5">
                 <AlertCircle className="h-4 w-4" /> Affected Dashboard Charts ({diffReport.affectedCharts.length})
               </h4>
               <div className="space-y-2">

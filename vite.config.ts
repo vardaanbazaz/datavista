@@ -80,7 +80,7 @@ export default defineConfig(() => ({
     environment: "node",
     // In-memory IndexedDB for persistence tests; must load before Dexie reads the globals.
     setupFiles: ["fake-indexeddb/auto"],
-    exclude: ['**/node_modules/**', '**/dist/**', 'tests/e2e/**', 'tests/smoke/**', 'tests/bigfiles/**', 'scripts/bench/startup/**']
+    exclude: ['**/node_modules/**', '**/dist/**', 'tests/e2e/**', 'tests/smoke/**', 'tests/bigfiles/**', 'scripts/bench/startup/**', 'scripts/design/**']
   },
 }));
 

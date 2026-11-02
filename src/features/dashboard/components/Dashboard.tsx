@@ -6,6 +6,9 @@ import { MainContent } from "@/app/layout/MainContent";
 import { FileUpload } from "@/features/upload/components/FileUpload";
 import { ImportDialog } from "@/features/upload/components/ImportDialog";
 import { DataPrivacyDialog } from "@/features/privacy/components/DataPrivacyDialog";
+import { ReadingComfortPanel } from "@/features/settings/components/ReadingComfortPanel";
+import { Bookplate, SectionHeading } from "@/shared/components/ornament";
+import { NoDatasetPlate } from "@/shared/components/NoDatasetPlate";
 import { ChartBuilder } from "@/features/charts/components/ChartBuilder";
 import { DataTable } from "@/features/datasets/components/DataTable";
 import { FilterPanel } from "@/features/filters/components/FilterPanel";
@@ -152,7 +155,7 @@ export function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-zinc-950 flex flex-col lg:flex-row text-zinc-900 dark:text-zinc-100 transition-colors">
+    <div className="min-h-screen bg-background text-foreground flex flex-col lg:flex-row transition-colors">
       <Sidebar
         onOpenSearch={() => {
           setSearchInitialQuery(undefined);
@@ -181,84 +184,52 @@ export function Dashboard() {
             {activeDataset ? (
               <DashboardSummary />
             ) : (
-              <div className="max-w-4xl mx-auto text-center">
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.2, duration: 0.5 }}
-                  className="mb-12"
+              // Empty workspace: the ex-libris bookplate (batch 6 empty-state style).
+              <div className="mx-auto max-w-4xl space-y-8">
+                <Bookplate
+                  inscription="Ex libris · DataVista"
+                  title="DataVista Dashboard"
+                  level={1}
+                  emblem={<BarChart3 aria-hidden />}
+                  data-testid="overview-empty"
+                  actions={
+                    <>
+                      <Button
+                        data-testid="sample-data-button"
+                        onClick={loadSampleData}
+                        variant="engraved"
+                        size="lg"
+                        className="text-base px-8"
+                      >
+                        Try with Sample Data
+                      </Button>
+                      <Button
+                        onClick={() => setActiveView('upload')}
+                        variant="plate"
+                        size="lg"
+                        className="text-base px-8"
+                      >
+                        Upload Your Data
+                      </Button>
+                    </>
+                  }
                 >
-                  <div className="w-20 h-20 bg-primary/10 border border-primary/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                    <BarChart3 className="w-10 h-10 text-primary" />
-                  </div>
-                  <h1 className="text-5xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-foreground to-muted-foreground">
-                    DataVista Dashboard
-                  </h1>
-                  <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-                    Transform your data into beautiful, interactive visualizations with professional-grade analytics tools
-                  </p>
-                </motion.div>
+                  Transform your data into clear, interactive visualizations with professional-grade analytics tools.
+                </Bookplate>
 
-                <motion.div
-                  initial={{ opacity: 0, y: 30 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.4, duration: 0.5 }}
-                  className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12"
-                >
-                  <div className="glass p-6 rounded-xl text-center hover:shadow-md transition-all duration-300">
-                    <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                    <h3 className="text-lg font-semibold mb-2">Import Data</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Upload CSV, TSV, or XLSX files to get started
-                    </p>
-                  </div>
-
-                  <div className="glass p-6 rounded-xl text-center hover:shadow-md transition-all duration-300">
-                    <Filter className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                    <h3 className="text-lg font-semibold mb-2">Smart Filtering</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Advanced filters with real-time data grouping
-                    </p>
-                  </div>
-
-                  <div className="glass p-6 rounded-xl text-center hover:shadow-md transition-all duration-300">
-                    <BarChart3 className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                    <h3 className="text-lg font-semibold mb-2">8 Chart Types</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Create stunning visualizations with our chart library
-                    </p>
-                  </div>
-                </motion.div>
-
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.6, duration: 0.5 }}
-                  className="flex flex-col sm:flex-row gap-4 justify-center"
-                >
-                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                    <Button 
-                      data-testid="sample-data-button"
-                      onClick={loadSampleData} 
-                      variant="premium" 
-                      size="lg"
-                      className="text-lg px-8"
-                    >
-                      Try with Sample Data ✨
-                    </Button>
-                  </motion.div>
-                  
-                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                    <Button 
-                      onClick={() => setActiveView('upload')} 
-                      variant="outline" 
-                      size="lg"
-                      className="text-lg px-8"
-                    >
-                      Upload Your Data
-                    </Button>
-                  </motion.div>
-                </motion.div>
+                <ul className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                  {[
+                    { icon: Upload, title: "Import Data", text: "Upload CSV, TSV, or XLSX files to get started" },
+                    { icon: Filter, title: "Smart Filtering", text: "Advanced filters with real-time data grouping" },
+                    { icon: BarChart3, title: "8 Chart Types", text: "Create clear visualizations with our chart library" },
+                  ].map(({ icon: Icon, title, text }) => (
+                    <li key={title} className="frame-double rounded-md bg-card p-6 text-center">
+                      <Icon className="mx-auto mb-3 h-8 w-8 text-ornament" aria-hidden />
+                      <h2 className="font-display text-h2">{title}</h2>
+                      <p className="mt-1 text-sm text-muted-foreground">{text}</p>
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
           </motion.div>
@@ -271,27 +242,15 @@ export function Dashboard() {
             transition={{ duration: 0.5 }}
             className="max-w-2xl mx-auto"
           >
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2, duration: 0.5 }}
-              className="text-center mb-8"
-            >
-              <h1 className="text-4xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-zinc-900 to-zinc-600 dark:from-white dark:to-zinc-400">
-                Welcome to DataVista
-              </h1>
-              <p className="text-xl text-zinc-500 dark:text-zinc-400 mb-6">
-                Upload your data and create stunning visualizations
-              </p>
-              <motion.div
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <Button onClick={loadSampleData} variant="outline" className="mb-6">
-                  Try with Sample Data
-                </Button>
-              </motion.div>
-            </motion.div>
+            <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <SectionHeading numeral="II" label="Upload Data" title="Add a dataset" className="[&_h2]:text-h1" />
+                <p className="mt-1 text-body text-muted-foreground">CSV, TSV or XLSX, read and kept in this browser.</p>
+              </div>
+              <Button onClick={loadSampleData} variant="outline">
+                Try with Sample Data
+              </Button>
+            </div>
             <FileUpload />
           </motion.div>
         )}
@@ -307,9 +266,9 @@ export function Dashboard() {
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.1, duration: 0.4 }}
-              className="flex items-center justify-between"
+              className="flex flex-wrap items-end justify-between gap-3"
             >
-              <h2 className="text-h1">Data Filters</h2>
+              <SectionHeading numeral="III" label="Filters" title="Data Filters" className="[&_h2]:text-h1" />
               <div className="flex gap-2">
                 <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                   <Button 
@@ -345,9 +304,9 @@ export function Dashboard() {
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.1, duration: 0.4 }}
-              className="flex items-center justify-between"
+              className="flex flex-wrap items-end justify-between gap-3"
             >
-              <h2 className="text-h1">Chart Builder</h2>
+              <SectionHeading numeral="IV" label="Charts" title="Chart Builder" className="[&_h2]:text-h1" />
               <div className="flex gap-2">
                 {!activeDataset && (
                   <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
@@ -378,49 +337,38 @@ export function Dashboard() {
                   <>
                     <ChartBuilder />
                     <div className="mt-8">
-                      <h3 className="text-h2 mb-4">Your Charts</h3>
+                      <h3 className="font-display text-h2 font-semibold mb-4">Your Charts</h3>
                       <ChartGrid />
                     </div>
                   </>
                 ) : (
-                  <motion.div 
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="text-center py-12"
-                  >
-                    <p className="text-muted-foreground">
-                      No data matches your current filters. Please adjust your filters.
-                    </p>
-                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                      <Button 
-                        variant="outline" 
-                        onClick={() => setActiveView('filters')}
-                        className="mt-4"
-                      >
+                  <Bookplate
+                    inscription="Charts"
+                    title="No rows match the filters"
+                    level={3}
+                    emblem={<Filter aria-hidden />}
+                    actions={
+                      <Button variant="outline" onClick={() => setActiveView('filters')}>
                         Adjust Filters
                       </Button>
-                    </motion.div>
-                  </motion.div>
+                    }
+                  >
+                    Every row is filtered out. Change or clear the filters to chart the data.
+                  </Bookplate>
                 )}
               </>
             ) : (
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="text-center py-12"
-              >
-                <p className="text-muted-foreground">
-                  Please upload a dataset first to start creating charts
-                </p>
-              </motion.div>
+              <NoDatasetPlate view="Charts" emblem={<BarChart3 aria-hidden />}>
+                Upload or pick a dataset to build charts.
+              </NoDatasetPlate>
             )}
           </motion.div>
         )}
 
         {!isLoading && activeView === 'data' && (
           <div className="space-y-6 animate-fade-in">
-            <div className="flex items-center justify-between">
-              <h2 className="text-h1">Data Explorer</h2>
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <SectionHeading numeral="V" label="Data Explorer" title="Data Explorer" className="[&_h2]:text-h1" />
               {activeDataset && (
                 <Button 
                   variant="outline" 
@@ -436,8 +384,8 @@ export function Dashboard() {
 
         {!isLoading && activeView === 'pivot' && (
           <div className="space-y-6 animate-fade-in w-full">
-            <div className="flex items-center justify-between">
-              <h2 className="text-h1">Pivot Analyzer</h2>
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <SectionHeading numeral="VI" label="Pivot Table" title="Pivot Analyzer" className="[&_h2]:text-h1" />
               {activeDataset && (
                 <Button 
                   variant="outline" 
@@ -457,8 +405,8 @@ export function Dashboard() {
 
         {!isLoading && activeView === 'stats' && (
           <div className="space-y-6 animate-fade-in w-full">
-            <div className="flex items-center justify-between">
-              <h2 className="text-h1">Statistical Summary</h2>
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <SectionHeading numeral="VII" label="Statistics" title="Statistical Summary" className="[&_h2]:text-h1" />
               {activeDataset && (
                 <Button 
                   variant="outline" 
@@ -478,8 +426,8 @@ export function Dashboard() {
 
         {!isLoading && activeView === 'window-builder' && (
           <div className="space-y-6 animate-fade-in w-full">
-            <div className="flex items-center justify-between">
-              <h2 className="text-h1">Window & Ranking Builder</h2>
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <SectionHeading numeral="VIII" label="Window Functions" title="Window & Ranking Builder" className="[&_h2]:text-h1" />
               {activeDataset && (
                 <Button 
                   variant="outline" 
@@ -519,6 +467,7 @@ export function Dashboard() {
       />
       <ImportDialog />
       <DataPrivacyDialog />
+      <ReadingComfortPanel />
     </div>
   );
 }

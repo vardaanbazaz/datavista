@@ -42,11 +42,11 @@ export function DrillThroughModal() {
       <DialogContent className="max-w-6xl w-11/12 max-h-[90vh] flex flex-col p-6 overflow-hidden border-border bg-background shadow-2xl glass">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2 text-xl font-bold">
-            <Database className="h-5 w-5 text-primary animate-pulse" />
+            <Database className="h-5 w-5 text-primary-ink animate-pulse" />
             <span>{title}</span>
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
-            Showing up to <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">{drillThroughData.length}</Badge> raw records matching the selected data point.
+            Showing up to <Badge variant="secondary" className="px-1.5 py-0 text-xs">{drillThroughData.length}</Badge> raw records matching the selected data point.
           </DialogDescription>
         </DialogHeader>
 

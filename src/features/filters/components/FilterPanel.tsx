@@ -18,6 +18,7 @@ import { queryEngine } from "@/shared/services/queryEngine";
 import { useFilterStore } from "@/store/filterStore";
 import { useDatasetStore } from "@/store/datasetStore";
 import { buildFilterQuery } from "@/features/dashboards/store/dashboardStore";
+import { NoDatasetPlate } from "@/shared/components/NoDatasetPlate";
 import { columnsOfType, getEffectiveColumnType } from "@/shared/utils/columnType";
 
 export function FilterPanel() {
@@ -52,15 +53,9 @@ export function FilterPanel() {
 
   if (!dataset) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-center select-none">
-        <div className="w-16 h-16 rounded-2xl bg-muted/40 flex items-center justify-center mb-4">
-          <Filter className="w-8 h-8 text-muted-foreground" />
-        </div>
-        <h3 className="text-lg font-semibold mb-1">No Active Dataset</h3>
-        <p className="text-sm text-muted-foreground max-w-sm">
-          Upload or select a dataset first to start filtering.
-        </p>
-      </div>
+      <NoDatasetPlate view="Filters" emblem={<Filter aria-hidden />}>
+        Upload or pick a dataset to start filtering.
+      </NoDatasetPlate>
     );
   }
 
@@ -400,7 +395,7 @@ export function FilterPanel() {
                   groupByColumn: value === 'none' ? undefined : value
                 }))}
               >
-                <SelectTrigger>
+                <SelectTrigger aria-label="Group by column">
                   <SelectValue placeholder="Select column" />
                 </SelectTrigger>
                 <SelectContent>
@@ -419,7 +414,7 @@ export function FilterPanel() {
                     groupByPeriod: value as 'day' | 'month' | 'year'
                   }))}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger aria-label="Group dates by period">
                     <SelectValue placeholder="Select period" />
                   </SelectTrigger>
                   <SelectContent>

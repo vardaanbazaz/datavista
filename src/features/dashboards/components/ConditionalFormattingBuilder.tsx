@@ -19,28 +19,28 @@ interface ConditionalFormattingBuilderProps {
 const PRESET_SWATCHES: Array<{ label: string; style: FormattingStyle; badgeClass: string }> = [
   {
     label: "Danger Red",
-    style: { textColor: "#ef4444", backgroundColor: "#fef2f2", fill: "#ef4444" },
-    badgeClass: "bg-red-100 text-red-700 border-red-200 hover:bg-red-200"
+    style: { textColor: "#A8261E", backgroundColor: "#F6E3E0", fill: "#A8261E" },
+    badgeClass: "bg-destructive/10 text-foreground border-destructive/50 hover:bg-destructive/20"
   },
   {
     label: "Success Green",
-    style: { textColor: "#10b981", backgroundColor: "#ecfdf5", fill: "#10b981" },
-    badgeClass: "bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-200"
+    style: { textColor: "#2E6B3A", backgroundColor: "#E4EFE2", fill: "#2E6B3A" },
+    badgeClass: "bg-success/10 text-foreground border-success/50 hover:bg-success/20"
   },
   {
     label: "Warning Yellow",
-    style: { textColor: "#f59e0b", backgroundColor: "#fffbeb", fill: "#f59e0b" },
-    badgeClass: "bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-200"
+    style: { textColor: "#8D6300", backgroundColor: "#F5EBD3", fill: "#8D6300" },
+    badgeClass: "bg-tertiary/10 text-foreground border-tertiary/50 hover:bg-tertiary/20"
   },
   {
     label: "Info Blue",
-    style: { textColor: "#3b82f6", backgroundColor: "#eff6ff", fill: "#3b82f6" },
-    badgeClass: "bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200"
+    style: { textColor: "#2F5F9E", backgroundColor: "#E6EEF8", fill: "#2F5F9E" },
+    badgeClass: "bg-primary/10 text-foreground border-primary/50 hover:bg-primary/20"
   },
   {
     label: "Purple Accent",
-    style: { textColor: "#8b5cf6", backgroundColor: "#f3e8ff", fill: "#8b5cf6" },
-    badgeClass: "bg-purple-100 text-purple-700 border-purple-200 hover:bg-purple-200"
+    style: { textColor: "#93398E", backgroundColor: "#F3E5F2", fill: "#93398E" },
+    badgeClass: "bg-primary/10 text-foreground border-primary/50 hover:bg-primary/20"
   }
 ];
 
@@ -60,9 +60,9 @@ export function ConditionalFormattingBuilder({
       targetColumn: "",
       conditionExpression: availableColumns.length > 0 ? `${availableColumns[0]} < 0` : "value < 0",
       styles: {
-        textColor: "#ef4444",
-        backgroundColor: "#fef2f2",
-        fill: "#ef4444"
+        textColor: "#A8261E",
+        backgroundColor: "#F6E3E0",
+        fill: "#A8261E"
       }
     };
     onChange([...rules, newRule]);
@@ -114,7 +114,7 @@ export function ConditionalFormattingBuilder({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Palette className="h-5 w-5 text-primary" />
+          <Palette className="h-5 w-5 text-primary-ink" />
           <h3 className="text-lg font-semibold">{title}</h3>
         </div>
         <Button onClick={handleAddRule} size="sm" className="gap-2">
@@ -137,7 +137,7 @@ export function ConditionalFormattingBuilder({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Rules List Column */}
           <div className="space-y-2 border-r pr-4">
-            <Label className="text-xs font-semibold uppercase text-muted-foreground">
+            <Label className="text-sm font-semibold text-foreground">
               Rules ({rules.length})
             </Label>
             <div className="space-y-2 max-h-[350px] overflow-y-auto pr-1">
@@ -146,24 +146,29 @@ export function ConditionalFormattingBuilder({
                 return (
                   <div
                     key={rule.id}
-                    onClick={() => setActiveRuleId(rule.id)}
-                    className={`p-3 rounded-lg border text-sm cursor-pointer transition-all flex items-center justify-between gap-2 ${
+                    className={`p-3 rounded-lg border text-sm transition-all flex items-center justify-between gap-2 ${
                       isActive
                         ? "border-primary bg-primary/10 shadow-sm"
                         : "hover:bg-accent/50 border-border"
                     }`}
                   >
-                    <div className="min-w-0 flex-1">
+                    {/* Selecting a rule is a real button (keyboard, screen readers); delete stays separate. */}
+                    <button
+                      type="button"
+                      onClick={() => setActiveRuleId(rule.id)}
+                      aria-pressed={isActive}
+                      className="min-w-0 flex-1 text-left rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-xs text-muted-foreground">
                           #{idx + 1}
                         </span>
                         {rule.targetColumn ? (
-                          <Badge variant="outline" className="text-[10px] px-1 py-0 truncate">
+                          <Badge variant="outline" className="text-xs px-1 py-0 truncate">
                             {rule.targetColumn}
                           </Badge>
                         ) : (
-                          <Badge variant="secondary" className="text-[10px] px-1 py-0">
+                          <Badge variant="secondary" className="text-xs px-1 py-0">
                             All Columns
                           </Badge>
                         )}
@@ -171,12 +176,12 @@ export function ConditionalFormattingBuilder({
                       <div className="text-xs font-mono truncate mt-1 text-foreground/90">
                         {rule.conditionExpression || "No condition"}
                       </div>
-                    </div>
-                    
+                    </button>
+
                     {/* Swatch Preview */}
                     <div className="flex items-center gap-2 shrink-0">
                       <div
-                        className="w-5 h-5 rounded border shadow-sm flex items-center justify-center text-[10px] font-bold"
+                        className="w-5 h-5 rounded border shadow-sm flex items-center justify-center text-xs font-bold"
                         style={{
                           color: rule.styles.textColor || "#000000",
                           backgroundColor: rule.styles.backgroundColor || "#ffffff"
@@ -234,7 +239,7 @@ export function ConditionalFormattingBuilder({
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="condition-expr">Condition Expression</Label>
-                  <span className="text-[11px] text-muted-foreground">
+                  <span className="text-xs text-muted-foreground">
                     e.g. <code className="bg-muted px-1 rounded">Revenue &lt; 0</code> or{" "}
                     <code className="bg-muted px-1 rounded">[Profit] &lt; [Target]</code>
                   </span>
@@ -254,12 +259,12 @@ export function ConditionalFormattingBuilder({
                 {/* Validation Status */}
                 <div className="flex items-center gap-1.5 text-xs mt-1">
                   {activeRuleValidation.valid ? (
-                    <span className="text-emerald-500 flex items-center gap-1 font-medium">
+                    <span className="text-success flex items-center gap-1 font-medium">
                       <CheckCircle2 className="h-3.5 w-3.5" />
                       {activeRuleValidation.message}
                     </span>
                   ) : (
-                    <span className="text-amber-500 flex items-center gap-1">
+                    <span className="text-tertiary flex items-center gap-1">
                       <AlertTriangle className="h-3.5 w-3.5" />
                       {activeRuleValidation.message}
                     </span>
@@ -278,7 +283,7 @@ export function ConditionalFormattingBuilder({
                       key={col}
                       variant="outline"
                       size="sm"
-                      className="h-6 text-[11px] px-2"
+                      className="h-6 text-xs px-2"
                       onClick={() =>
                         handleUpdateRule(activeRule.id, {
                           conditionExpression: `${activeRule.conditionExpression} ${col}`.trim()
@@ -293,7 +298,7 @@ export function ConditionalFormattingBuilder({
                       key={op}
                       variant="secondary"
                       size="sm"
-                      className="h-6 text-[11px] px-2 font-mono"
+                      className="h-6 text-xs px-2 font-mono"
                       onClick={() =>
                         handleUpdateRule(activeRule.id, {
                           conditionExpression: `${activeRule.conditionExpression} ${op}`.trim()
@@ -308,7 +313,7 @@ export function ConditionalFormattingBuilder({
 
               {/* Styles Section */}
               <div className="space-y-3 border-t pt-4">
-                <Label className="text-xs font-semibold uppercase text-muted-foreground">
+                <Label className="text-sm font-semibold text-foreground">
                   Formatting Style
                 </Label>
 
@@ -340,7 +345,7 @@ export function ConditionalFormattingBuilder({
                       <input
                         type="color"
                         id="text-color"
-                        value={activeRule.styles.textColor || "#ef4444"}
+                        value={activeRule.styles.textColor || "#A8261E"}
                         onChange={(e) =>
                           handleUpdateStyle(activeRule.id, {
                             textColor: e.target.value,
@@ -350,7 +355,7 @@ export function ConditionalFormattingBuilder({
                         className="w-8 h-8 rounded cursor-pointer border p-0.5"
                       />
                       <Input
-                        value={activeRule.styles.textColor || "#ef4444"}
+                        value={activeRule.styles.textColor || "#A8261E"}
                         onChange={(e) =>
                           handleUpdateStyle(activeRule.id, {
                             textColor: e.target.value,
@@ -370,7 +375,7 @@ export function ConditionalFormattingBuilder({
                       <input
                         type="color"
                         id="bg-color"
-                        value={activeRule.styles.backgroundColor || "#fef2f2"}
+                        value={activeRule.styles.backgroundColor || "#F6E3E0"}
                         onChange={(e) =>
                           handleUpdateStyle(activeRule.id, {
                             backgroundColor: e.target.value
@@ -379,7 +384,7 @@ export function ConditionalFormattingBuilder({
                         className="w-8 h-8 rounded cursor-pointer border p-0.5"
                       />
                       <Input
-                        value={activeRule.styles.backgroundColor || "#fef2f2"}
+                        value={activeRule.styles.backgroundColor || "#F6E3E0"}
                         onChange={(e) =>
                           handleUpdateStyle(activeRule.id, {
                             backgroundColor: e.target.value

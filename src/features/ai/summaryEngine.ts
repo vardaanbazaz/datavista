@@ -26,7 +26,7 @@ export const summaryEngine = {
     // 1. Detect statistical anomalies
     let anomalies = anomalyDetector.detectDashboardAnomalies(charts, rows ?? dataset.data, dataset);
     if (anomalies.length === 0) {
-      anomalies = anomalyDetector.detectDatasetAnomalies(dataset);
+      anomalies = anomalyDetector.detectDatasetAnomalies(dataset, rows);
     }
 
     // 2. Build summary context
@@ -115,24 +115,20 @@ TASK: Generate a concise, professional 2 to 3 sentence executive summary describ
   generateOfflineSummary(
     datasetName: string,
     rowCount: number,
-    chartCount: number,
+    _chartCount: number,
     anomalies: DetectedAnomaly[],
     filterText?: string
   ): string {
-    const filterInfo = filterText && filterText.trim() ? ` with active filters applied (${filterText})` : "";
-
-    if (anomalies.length > 0) {
-      const topAnomaly = anomalies[0];
-      const secondAnomaly = anomalies[1];
-
-      let anomalyPart = topAnomaly.description;
-      if (secondAnomaly) {
-        anomalyPart += ` Additionally, ${secondAnomaly.columnName} recorded a ${secondAnomaly.type} at ${secondAnomaly.dimensionKey}.`;
-      }
-
-      return `Dataset "${datasetName}" (${rowCount.toLocaleString()} rows) shows active performance across ${chartCount} widgets${filterInfo}. ${anomalyPart} Overall performance remains steady outside of these localized deviations.`;
+    // Only sentences with something real to say: which values stand out, and where.
+    const scope = filterText && filterText.trim() ? ` (filtered: ${filterText})` : "";
+    if (anomalies.length === 0) {
+      return `No unusual values in the numeric columns of "${datasetName}"${scope}.`;
     }
-
-    return `Dataset "${datasetName}" (${rowCount.toLocaleString()} rows) is performing within standard statistical thresholds across all ${chartCount} dashboard visualizations${filterInfo}. Metric variance remains low with no critical anomalies or outliers detected. All key indicators demonstrate consistent performance.`;
+    const top = anomalies.slice(0, 2).map((a) => a.description.replace(/\.$/, ""));
+    const more = anomalies.length - top.length;
+    return (
+      `Most unusual values in "${datasetName}" (${rowCount.toLocaleString()} rows${scope}): ${top.join("; ")}.` +
+      (more > 0 ? ` ${more} more ${more === 1 ? "value stands" : "values stand"} out.` : "")
+    );
   }
 };

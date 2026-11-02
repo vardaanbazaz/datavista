@@ -10,17 +10,27 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-elegant",
+        // Batch 6: every primary action is the engraved oxblood plate, every secondary one
+        // the embossed card plate (the phase A `engraved`/`plate` names stay as aliases).
+        default:
+          "emboss border border-tertiary/50 bg-primary font-semibold text-primary-foreground hover:bg-primary-glow",
         destructive:
           "bg-destructive text-destructive-foreground hover:bg-destructive/90",
         outline:
-          "border border-border bg-background hover:bg-accent hover:text-accent-foreground",
+          "emboss border border-borderStrong bg-card text-foreground hover:bg-accent hover:text-accent-foreground",
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
-        premium: "gradient-primary text-primary-foreground hover:shadow-glow transition-spring shadow-elegant",
-        glass: "glass text-foreground hover:bg-glass/80 backdrop-blur-sm",
+        link: "text-primary-ink underline-offset-4 hover:underline",
+        premium:
+          "emboss border border-tertiary/50 bg-primary font-semibold text-primary-foreground hover:bg-primary-glow",
+        glass: "emboss border border-borderStrong bg-card text-foreground hover:bg-accent",
+        // Batch 6 frame buttons (Dark Academia). Embossed oxblood with a gilt edge for the
+        // main action, an embossed plate for secondary ones. Phase B makes these the defaults.
+        engraved:
+          "emboss border border-tertiary/50 bg-primary font-semibold text-primary-foreground hover:bg-primary-glow",
+        plate:
+          "emboss border border-borderStrong bg-card text-foreground hover:bg-accent hover:text-accent-foreground",
       },
       size: {
         default: "h-10 px-4 py-2",

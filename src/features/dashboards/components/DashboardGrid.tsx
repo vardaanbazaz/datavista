@@ -162,7 +162,7 @@ export function DashboardGrid({ charts, activeDashboardId, onEditKpi }: Dashboar
         {widgets.map((widget) => (
           <div key={widget.id}>
             {widget.type === "chart" ? (
-              <Card className="h-full w-full bg-white dark:bg-zinc-900 border border-gray-200 dark:border-white/5 flex flex-col overflow-hidden shadow-none group transition-colors">
+              <Card className="h-full w-full bg-card border border-border flex flex-col overflow-hidden shadow-none group transition-colors">
                 <CardHeader className="p-3 pb-2 flex flex-row items-center justify-between border-b flex-shrink-0 drag-handle select-none">
                   <div className="flex items-center gap-2 min-w-0">
                     {!isMobile && (

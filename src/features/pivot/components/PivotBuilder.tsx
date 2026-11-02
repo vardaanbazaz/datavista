@@ -110,16 +110,16 @@ export const PivotBuilder: React.FC<PivotBuilderProps> = ({ dataset }) => {
 
   const renderTypeIcon = (type: string, role: string) => {
     if (role === 'calculated') {
-      return <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />;
+      return <Sparkles className="w-3.5 h-3.5 text-tertiary shrink-0" />;
     }
     switch (type) {
       case 'numeric':
-        return <Hash className="w-3.5 h-3.5 text-blue-400 shrink-0" />;
+        return <Hash className="w-3.5 h-3.5 text-primary-ink shrink-0" />;
       case 'date':
-        return <Calendar className="w-3.5 h-3.5 text-emerald-400 shrink-0" />;
+        return <Calendar className="w-3.5 h-3.5 text-success shrink-0" />;
       case 'categorical':
       default:
-        return <Type className="w-3.5 h-3.5 text-purple-400 shrink-0" />;
+        return <Type className="w-3.5 h-3.5 text-primary-ink shrink-0" />;
     }
   };
 
@@ -230,15 +230,16 @@ export const PivotBuilder: React.FC<PivotBuilderProps> = ({ dataset }) => {
   return (
     <div className="w-full lg:w-80 shrink-0 glass border border-border rounded-xl flex flex-col h-[78vh] shadow-xl overflow-hidden animate-fade-in">
       <div className="p-4 border-b border-border bg-muted/30 flex items-center gap-2 select-none">
-        <Settings2 className="w-4 h-4 text-primary" />
-        <h3 className="font-semibold text-sm tracking-wide uppercase">Pivot Settings</h3>
+        <Settings2 className="w-4 h-4 text-primary-ink" />
+        <h3 className="font-display text-h3 font-semibold">Pivot Settings</h3>
       </div>
 
-      <ScrollArea className="flex-1 p-4 space-y-5">
+      <ScrollArea className="flex-1">
+        <div className="p-4 space-y-5">
         {/* Available Fields */}
         <div className="space-y-2">
-          <span className="text-caption uppercase text-textTertiary select-none">Fields</span>
-          <div className="grid grid-cols-1 gap-1.5 max-h-40 overflow-y-auto pr-1">
+          <span className="catalogue-label text-muted-foreground select-none">Fields</span>
+          <div className="grid grid-cols-1 gap-1.5 max-h-60 overflow-y-auto rounded-md border border-border p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" tabIndex={0} role="region" aria-label="Fields (scrollable)">
             {columns.map((col) => {
               const inRows = currentConfig.rowDimensions.includes(col.name);
               const inCols = currentConfig.columnDimensions.includes(col.name);
@@ -250,7 +251,7 @@ export const PivotBuilder: React.FC<PivotBuilderProps> = ({ dataset }) => {
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     {renderTypeIcon(col.type, col.role)}
-                    <span className="text-xs font-medium truncate" title={col.name}>
+                    <span className="text-sm font-medium truncate" title={col.name}>
                       {col.name}
                     </span>
                   </div>
@@ -261,7 +262,7 @@ export const PivotBuilder: React.FC<PivotBuilderProps> = ({ dataset }) => {
                           size="sm"
                           variant="outline"
                           onClick={() => addRowDimension(col.name)}
-                          className={cn("text-[9px] px-1.5 h-6", inRows && "bg-primary/20 hover:bg-primary/30 border-primary text-primary")}
+                          className={cn("text-xs px-1.5 h-6", inRows && "bg-primary/20 hover:bg-primary/30 border-primary text-primary-ink")}
                         >
                           Row
                         </Button>
@@ -277,7 +278,7 @@ export const PivotBuilder: React.FC<PivotBuilderProps> = ({ dataset }) => {
                           size="sm"
                           variant="outline"
                           onClick={() => addColumnDimension(col.name)}
-                          className={cn("text-[9px] px-1.5 h-6", inCols && "bg-primary/20 hover:bg-primary/30 border-primary text-primary")}
+                          className={cn("text-xs px-1.5 h-6", inCols && "bg-primary/20 hover:bg-primary/30 border-primary text-primary-ink")}
                         >
                           Col
                         </Button>
@@ -293,7 +294,7 @@ export const PivotBuilder: React.FC<PivotBuilderProps> = ({ dataset }) => {
                           size="sm"
                           variant="outline"
                           onClick={() => addValueField(col.name, col.type === 'numeric' ? 'sum' : 'count')}
-                          className="text-[9px] px-1.5 h-6"
+                          className="text-xs px-1.5 h-6"
                         >
                           + Val
                         </Button>
@@ -314,8 +315,8 @@ export const PivotBuilder: React.FC<PivotBuilderProps> = ({ dataset }) => {
         {/* Row Dimensions */}
         <div className="space-y-2">
           <div className="flex items-center justify-between select-none">
-            <span className="text-caption uppercase text-textTertiary">Row Dimensions</span>
-            <Badge variant="outline" className="text-[10px] font-semibold text-primary">{currentConfig.rowDimensions.length}</Badge>
+            <span className="catalogue-label text-muted-foreground">Row Dimensions</span>
+            <Badge variant="outline" className="text-xs font-semibold text-primary-ink">{currentConfig.rowDimensions.length}</Badge>
           </div>
           <div className="space-y-1.5">
             {currentConfig.rowDimensions.map((dim, idx) => (
@@ -363,7 +364,7 @@ export const PivotBuilder: React.FC<PivotBuilderProps> = ({ dataset }) => {
               </div>
             ))}
             {currentConfig.rowDimensions.length === 0 && (
-              <div className="text-[11px] text-center text-muted-foreground italic py-3 bg-muted/20 border border-dashed rounded-lg border-border/80 select-none">
+              <div className="text-xs text-center text-muted-foreground italic py-3 bg-muted/20 border border-dashed rounded-lg border-border/80 select-none">
                 No row groupings selected.
               </div>
             )}
@@ -375,8 +376,8 @@ export const PivotBuilder: React.FC<PivotBuilderProps> = ({ dataset }) => {
         {/* Column Dimensions */}
         <div className="space-y-2">
           <div className="flex items-center justify-between select-none">
-            <span className="text-caption uppercase text-textTertiary">Column Dimensions</span>
-            <Badge variant="outline" className="text-[10px] font-semibold text-primary">{currentConfig.columnDimensions.length}</Badge>
+            <span className="catalogue-label text-muted-foreground">Column Dimensions</span>
+            <Badge variant="outline" className="text-xs font-semibold text-primary-ink">{currentConfig.columnDimensions.length}</Badge>
           </div>
           <div className="space-y-1.5">
             {currentConfig.columnDimensions.map((dim, idx) => (
@@ -424,7 +425,7 @@ export const PivotBuilder: React.FC<PivotBuilderProps> = ({ dataset }) => {
               </div>
             ))}
             {currentConfig.columnDimensions.length === 0 && (
-              <div className="text-[11px] text-center text-muted-foreground italic py-3 bg-muted/20 border border-dashed rounded-lg border-border/80 select-none">
+              <div className="text-xs text-center text-muted-foreground italic py-3 bg-muted/20 border border-dashed rounded-lg border-border/80 select-none">
                 No column groupings selected.
               </div>
             )}
@@ -436,8 +437,8 @@ export const PivotBuilder: React.FC<PivotBuilderProps> = ({ dataset }) => {
         {/* Value Fields */}
         <div className="space-y-2">
           <div className="flex items-center justify-between select-none">
-            <span className="text-caption uppercase text-textTertiary">Values / Aggregates</span>
-            <Badge variant="outline" className="text-[10px] font-semibold text-primary">{currentConfig.valueFields.length}</Badge>
+            <span className="catalogue-label text-muted-foreground">Values / Aggregates</span>
+            <Badge variant="outline" className="text-xs font-semibold text-primary-ink">{currentConfig.valueFields.length}</Badge>
           </div>
           <div className="space-y-2">
             {currentConfig.valueFields.map((vf, idx) => {
@@ -469,7 +470,7 @@ export const PivotBuilder: React.FC<PivotBuilderProps> = ({ dataset }) => {
                       value={vf.operator}
                       onValueChange={(val) => updateValueOperator(idx, val as AggregationOperator)}
                     >
-                      <SelectTrigger className="h-7 text-xs bg-background/50 border-primary/25">
+                      <SelectTrigger aria-label="Aggregation" className="h-9 text-sm bg-background/50 border-borderStrong">
                         <SelectValue placeholder="Select aggregation" />
                       </SelectTrigger>
                       <SelectContent>
@@ -485,7 +486,7 @@ export const PivotBuilder: React.FC<PivotBuilderProps> = ({ dataset }) => {
                       </SelectContent>
                     </Select>
                     {aggregationNote(aggregationFlag(dataset, vf.column), vf.operator) && (
-                      <p className="text-[10px] leading-snug text-amber-600 dark:text-amber-400" role="note" data-testid="aggregation-note">
+                      <p className="text-xs leading-snug text-tertiary" role="note" data-testid="aggregation-note">
                         {aggregationNote(aggregationFlag(dataset, vf.column), vf.operator)}
                       </p>
                     )}
@@ -493,12 +494,12 @@ export const PivotBuilder: React.FC<PivotBuilderProps> = ({ dataset }) => {
                     {/* Weighted Average Secondary Input */}
                     {vf.operator === "weighted_average" && (
                       <div className="space-y-1 mt-1">
-                        <Label className="text-[9px] font-bold text-muted-foreground uppercase">Weight Column</Label>
+                        <Label className="text-sm font-semibold text-foreground">Weight Column</Label>
                         <Select
                           value={vf.weightColumn || ""}
                           onValueChange={(val) => updateValueFieldParams(idx, { weightColumn: val })}
                         >
-                          <SelectTrigger className="h-7 text-xs bg-background/50 border-primary/25">
+                          <SelectTrigger aria-label="Weight column" className="h-9 text-sm bg-background/50 border-borderStrong">
                             <SelectValue placeholder="Select weight" />
                           </SelectTrigger>
                           <SelectContent>
@@ -517,7 +518,7 @@ export const PivotBuilder: React.FC<PivotBuilderProps> = ({ dataset }) => {
                     {/* Percentile Secondary Input */}
                     {vf.operator === "percentile" && (
                       <div className="space-y-1 mt-1">
-                        <Label className="text-[9px] font-bold text-muted-foreground uppercase">Percentile (0-100)</Label>
+                        <Label className="text-sm font-semibold text-foreground">Percentile (0-100)</Label>
                         <input
                           type="number"
                           min="0"
@@ -532,7 +533,7 @@ export const PivotBuilder: React.FC<PivotBuilderProps> = ({ dataset }) => {
                     {/* Condition Formula Secondary Input */}
                     {(vf.operator === "sum_if" || vf.operator === "count_if") && (
                       <div className="space-y-1 mt-1">
-                        <Label className="text-[9px] font-bold text-muted-foreground uppercase">Condition Formula</Label>
+                        <Label className="text-sm font-semibold text-foreground">Condition Formula</Label>
                         <input
                           type="text"
                           placeholder='e.g. [Status] = "Active"'
@@ -547,7 +548,7 @@ export const PivotBuilder: React.FC<PivotBuilderProps> = ({ dataset }) => {
               );
             })}
             {currentConfig.valueFields.length === 0 && (
-              <div className="text-[11px] text-center text-muted-foreground italic py-3 bg-muted/20 border border-dashed rounded-lg border-border/80 select-none">
+              <div className="text-xs text-center text-muted-foreground italic py-3 bg-muted/20 border border-dashed rounded-lg border-border/80 select-none">
                 No aggregation values selected.
               </div>
             )}
@@ -558,7 +559,7 @@ export const PivotBuilder: React.FC<PivotBuilderProps> = ({ dataset }) => {
 
         {/* Display Settings */}
         <div className="space-y-3 pb-2 select-none">
-          <span className="text-caption uppercase text-textTertiary">Display Settings</span>
+          <span className="catalogue-label text-muted-foreground">Display Settings</span>
           <div className="space-y-2">
             <div className="flex items-center space-x-2">
               <Checkbox
@@ -592,6 +593,7 @@ export const PivotBuilder: React.FC<PivotBuilderProps> = ({ dataset }) => {
             </div>
           </div>
         </div>
+      </div>
       </ScrollArea>
     </div>
   );

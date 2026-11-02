@@ -1,9 +1,66 @@
-@import "@fontsource/inter/400.css";
-@import "@fontsource/inter/500.css";
-@import "@fontsource/inter/600.css";
-@import "@fontsource/inter/700.css";
-@import "@fontsource/jetbrains-mono/500.css";
-@import "@fontsource/jetbrains-mono/700.css";
+/*
+ * Fonts: bundled woff2 only (offline-first: no CDN, no .woff fallbacks in dist/). Our own
+ * @font-face rules instead of the @fontsource CSS, which also emit .woff files and every
+ * subset. Weight ranges map the classes we use onto the faces we ship, so the browser never
+ * fakes a bold: 400 covers 100-500 (font-normal, font-medium), 600 covers 600-900.
+ * Latin-ext faces download only when a glyph needs them (unicode-range).
+ */
+@font-face {
+  font-family: "Source Serif 4";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 500;
+  src: url("@fontsource/source-serif-4/files/source-serif-4-latin-400-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Source Serif 4";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 500;
+  src: url("@fontsource/source-serif-4/files/source-serif-4-latin-ext-400-normal.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "Source Serif 4";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600 900;
+  src: url("@fontsource/source-serif-4/files/source-serif-4-latin-600-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Source Serif 4";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600 900;
+  src: url("@fontsource/source-serif-4/files/source-serif-4-latin-ext-600-normal.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "Cormorant Garamond";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("@fontsource/cormorant-garamond/files/cormorant-garamond-latin-600-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 600;
+  src: url("@fontsource/jetbrains-mono/files/jetbrains-mono-latin-500-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700 900;
+  src: url("@fontsource/jetbrains-mono/files/jetbrains-mono-latin-700-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
 
 @tailwind base;
 @tailwind components;
@@ -52,153 +109,219 @@
   cursor: grabbing;
 }
 
-/* DataVista Design System - Professional Data Visualization Theme */
-
+/*
+ * DataVista tokens, batch 6 "Dark Academia" (evolves the 2026-09 maroon / black / gold set:
+ * Main #7C2438 and gold #D4AF37 kept, neutrals warmed to ink and walnut, light mode to
+ * parchment). Four sets: light (:root), dark (.dark), and a high-contrast version of each
+ * (data-contrast="high" on <html>, set from Reading comfort). Each value is HSL for
+ * Tailwind's hsl(var(--x) / alpha); the hex in the comment is the source of truth, and
+ * src/shared/theme/__tests__/tokens.contrast.test.ts checks every text/UI pair against it.
+ */
 @layer base {
   :root {
-    /* Background & Base */
-    --background: 220 20% 97%;
-    --foreground: 220 25% 15%;
+    --background: 39.1304 46.9388% 90.3922%; /* #F2EADB */
+    --foreground: 23.4783 37.7049% 11.9608%; /* #2A1C13 */
+    --card: 41.5385 61.9048% 95.8824%; /* #FBF7EE */
+    --card-foreground: 23.4783 37.7049% 11.9608%; /* #2A1C13 */
+    --glass: 41.5385 61.9048% 95.8824%; /* #FBF7EE */
+    --popover: 42.0000 100.0000% 98.0392%; /* #FFFCF5 */
+    --popover-foreground: 23.4783 37.7049% 11.9608%; /* #2A1C13 */
+    --primary: 346.3636 55.0000% 31.3725%; /* #7C2438 */
+    --primary-foreground: 41.5385 61.9048% 95.8824%; /* #FBF7EE */
+    --primary-glow: 347.4000 50.0000% 39.2157%; /* #963247 */
+    --primary-ink: 346.3636 55.0000% 31.3725%; /* #7C2438 */
+    --secondary: 39.4286 41.1765% 83.3333%; /* #E6DAC3 */
+    --secondary-foreground: 23.4783 37.7049% 11.9608%; /* #2A1C13 */
+    --accent: 39.3103 44.6154% 87.2549%; /* #EDE3D0 */
+    --accent-foreground: 23.4783 37.7049% 11.9608%; /* #2A1C13 */
+    --muted: 39.3103 44.6154% 87.2549%; /* #EDE3D0 */
+    --muted-foreground: 26.6667 23.3766% 30.1961%; /* #5F4B3B */
+    --destructive: 3.4783 69.6970% 38.8235%; /* #A8261E */
+    --destructive-foreground: 0.0000 0.0000% 100.0000%; /* #FFFFFF */
+    --border: 39.5122 35.0427% 77.0588%; /* #D9CBB0 */
+    --border-strong: 35.2941 21.7021% 46.0784%; /* #8F7A5C */
+    --input: 35.2941 21.7021% 46.0784%; /* #8F7A5C */
+    --ring: 346.3636 55.0000% 31.3725%; /* #7C2438 */
+    --tertiary: 42.8571 72.4138% 28.4314%; /* #7D5F14 */
+    --tertiary-foreground: 41.5385 61.9048% 95.8824%; /* #FBF7EE */
+    --success: 131.8033 39.8693% 30.0000%; /* #2E6B3A */
+    --text-tertiary: 28.4211 21.5909% 34.5098%; /* #6B5745 */
+    --ornament: 40.1942 49.2823% 40.9804%; /* #9C7A35 */
+    --chart-1: 213.4426 51.6949% 53.7255%; /* #4c82c6 */
+    --chart-2: 42.1277 100.0000% 27.6471%; /* #8d6300 */
+    --chart-3: 303.3333 44.1176% 40.0000%; /* #93398e */
+    --chart-4: 138.8060 54.4715% 24.1176%; /* #1c5f31 */
+    --chart-5: 353.4653 46.1187% 57.0588%; /* #c45f6a */
+    --sidebar-background: 39.1304 46.9388% 90.3922%; /* #F2EADB */
+    --sidebar-foreground: 23.4783 37.7049% 11.9608%; /* #2A1C13 */
+    --sidebar-primary: 346.3636 55.0000% 31.3725%; /* #7C2438 */
+    --sidebar-primary-foreground: 41.5385 61.9048% 95.8824%; /* #FBF7EE */
+    --sidebar-accent: 39.3103 44.6154% 87.2549%; /* #EDE3D0 */
+    --sidebar-accent-foreground: 23.4783 37.7049% 11.9608%; /* #2A1C13 */
+    --sidebar-border: 39.5122 35.0427% 77.0588%; /* #D9CBB0 */
+    --sidebar-ring: 346.3636 55.0000% 31.3725%; /* #7C2438 */
 
-    /* Cards & Surfaces */
-    --card: 0 0% 100%;
-    --card-foreground: 220 25% 15%;
-    --glass: 220 30% 98%;
+    --radius: 0.375rem;
 
-    /* Popover */
-    --popover: 0 0% 100%;
-    --popover-foreground: 220 25% 15%;
-
-    /* Primary - Data Blue */
-    --primary: 220 90% 56%;
-    --primary-foreground: 0 0% 98%;
-    --primary-glow: 220 85% 65%;
-
-    /* Secondary - Professional Purple */
-    --secondary: 260 85% 57%;
-    --secondary-foreground: 0 0% 98%;
-
-    /* Data Accent Colors */
-    --accent: 280 85% 60%;
-    --accent-foreground: 0 0% 98%;
-    --chart-1: 220 90% 56%;
-    --chart-2: 260 85% 57%;
-    --chart-3: 280 85% 60%;
-    --chart-4: 340 80% 58%;
-    --chart-5: 30 90% 55%;
-
-    /* Muted & States */
-    --muted: 220 15% 94%;
-    --muted-foreground: 220 10% 46%;
-
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 98%;
-
-    --border: 220 13% 91%;
-    --border-strong: 220 13% 80%;
-    --input: 220 13% 91%;
-    --ring: 220 90% 56%;
-
-    --tertiary: 46 65% 52%;
-    --tertiary-foreground: 220 25% 15%;
-    --success: 142 71% 45%;
-    --text-tertiary: 220 10% 46%;
-
-    --radius: 0.75rem;
-
-    /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
+    --gradient-primary: linear-gradient(180deg, hsl(var(--primary-glow)), hsl(var(--primary)));
     --gradient-secondary: linear-gradient(135deg, hsl(var(--secondary)), hsl(var(--accent)));
-    --gradient-glass: linear-gradient(135deg, hsl(var(--glass) / 0.8), hsl(var(--card) / 0.9));
-    
-    /* Shadows */
-    --shadow-elegant: 0 10px 30px -10px hsl(var(--primary) / 0.2);
-    --shadow-glass: 0 8px 32px hsl(220 30% 15% / 0.1);
-    --shadow-glow: 0 0 40px hsl(var(--primary-glow) / 0.3);
+    --gradient-glass: linear-gradient(135deg, hsl(var(--card) / 0.9), hsl(var(--card) / 0.95));
+    --shadow-elegant: 0 1px 0 hsl(var(--ornament) / 0.25) inset, 0 6px 18px -10px hsl(var(--foreground) / 0.35);
+    --shadow-glass: none;
+    --shadow-glow: 0 0 0 1px hsl(var(--tertiary) / 0.5), 0 0 18px hsl(var(--tertiary) / 0.25);
 
-    /* Animations */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     --transition-spring: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    color-scheme: light;
   }
 
   .dark {
-    /* DataVista 2026 redesign — maroon / near-black / gold, per approved Figma tokens.
-       HSL values carried to 4 decimals — verified to round-trip byte-exact to the
-       approved hex (see docs/superpowers/plans/2026-09-21-visual-redesign.md). */
-    --background: 230 23.0769% 5.0980%;
-    --foreground: 220 15.7895% 96.2745%;
+    --background: 26.6667 27.2727% 6.4706%; /* #15100C */
+    --foreground: 39.2308 50.0000% 89.8039%; /* #F2E9D8 */
+    --card: 24.0000 20.0000% 9.8039%; /* #1E1814 */
+    --card-foreground: 39.2308 50.0000% 89.8039%; /* #F2E9D8 */
+    --glass: 24.0000 20.0000% 9.8039%; /* #1E1814 */
+    --popover: 25.0000 20.0000% 11.7647%; /* #241D18 */
+    --popover-foreground: 39.2308 50.0000% 89.8039%; /* #F2E9D8 */
+    --primary: 346.3636 55.0000% 31.3725%; /* #7C2438 */
+    --primary-foreground: 39.1304 56.0976% 91.9608%; /* #F6EEDF */
+    --primary-glow: 346.4151 52.4752% 39.6078%; /* #9A3048 */
+    --primary-ink: 349.2632 55.5556% 66.4706%; /* #D97A8B */
+    --secondary: 25.7143 24.1379% 5.6863%; /* #120E0B */
+    --secondary-foreground: 39.2308 50.0000% 89.8039%; /* #F2E9D8 */
+    --accent: 25.7143 19.4444% 14.1176%; /* #2B231D */
+    --accent-foreground: 39.2308 50.0000% 89.8039%; /* #F2E9D8 */
+    --muted: 25.7143 19.4444% 14.1176%; /* #2B231D */
+    --muted-foreground: 36.0000 25.3165% 69.0196%; /* #C4B49C */
+    --destructive: 6.7200 73.0994% 66.4706%; /* #E8796B */
+    --destructive-foreground: 26.6667 27.2727% 6.4706%; /* #15100C */
+    --border: 25.7143 20.3883% 20.1961%; /* #3E3229 */
+    --border-strong: 30.0000 20.7921% 39.6078%; /* #7A6550 */
+    --input: 30.0000 20.7921% 39.6078%; /* #7A6550 */
+    --ring: 45.8599 64.6091% 52.3529%; /* #D4AF37 */
+    --tertiary: 45.8599 64.6091% 52.3529%; /* #D4AF37 */
+    --tertiary-foreground: 26.6667 27.2727% 6.4706%; /* #15100C */
+    --success: 122.5000 37.8947% 62.7451%; /* #7CC47F */
+    --text-tertiary: 35.1220 19.0698% 57.8431%; /* #A8977F */
+    --ornament: 40.9091 43.6508% 50.5882%; /* #B8954A */
+    --chart-1: 212.9825 76.0000% 55.8824%; /* #3986e4 */
+    --chart-2: 46.2745 97.4522% 30.7843%; /* #9b7802 */
+    --chart-3: 305.2174 32.7014% 58.6275%; /* #b873b2 */
+    --chart-4: 145.6311 44.9782% 44.9020%; /* #3fa66b */
+    --chart-5: 356.0440 37.7593% 47.2549%; /* #a64b51 */
+    --sidebar-background: 26.6667 27.2727% 6.4706%; /* #15100C */
+    --sidebar-foreground: 39.2308 50.0000% 89.8039%; /* #F2E9D8 */
+    --sidebar-primary: 346.3636 55.0000% 31.3725%; /* #7C2438 */
+    --sidebar-primary-foreground: 39.1304 56.0976% 91.9608%; /* #F6EEDF */
+    --sidebar-accent: 25.7143 19.4444% 14.1176%; /* #2B231D */
+    --sidebar-accent-foreground: 39.2308 50.0000% 89.8039%; /* #F2E9D8 */
+    --sidebar-border: 25.7143 20.3883% 20.1961%; /* #3E3229 */
+    --sidebar-ring: 45.8599 64.6091% 52.3529%; /* #D4AF37 */
 
-    --card: 226.6667 19.1489% 9.2157%;
-    --card-foreground: 220 15.7895% 96.2745%;
-    --glass: 226.6667 19.1489% 9.2157%;
+    color-scheme: dark;
+  }
 
-    --popover: 226.6667 19.1489% 9.2157%;
-    --popover-foreground: 220 15.7895% 96.2745%;
+  :root[data-contrast="high"] {
+    --background: 0.0000 0.0000% 100.0000%; /* #FFFFFF */
+    --foreground: 0.0000 0.0000% 0.0000%; /* #000000 */
+    --card: 0.0000 0.0000% 100.0000%; /* #FFFFFF */
+    --card-foreground: 0.0000 0.0000% 0.0000%; /* #000000 */
+    --glass: 0.0000 0.0000% 100.0000%; /* #FFFFFF */
+    --popover: 0.0000 0.0000% 100.0000%; /* #FFFFFF */
+    --popover-foreground: 0.0000 0.0000% 0.0000%; /* #000000 */
+    --primary: 343.9437 62.8319% 22.1569%; /* #5C1528 */
+    --primary-foreground: 0.0000 0.0000% 100.0000%; /* #FFFFFF */
+    --primary-glow: 344.3182 61.1111% 28.2353%; /* #741C33 */
+    --primary-ink: 343.9437 62.8319% 22.1569%; /* #5C1528 */
+    --secondary: 40.9091 47.8261% 90.9804%; /* #F3ECDD */
+    --secondary-foreground: 0.0000 0.0000% 0.0000%; /* #000000 */
+    --accent: 40.5882 44.7368% 85.0980%; /* #EADFC8 */
+    --accent-foreground: 0.0000 0.0000% 0.0000%; /* #000000 */
+    --muted: 40.9091 47.8261% 90.9804%; /* #F3ECDD */
+    --muted-foreground: 23.4783 37.7049% 11.9608%; /* #2A1C13 */
+    --destructive: 2.5000 76.9231% 30.5882%; /* #8A1712 */
+    --destructive-foreground: 0.0000 0.0000% 100.0000%; /* #FFFFFF */
+    --border: 29.2683 28.6713% 28.0392%; /* #5C4733 */
+    --border-strong: 24.7059 39.5349% 8.4314%; /* #1E140D */
+    --input: 24.7059 39.5349% 8.4314%; /* #1E140D */
+    --ring: 343.9437 62.8319% 22.1569%; /* #5C1528 */
+    --tertiary: 41.5385 76.4706% 20.0000%; /* #5A420C */
+    --tertiary-foreground: 0.0000 0.0000% 100.0000%; /* #FFFFFF */
+    --success: 132.5000 45.2830% 20.7843%; /* #1D4D27 */
+    --text-tertiary: 24.0000 32.4675% 15.0980%; /* #33241A */
+    --ornament: 41.5385 76.4706% 20.0000%; /* #5A420C */
+    --chart-1: 213.4426 51.6949% 53.7255%; /* #4c82c6 */
+    --chart-2: 42.1277 100.0000% 27.6471%; /* #8d6300 */
+    --chart-3: 303.3333 44.1176% 40.0000%; /* #93398e */
+    --chart-4: 138.8060 54.4715% 24.1176%; /* #1c5f31 */
+    --chart-5: 353.4653 46.1187% 57.0588%; /* #c45f6a */
+    --sidebar-background: 0.0000 0.0000% 100.0000%; /* #FFFFFF */
+    --sidebar-foreground: 0.0000 0.0000% 0.0000%; /* #000000 */
+    --sidebar-primary: 343.9437 62.8319% 22.1569%; /* #5C1528 */
+    --sidebar-primary-foreground: 0.0000 0.0000% 100.0000%; /* #FFFFFF */
+    --sidebar-accent: 40.5882 44.7368% 85.0980%; /* #EADFC8 */
+    --sidebar-accent-foreground: 0.0000 0.0000% 0.0000%; /* #000000 */
+    --sidebar-border: 29.2683 28.6713% 28.0392%; /* #5C4733 */
+    --sidebar-ring: 343.9437 62.8319% 22.1569%; /* #5C1528 */
+  }
 
-    --primary: 346.3636 55.0000% 31.3725%;
-    --primary-foreground: 220 15.7895% 96.2745%;
-    --primary-glow: 346.3636 55.0000% 41.3725%;
+  html.dark[data-contrast="high"] {
+    --background: 0.0000 0.0000% 0.0000%; /* #000000 */
+    --foreground: 0.0000 0.0000% 100.0000%; /* #FFFFFF */
+    --card: 24.0000 33.3333% 2.9412%; /* #0A0705 */
+    --card-foreground: 0.0000 0.0000% 100.0000%; /* #FFFFFF */
+    --glass: 24.0000 33.3333% 2.9412%; /* #0A0705 */
+    --popover: 24.0000 33.3333% 2.9412%; /* #0A0705 */
+    --popover-foreground: 0.0000 0.0000% 100.0000%; /* #FFFFFF */
+    --primary: 346.2000 54.3478% 36.0784%; /* #8E2A41 */
+    --primary-foreground: 0.0000 0.0000% 100.0000%; /* #FFFFFF */
+    --primary-glow: 346.0345 52.7273% 43.1373%; /* #A8344F */
+    --primary-ink: 350.2703 71.1538% 79.6078%; /* #F0A6B2 */
+    --secondary: 0.0000 0.0000% 0.0000%; /* #000000 */
+    --secondary-foreground: 0.0000 0.0000% 100.0000%; /* #FFFFFF */
+    --accent: 28.2353 25.3731% 13.1373%; /* #2A2119 */
+    --accent-foreground: 0.0000 0.0000% 100.0000%; /* #FFFFFF */
+    --muted: 27.2727 24.4444% 8.8235%; /* #1C1611 */
+    --muted-foreground: 39.2308 50.0000% 89.8039%; /* #F2E9D8 */
+    --destructive: 7.2180 100.0000% 73.9216%; /* #FF8A7A */
+    --destructive-foreground: 0.0000 0.0000% 0.0000%; /* #000000 */
+    --border: 40.0000 36.8421% 66.4706%; /* #C9B48A */
+    --border-strong: 44.0000 82.1918% 71.3725%; /* #F2D27A */
+    --input: 44.0000 82.1918% 71.3725%; /* #F2D27A */
+    --ring: 45.0932 100.0000% 68.4314%; /* #FFD75E */
+    --tertiary: 45.0932 100.0000% 68.4314%; /* #FFD75E */
+    --tertiary-foreground: 0.0000 0.0000% 0.0000%; /* #000000 */
+    --success: 128.2759 62.5899% 72.7451%; /* #8EE59A */
+    --text-tertiary: 38.8235 42.5000% 84.3137%; /* #E8DCC6 */
+    --ornament: 44.0000 82.1918% 71.3725%; /* #F2D27A */
+    --chart-1: 212.9825 76.0000% 55.8824%; /* #3986e4 */
+    --chart-2: 46.2745 97.4522% 30.7843%; /* #9b7802 */
+    --chart-3: 305.2174 32.7014% 58.6275%; /* #b873b2 */
+    --chart-4: 145.6311 44.9782% 44.9020%; /* #3fa66b */
+    --chart-5: 356.0440 37.7593% 47.2549%; /* #a64b51 */
+    --sidebar-background: 0.0000 0.0000% 0.0000%; /* #000000 */
+    --sidebar-foreground: 0.0000 0.0000% 100.0000%; /* #FFFFFF */
+    --sidebar-primary: 346.2000 54.3478% 36.0784%; /* #8E2A41 */
+    --sidebar-primary-foreground: 0.0000 0.0000% 100.0000%; /* #FFFFFF */
+    --sidebar-accent: 28.2353 25.3731% 13.1373%; /* #2A2119 */
+    --sidebar-accent-foreground: 0.0000 0.0000% 100.0000%; /* #FFFFFF */
+    --sidebar-border: 40.0000 36.8421% 66.4706%; /* #C9B48A */
+    --sidebar-ring: 45.0932 100.0000% 68.4314%; /* #FFD75E */
+  }
 
-    --secondary: 30 8.3333% 4.7059%;
-    --secondary-foreground: 220 15.7895% 96.2745%;
-
-    --accent: 225 18.7500% 12.5490%;
-    --accent-foreground: 220 15.7895% 96.2745%;
-    /* Categorical chart ramp — dataviz skill validated default (blue/orange/aqua/
-       yellow/magenta, dark steps), NOT brand Main/Tertiary — series color must
-       stay distinct from Main's "active/selected" UI meaning and Tertiary's
-       AI-accent meaning. Validated vs our #13151C surface: all pass, worst
-       adjacent CVD ΔE 8.4 — floor band, requires legend/direct-label (already
-       present) per dataviz skill's secondary-encoding rule. See plan Decision 4. */
-    --chart-1: 212.7907 76.7857% 56.0784%;
-    --chart-2: 17.0950 70.1961% 50.0000%;
-    --chart-3: 159.2481 72.6776% 35.8824%;
-    --chart-4: 39.7015 100.0000% 39.4118%;
-    --chart-5: 338.1818 61.1111% 57.6471%;
-
-    --muted: 225 18.7500% 12.5490%;
-    --muted-foreground: 222 12.1951% 67.8431%;
-
-    --destructive: 4.3114 89.3048% 63.3333%;
-    --destructive-foreground: 230 23.0769% 5.0980%;
-
-    --border: 224 16.4835% 17.8431%;
-    --border-strong: 224.2105 15.7025% 23.7255%;
-    --input: 224 16.4835% 17.8431%;
-    --ring: 346.3636 55.0000% 31.3725%;
-
-    --tertiary: 45.8599 64.6091% 52.3529%;
-    --tertiary-foreground: 230 23.0769% 5.0980%;
-    --success: 142.0859 70.5628% 45.2941%;
-    --text-tertiary: 220 8.9362% 46.0784%;
-
-    --gradient-glass: linear-gradient(135deg, hsl(226.6667 19.1489% 9.2157% / 0.9), hsl(226.6667 19.1489% 9.2157% / 0.95));
-    --shadow-glass: none;
-
-    --sidebar-background: 230 23.0769% 5.0980%;
-    --sidebar-foreground: 220 15.7895% 96.2745%;
-    --sidebar-primary: 346.3636 55.0000% 31.3725%;
-    --sidebar-primary-foreground: 220 15.7895% 96.2745%;
-    --sidebar-accent: 225 18.7500% 12.5490%;
-    --sidebar-accent-foreground: 220 15.7895% 96.2745%;
-    --sidebar-border: 224 16.4835% 17.8431%;
-    --sidebar-ring: 346.3636 55.0000% 31.3725%;
+  /*
+   * Reading comfort: text size scales the root font size, so the whole rem-based type
+   * scale and spacing move together (Default 16px, Large 19px, Extra large 22px).
+   */
+  html {
+    font-size: 100%;
+  }
+  html[data-text-size="large"] {
+    font-size: 118.75%;
+  }
+  html[data-text-size="xlarge"] {
+    font-size: 137.5%;
   }
 }
 
@@ -208,7 +331,14 @@
   }
 
   body {
-    @apply bg-gray-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans antialiased transition-colors duration-200;
+    @apply bg-background text-foreground font-sans text-body antialiased transition-colors duration-200;
+    font-optical-sizing: auto;
+  }
+
+  /* High contrast: borders and focus rings get heavier, nothing is faded. */
+  html[data-contrast="high"] *:focus-visible {
+    outline: 3px solid hsl(var(--ring));
+    outline-offset: 2px;
   }
 }
 
@@ -245,7 +375,7 @@
 /* Custom Utilities */
 @layer utilities {
   .glass {
-    @apply bg-white dark:bg-zinc-900 border border-gray-200 dark:border-white/5 shadow-none;
+    @apply bg-card text-card-foreground border border-border shadow-none;
   }
 
   .gradient-primary {
@@ -286,10 +416,105 @@
  */
 .dv-chart .tick text {
   fill: hsl(var(--muted-foreground));
-  font-size: 10px;
+  font-size: 0.6875rem;
+}
+
+/* Data stays clean: chart text in the plain text face, never the display serif. */
+.dv-chart text {
+  font-family: theme("fontFamily.sans");
 }
 
 .dv-chart g:not(.grid-horizontal) > .domain,
 .dv-chart g:not(.grid-horizontal) > .tick line {
   stroke: hsl(var(--border));
+}
+
+/*
+ * Reduced motion: on when the person chose it in Reading comfort (data-motion="reduce"),
+ * or when the device asks for it and they left the setting on "Match my device".
+ * framer-motion follows the same choice through <MotionConfig> (src/main.tsx).
+ */
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-motion="full"]) *,
+  html:not([data-motion="full"]) *::before,
+  html:not([data-motion="full"]) *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+html[data-motion="reduce"] *,
+html[data-motion="reduce"] *::before,
+html[data-motion="reduce"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/*
+ * Ornament (src/shared/components/ornament/): decoration on the frame only, never on data.
+ * Every ornament carries the `ornament` class, is aria-hidden and takes no pointer events.
+ * "Simple frames" in Reading comfort hides all of it.
+ */
+@layer components {
+  .ornament {
+    pointer-events: none;
+    color: hsl(var(--ornament));
+  }
+  html[data-frames="simple"] .ornament {
+    display: none !important;
+  }
+
+  /* Double rule: an outer hairline and an inner one, like an engraved plate border. */
+  .frame-double {
+    position: relative;
+    border: 1px solid hsl(var(--border));
+  }
+  .frame-double::after {
+    content: "";
+    position: absolute;
+    inset: 3px;
+    border: 1px solid hsl(var(--ornament) / 0.35);
+    border-radius: inherit;
+    pointer-events: none;
+  }
+  html[data-frames="simple"] .frame-double::after {
+    display: none;
+  }
+  html[data-contrast="high"] .frame-double {
+    border-color: hsl(var(--border-strong));
+  }
+
+  /* Catalogue label: tracked capitals (the bundled subsets have no true small caps). */
+  .catalogue-label {
+    font-family: theme("fontFamily.sans");
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  /* Embossed button face: a light top edge and a dark bottom edge, pressed when active. */
+  .emboss {
+    box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.14), inset 0 -1px 0 hsl(0 0% 0% / 0.25), 0 1px 2px hsl(0 0% 0% / 0.25);
+  }
+  .emboss:active {
+    box-shadow: inset 0 2px 3px hsl(0 0% 0% / 0.3);
+  }
+  html[data-frames="simple"] .emboss {
+    box-shadow: none;
+  }
+
+  /* Sidebar edge: the border plus a gilt hairline 3px inside it (large screens only). */
+  @media (min-width: 1024px) {
+    .sidebar-frame {
+      box-shadow: inset -4px 0 0 -3px hsl(var(--ornament) / 0.45);
+    }
+    html[data-frames="simple"] .sidebar-frame {
+      box-shadow: none;
+    }
+  }
 }

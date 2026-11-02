@@ -6,6 +6,7 @@ import { useUiStore } from "@/store/uiStore";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/components/ui/tooltip";
 import { useImportStore } from "@/store/importStore";
 import { MAX_IMPORT_BYTES } from "@/features/upload/lib/importLimits";
+import { Ornament } from "@/shared/components/ornament";
 
 export function FileUpload() {
   const importForUpload = useImportStore((state) => state.importForUpload);
@@ -48,10 +49,11 @@ export function FileUpload() {
   }, [handleFile]);
 
   return (
-    <Card className="glass shadow-elegant" data-tour="sidebar-upload">
+    <Card data-tour="sidebar-upload">
+      <Ornament.Corners />
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Upload className="w-5 h-5" />
+          <Upload className="w-5 h-5 text-ornament" aria-hidden />
           Upload Dataset
         </CardTitle>
       </CardHeader>
@@ -60,7 +62,7 @@ export function FileUpload() {
           className={`border-2 border-dashed rounded-lg p-8 text-center transition-all duration-300 ${
             dragActive 
               ? "border-primary bg-primary/5 scale-105 animate-pulse-glow" 
-              : "border-border hover:border-primary/50 hover:bg-muted/20"
+              : "border-borderStrong hover:border-primary hover:bg-muted/40"
           }`}
           onDragEnter={handleDrag}
           onDragLeave={handleDrag}
@@ -77,8 +79,8 @@ export function FileUpload() {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center">
-                <FileText className="w-8 h-8 text-primary" />
+              <div className="w-16 h-16 mx-auto rounded-full border border-ornament/60 ring-1 ring-ornament/30 ring-offset-4 ring-offset-card flex items-center justify-center">
+                <FileText className="w-7 h-7 text-ornament" aria-hidden />
               </div>
               <div>
                 <p className="text-lg font-medium mb-2">
@@ -97,7 +99,7 @@ export function FileUpload() {
                 />
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button asChild variant="premium">
+                    <Button asChild>
                       <label htmlFor="file-upload" className="cursor-pointer">
                         Select File
                       </label>
@@ -114,7 +116,7 @@ export function FileUpload() {
 
         <div className="mt-6 space-y-3">
           <div className="flex items-start gap-3 text-sm">
-            <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
+            <CheckCircle className="w-5 h-5 text-success flex-shrink-0 mt-0.5" />
             <div>
               <p className="font-medium">Automatic Data Detection</p>
               <p className="text-muted-foreground">
@@ -124,7 +126,7 @@ export function FileUpload() {
           </div>
           
           <div className="flex items-start gap-3 text-sm">
-            <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+            <AlertCircle className="w-5 h-5 text-tertiary flex-shrink-0 mt-0.5" />
             <div>
               <p className="font-medium">Data Requirements</p>
               <p className="text-muted-foreground">
@@ -134,7 +136,7 @@ export function FileUpload() {
           </div>
 
           <div className="flex items-start gap-3 text-sm" data-testid="upload-privacy-notice">
-            <ShieldCheck className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+            <ShieldCheck className="w-5 h-5 text-primary-ink flex-shrink-0 mt-0.5" />
             <div>
               <p className="font-medium">Your data stays in this browser</p>
               <p className="text-muted-foreground">

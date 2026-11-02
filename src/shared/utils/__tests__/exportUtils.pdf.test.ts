@@ -29,9 +29,9 @@ describe("buildPDFReport", () => {
   it("writes a valid PDF with the summary, chart titles and chart images", async () => {
     const ds = processRawData(
       [
-        { Region: "North", Sales: 10 },
-        { Region: "South", Sales: 30 },
-        { Region: "East", Sales: 20 },
+        { Region: "North", Sales: 10, StoreID: 7, Units: 1 },
+        { Region: "South", Sales: 30, StoreID: 8, Units: 1 },
+        { Region: "East", Sales: 20, StoreID: 8, Units: 1 },
       ],
       "sales.csv",
     );
@@ -51,6 +51,9 @@ describe("buildPDFReport", () => {
     expect(page1).toContain("Total Records: 3");
     expect(page1).toContain("Filtered Records: 3");
     expect(page1).toContain("Sales: Min=10.00, Max=30.00, Avg=20.00");
+    // ID columns: no average; constant columns: one line.
+    expect(page1).toContain("StoreID (ID): Count=3, Distinct=2, Min=7, Max=8");
+    expect(page1).toContain("Units: constant: 1");
     expect(page1).toContain("Sales by Region");
     expect(page1).toContain("Second Chart");
   });

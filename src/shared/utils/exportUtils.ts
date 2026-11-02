@@ -2,7 +2,7 @@ import html2canvas from 'html2canvas';
 import { saveAs } from 'file-saver';
 import jsPDF from 'jspdf';
 import { ChartConfig, DataRow, Dataset } from '@/shared/types';
-import { summarizeNumericColumns } from '@/shared/services/stats/columnSummary';
+import { profileNumericColumns } from '@/shared/services/stats/columnProfile';
 import { columnsOfType } from "@/shared/utils/columnType";
 
 /**
@@ -205,10 +205,23 @@ export const buildPDFReport = async (
     // Calculate summary statistics for numeric columns
     const numericColumns = columnsOfType(dataset, 'numeric');
 
-    summarizeNumericColumns(filteredData, numericColumns).forEach(({ column: col, min, max, mean: avg }) => {
-      pdf.text(`${col}: Min=${min.toFixed(2)}, Max=${max.toFixed(2)}, Avg=${avg.toFixed(2)}`, 20, yPosition);
+    // Same roles as the Overview ledger and Data view (services/stats/columnProfile.ts):
+    // ID/year columns get count/distinct/min/max, constant columns one line.
+    for (const p of profileNumericColumns(filteredData, numericColumns, dataset)) {
+      if (p.count === 0) continue;
+      if (yPosition > pageHeight - 20) {
+        pdf.addPage();
+        yPosition = 20;
+      }
+      const line =
+        p.role === 'constant'
+          ? `${p.column}: constant: ${p.min}`
+          : p.role === 'id' || p.role === 'year'
+            ? `${p.column} (${p.role === 'id' ? 'ID' : 'year'}): Count=${p.count}, Distinct=${p.distinct}, Min=${p.min}, Max=${p.max}`
+            : `${p.column}: Min=${p.min.toFixed(2)}, Max=${p.max.toFixed(2)}, Avg=${p.mean.toFixed(2)}`;
+      pdf.text(line, 20, yPosition);
       yPosition += 6;
-    });
+    }
     
     yPosition += 10;
   }

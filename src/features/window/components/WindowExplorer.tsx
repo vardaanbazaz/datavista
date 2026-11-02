@@ -21,6 +21,7 @@ import {
   AlertTriangle
 } from "lucide-react";
 import { Hint } from "@/shared/components/Hint";
+import { NoDatasetPlate } from "@/shared/components/NoDatasetPlate";
 import { columnsOfType } from "@/shared/utils/columnType";
 
 export const WindowExplorer: React.FC = () => {
@@ -71,15 +72,9 @@ export const WindowExplorer: React.FC = () => {
 
   if (!activeDataset) {
     return (
-      <div className="flex flex-col items-center justify-center h-[50vh] text-center select-none animate-fade-in">
-        <div className="w-16 h-16 rounded-2xl bg-muted/40 flex items-center justify-center mb-4">
-          <Layers className="w-8 h-8 text-muted-foreground" />
-        </div>
-        <h3 className="text-lg font-semibold mb-1">No Active Dataset</h3>
-        <p className="text-sm text-muted-foreground max-w-sm">
-          Please upload or select a dataset first to begin window functions builder.
-        </p>
-      </div>
+      <NoDatasetPlate view="Window Functions" emblem={<Layers aria-hidden />}>
+        Upload or pick a dataset to build window functions.
+      </NoDatasetPlate>
     );
   }
 
@@ -166,7 +161,7 @@ export const WindowExplorer: React.FC = () => {
         <Card className="glass shadow-xl border-border/80">
           <CardHeader className="pb-3 select-none">
             <CardTitle className="flex items-center gap-2 text-md font-bold">
-              <Plus className="w-5 h-5 text-primary" />
+              <Plus className="w-5 h-5 text-primary-ink" />
               Add Window Column
             </CardTitle>
             <CardDescription className="text-xs">
@@ -178,7 +173,7 @@ export const WindowExplorer: React.FC = () => {
               
               {/* Alias */}
               <div className="space-y-1.5">
-                <Label htmlFor="alias" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                <Label htmlFor="alias" className="text-sm font-semibold text-foreground">
                   New Column Name (Alias)
                 </Label>
                 <Input
@@ -193,11 +188,11 @@ export const WindowExplorer: React.FC = () => {
 
               {/* Function Selector */}
               <div className="space-y-1.5">
-                <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                <Label className="text-sm font-semibold text-foreground">
                   Window Function
                 </Label>
                 <Select value={functionType} onValueChange={(val) => setFunctionType(val as WindowFunctionType)}>
-                  <SelectTrigger className="h-9 text-xs bg-background/50">
+                  <SelectTrigger aria-label="Window function" className="h-9 text-xs bg-background/50">
                     <SelectValue placeholder="Choose a function" />
                   </SelectTrigger>
                   <SelectContent className="max-h-56">
@@ -221,11 +216,11 @@ export const WindowExplorer: React.FC = () => {
               {/* Target Column */}
               {needsTargetCol && (
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  <Label className="text-sm font-semibold text-foreground">
                     Target Column
                   </Label>
                   <Select value={targetColumn} onValueChange={setTargetColumn}>
-                    <SelectTrigger className="h-9 text-xs bg-background/50">
+                    <SelectTrigger aria-label="Target column" className="h-9 text-xs bg-background/50">
                       <SelectValue placeholder="Select target field" />
                     </SelectTrigger>
                     <SelectContent>
@@ -241,7 +236,7 @@ export const WindowExplorer: React.FC = () => {
               {(functionType === "LAG" || functionType === "LEAD") && (
                 <div className="grid grid-cols-2 gap-3.5">
                   <div className="space-y-1">
-                    <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Offset</Label>
+                    <Label className="text-sm font-semibold text-foreground">Offset</Label>
                     <Input
                       type="number"
                       min="1"
@@ -251,7 +246,7 @@ export const WindowExplorer: React.FC = () => {
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Default Value</Label>
+                    <Label className="text-sm font-semibold text-foreground">Default Value</Label>
                     <Input
                       placeholder="null"
                       value={defaultValue}
@@ -265,7 +260,7 @@ export const WindowExplorer: React.FC = () => {
               {/* NTILE Groups */}
               {functionType === "NTILE" && (
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Ntile Buckets</Label>
+                  <Label className="text-sm font-semibold text-foreground">Ntile Buckets</Label>
                   <Input
                     type="number"
                     min="1"
@@ -282,7 +277,7 @@ export const WindowExplorer: React.FC = () => {
               <div className="space-y-2 select-none">
                 <div className="flex items-center gap-1.5">
                   <Layers className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Partition By</span>
+                  <span className="text-sm font-semibold text-foreground">Partition By</span>
                 </div>
                 <ScrollArea className="h-28 border rounded-md p-2 bg-muted/10">
                   <div className="space-y-2">
@@ -306,14 +301,14 @@ export const WindowExplorer: React.FC = () => {
               <div className="space-y-2.5 select-none">
                 <div className="flex items-center gap-1.5">
                   <ArrowUpDown className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Order By</span>
+                  <span className="text-sm font-semibold text-foreground">Order By</span>
                 </div>
                 
                 {/* Active Sort list */}
                 {orderBy.length > 0 && (
                   <div className="flex flex-wrap gap-1 border border-dashed rounded-md p-1.5 min-h-[38px] bg-muted/5">
                     {orderBy.map(rule => (
-                      <Badge key={`order-${rule.column}`} variant="secondary" className="text-[10px] pr-1.5 h-6 flex items-center gap-1">
+                      <Badge key={`order-${rule.column}`} variant="secondary" className="text-xs pr-1.5 h-6 flex items-center gap-1">
                         <span>{rule.column} ({rule.direction.toUpperCase()})</span>
                         <button type="button" onClick={() => handleRemoveSortRule(rule.column)} className="text-muted-foreground hover:text-foreground">
                           ×
@@ -326,7 +321,7 @@ export const WindowExplorer: React.FC = () => {
                 {/* Add rule form */}
                 <div className="flex gap-2">
                   <Select value={selectedSortCol} onValueChange={setSelectedSortCol}>
-                    <SelectTrigger className="h-8 text-[11px] bg-background/50 flex-1">
+                    <SelectTrigger aria-label="Order by column" className="h-8 text-xs bg-background/50 flex-1">
                       <SelectValue placeholder="Add sorting column" />
                     </SelectTrigger>
                     <SelectContent>
@@ -337,7 +332,7 @@ export const WindowExplorer: React.FC = () => {
                   </Select>
 
                   <Select value={selectedSortDir} onValueChange={(v) => setSelectedSortDir(v as "asc" | "desc")}>
-                    <SelectTrigger className="h-8 w-20 text-[11px] bg-background/50">
+                    <SelectTrigger aria-label="Sort direction" className="h-8 w-20 text-xs bg-background/50">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -352,7 +347,7 @@ export const WindowExplorer: React.FC = () => {
                 </div>
 
                 {orderByMissing && (
-                  <div className="flex items-start gap-1.5 text-[11px] text-destructive bg-destructive/10 border border-destructive/30 rounded-md p-2">
+                  <div className="flex items-start gap-1.5 text-xs text-destructive bg-destructive/10 border border-destructive/30 rounded-md p-2">
                     <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                     <span>{orderByRequiredReason}</span>
                   </div>
@@ -370,7 +365,7 @@ export const WindowExplorer: React.FC = () => {
                       checked={useCustomFrame}
                       onCheckedChange={(checked) => setUseCustomFrame(!!checked)}
                     />
-                    <label htmlFor="customFrame" className="text-xs font-bold text-muted-foreground uppercase tracking-wider cursor-pointer">
+                    <label htmlFor="customFrame" className="text-sm font-semibold text-foreground cursor-pointer">
                       Use Custom Window Frame
                     </label>
                   </div>
@@ -378,10 +373,10 @@ export const WindowExplorer: React.FC = () => {
                   {useCustomFrame && (
                     <div className="space-y-3 p-3 border border-border/80 rounded-lg bg-muted/10 animate-slide-in">
                       <div className="space-y-1">
-                        <Label className="text-[10px] font-bold text-muted-foreground uppercase">Frame Start</Label>
+                        <Label className="text-sm font-semibold text-foreground">Frame Start</Label>
                         <div className="grid grid-cols-2 gap-2">
                           <Select value={frameStartType} onValueChange={(val) => setFrameStartType(val as WindowFrameBound["type"])}>
-                            <SelectTrigger className="h-8 text-[10px] bg-background/50">
+                            <SelectTrigger aria-label="Frame start" className="h-8 text-xs bg-background/50">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -405,10 +400,10 @@ export const WindowExplorer: React.FC = () => {
                       </div>
 
                       <div className="space-y-1">
-                        <Label className="text-[10px] font-bold text-muted-foreground uppercase">Frame End</Label>
+                        <Label className="text-sm font-semibold text-foreground">Frame End</Label>
                         <div className="grid grid-cols-2 gap-2">
                           <Select value={frameEndType} onValueChange={(val) => setFrameEndType(val as WindowFrameBound["type"])}>
-                            <SelectTrigger className="h-8 text-[10px] bg-background/50">
+                            <SelectTrigger aria-label="Frame end" className="h-8 text-xs bg-background/50">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -455,7 +450,7 @@ export const WindowExplorer: React.FC = () => {
           <Card className="glass border-border/80 shadow-md">
             <CardHeader className="pb-3 select-none">
               <CardTitle className="text-sm font-bold flex items-center gap-2">
-                <Columns className="w-5 h-5 text-primary" />
+                <Columns className="w-5 h-5 text-primary-ink" />
                 Configured Window Columns ({activeDataset.windowQueries.length})
               </CardTitle>
             </CardHeader>
@@ -468,7 +463,7 @@ export const WindowExplorer: React.FC = () => {
                     className="pl-3 pr-2 py-1.5 h-8 text-xs border-primary/20 bg-primary/5 flex items-center gap-2 rounded-lg"
                   >
                     <span className="font-semibold text-foreground">{q.alias}</span>
-                    <span className="text-[10px] text-muted-foreground font-mono">({q.functionType})</span>
+                    <span className="text-xs text-muted-foreground font-mono">({q.functionType})</span>
                     <Hint label={`Delete window column ${q.alias}`}>
                       <button 
                         onClick={() => deleteWindowQuery(q.alias)} 

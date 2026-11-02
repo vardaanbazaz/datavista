@@ -85,7 +85,7 @@ export function FullPageError({ error, resetErrorBoundary }: FallbackProps) {
 export function WidgetError({ error, resetErrorBoundary }: FallbackProps) {
   return (
     <div className="h-full w-full min-h-[160px] flex flex-col items-center justify-center p-4 bg-muted/30 border border-destructive/20 rounded-lg text-center">
-      <AlertTriangle className="w-6 h-6 text-amber-500 mb-2" />
+      <AlertTriangle className="w-6 h-6 text-tertiary mb-2" />
       <h4 className="text-sm font-semibold text-foreground mb-1">Widget Crashed</h4>
       <p className="text-xs text-muted-foreground max-w-xs mb-3 truncate">
         {error?.message || "Failed to render visualization widget."}

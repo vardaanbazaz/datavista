@@ -73,7 +73,7 @@ export const OnboardingTour: React.FC = () => {
     },
     {
       target: '[data-tour="header-theme"]',
-      content: "Theme Toggle: Switch between Light and Dark mode to suit your workspace preference.",
+      content: "Reading comfort: text size, high contrast, reduced motion, simple frames, and Light or Dark theme.",
     },
   ];
 
@@ -95,35 +95,45 @@ export const OnboardingTour: React.FC = () => {
       run={runTour}
       continuous
       scrollToFirstStep
+      // Theme tokens (CSS variables work inside inline styles): the tour reads as a framed
+      // card in every theme, high contrast and text size included.
       options={{
-        primaryColor: "#2563eb",
-        textColor: "#18181b",
-        backgroundColor: "#ffffff",
-        arrowColor: "#ffffff",
+        primaryColor: "hsl(var(--primary))",
+        textColor: "hsl(var(--card-foreground))",
+        backgroundColor: "hsl(var(--card))",
+        arrowColor: "hsl(var(--card))",
+        overlayColor: "rgb(0 0 0 / 0.6)",
         zIndex: 10000,
         showProgress: true,
         buttons: ["back", "close", "primary", "skip"],
       }}
       styles={{
         tooltip: {
-          borderRadius: "12px",
-          padding: "16px",
-          boxShadow: "0 10px 30px -5px rgba(0, 0, 0, 0.25)",
+          borderRadius: "6px",
+          padding: "1rem",
+          border: "1px solid hsl(var(--border))",
+          outline: "1px solid hsl(var(--ornament) / 0.45)",
+          outlineOffset: "-4px",
+          fontFamily: "inherit",
+          fontSize: "1rem",
+          boxShadow: "0 10px 30px -5px rgb(0 0 0 / 0.35)",
         },
         buttonPrimary: {
-          borderRadius: "8px",
-          fontSize: "13px",
+          borderRadius: "6px",
+          fontSize: "0.875rem",
           fontWeight: 600,
-          padding: "8px 16px",
+          padding: "0.5rem 1rem",
+          color: "hsl(var(--primary-foreground))",
+          border: "1px solid hsl(var(--tertiary) / 0.5)",
         },
         buttonBack: {
-          marginRight: "8px",
-          fontSize: "13px",
-          color: "#71717a",
+          marginRight: "0.5rem",
+          fontSize: "0.875rem",
+          color: "hsl(var(--muted-foreground))",
         },
         buttonSkip: {
-          fontSize: "13px",
-          color: "#71717a",
+          fontSize: "0.875rem",
+          color: "hsl(var(--muted-foreground))",
         },
       }}
       onEvent={handleJoyrideCallback}

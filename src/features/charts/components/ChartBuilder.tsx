@@ -18,6 +18,7 @@ import { useDashboardStore } from "@/features/dashboards/store/dashboardStore";
 import { pluginRegistry } from "@/shared/services/pluginRegistry";
 import { ConditionalFormattingBuilder } from "@/features/dashboards/components/ConditionalFormattingBuilder";
 import { motion } from "framer-motion";
+import { NoDatasetPlate } from "@/shared/components/NoDatasetPlate";
 import { Hint } from "@/shared/components/Hint";
 
 export function ChartBuilder() {
@@ -115,11 +116,9 @@ export function ChartBuilder() {
 
   if (!dataset) {
     return (
-      <div className="text-center py-12">
-        <p className="text-muted-foreground">
-          No dataset selected. Upload data to build charts.
-        </p>
-      </div>
+      <NoDatasetPlate view="Charts" emblem={<BarChart aria-hidden />}>
+        Upload or pick a dataset to build charts.
+      </NoDatasetPlate>
     );
   }
 
@@ -360,7 +359,7 @@ export function ChartBuilder() {
                   </Select>
                 )}
               </div>
-              <p className="text-[10px] text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 Define a hierarchy path (e.g. Region → Country → State). Click data points on the chart with Drill Mode active to drill down.
               </p>
             </div>
@@ -417,7 +416,7 @@ export function ChartBuilder() {
                   </SelectContent>
                 </Select>
                 {note && (
-                  <p className="text-xs text-amber-600 dark:text-amber-400" role="note" data-testid="aggregation-note">
+                  <p className="text-xs text-tertiary" role="note" data-testid="aggregation-note">
                     {note}
                   </p>
                 )}
@@ -510,7 +509,7 @@ export function ChartBuilder() {
               <div className="flex items-center justify-between">
                 <Label className="text-sm font-semibold">Chart Conditional Formatting</Label>
                 {formattingRules.length > 0 && (
-                  <span className="text-xs text-emerald-500 font-medium">
+                  <span className="text-xs text-success font-medium">
                     {formattingRules.length} rule(s) configured
                   </span>
                 )}
@@ -521,15 +520,15 @@ export function ChartBuilder() {
                 onClick={() => setIsFormattingModalOpen(true)}
                 className="w-full justify-start gap-2"
               >
-                <Palette className="h-4 w-4 text-primary" />
+                <Palette className="h-4 w-4 text-primary-ink" />
                 {formattingRules.length > 0 ? "Edit Threshold Rules" : "Add Formatting Rules"}
               </Button>
 
               <Dialog open={isFormattingModalOpen} onOpenChange={setIsFormattingModalOpen}>
-                <DialogContent className="max-w-3xl glass border-white/20 shadow-2xl p-6">
+                <DialogContent className="max-w-3xl glass border-border shadow-2xl p-6">
                   <DialogHeader>
                     <DialogTitle className="text-xl font-bold flex items-center gap-2">
-                      <Palette className="h-5 w-5 text-primary" />
+                      <Palette className="h-5 w-5 text-primary-ink" />
                       Chart Visual Threshold Formatting Rules
                     </DialogTitle>
                   </DialogHeader>
@@ -549,7 +548,7 @@ export function ChartBuilder() {
               <div className="space-y-3 col-span-full p-4 rounded-lg bg-primary/5 border border-primary/20">
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label className="text-sm font-semibold flex items-center gap-1.5 text-primary">
+                    <Label className="text-sm font-semibold flex items-center gap-1.5 text-primary-ink">
                       <TrendingUp className="h-4 w-4" /> Predictive Analytics & Forecasting
                     </Label>
                     <p className="text-xs text-muted-foreground">
