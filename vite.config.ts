@@ -1,7 +1,26 @@
 /// <reference types="vitest" />
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
+import { bootScript } from "./src/shared/theme/boot";
+import { THEMES } from "./src/shared/theme/themes";
+
+/**
+ * Inlines the theme boot script (src/shared/theme/boot.ts) at the top of <head>, so the saved
+ * theme, text size and contrast are on <html> before the first paint (the app bundle is a
+ * deferred module and runs later).
+ */
+function themeBootPlugin(): Plugin {
+  const ids = THEMES.map((t) => t.id);
+  const darkIds = THEMES.filter((t) => t.scheme === "dark").map((t) => t.id);
+  return {
+    name: "datavista-theme-boot",
+    transformIndexHtml: {
+      order: "pre",
+      handler: () => [{ tag: "script", children: bootScript(ids, darkIds), injectTo: "head-prepend" }],
+    },
+  };
+}
 
 // https://vitejs.dev/config/
 export default defineConfig(() => ({
@@ -10,7 +29,7 @@ export default defineConfig(() => ({
     host: "::",
     port: 8080,
   },
-  plugins: [react()],
+  plugins: [themeBootPlugin(), react()],
   // The dev dep scan doesn't follow `new Worker(new URL(...))`, so the import worker's deps
   // were found on the first import and Vite reloaded the page mid-upload. Pre-bundle them.
   optimizeDeps: {

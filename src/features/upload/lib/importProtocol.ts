@@ -9,7 +9,7 @@ export type ToWorker =
   | { type: "review"; exclude: boolean };
 
 export type FromWorker =
-  | { type: "progress"; stage: ImportStage; fraction: number | null }
+  | { type: "progress"; stage: ImportStage; fraction: number | null; detail?: string }
   | { type: "sheets"; sheets: SheetInfo[]; canAppend: boolean }
   | { type: "review"; review: ImportReview }
   /** `sentAt` is `performance.timeOrigin + performance.now()` just before postMessage. */

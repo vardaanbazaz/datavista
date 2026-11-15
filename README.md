@@ -91,13 +91,15 @@ graph TD
 ## 📸 Platform Gallery
 
 
+Screenshots follow your GitHub theme (Light or Dark); both are in [`docs/screenshots/`](docs/screenshots/).
+
 | Overview Dashboard | Pivot Explorer |
 | :---: | :---: |
-| ![Dashboard](docs/dashboard-screenshot.png) <br> *Real-time metrics and executive summaries* | ![Pivot](docs/pivot-screenshot.png) <br> *Multidimensional data aggregation* |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dashboard-dark.png"><img alt="Overview dashboard" src="docs/screenshots/dashboard-light.png"></picture> <br> *Real-time metrics and executive summaries* | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/pivot-dark.png"><img alt="Pivot explorer" src="docs/screenshots/pivot-light.png"></picture> <br> *Multidimensional data aggregation* |
 
 | AI Co-Pilot | Advanced Charting |
 | :---: | :---: |
-| ![AI Copilot](docs/ai-screenshot.png) <br> *Natural language queries via Gemini/GPT-4o* | ![Charts](docs/charts-screenshot.png) <br> *Over 8 interactive visualization types* |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/ai-dark.png"><img alt="AI Co-Pilot settings" src="docs/screenshots/ai-light.png"></picture> <br> *Natural language queries via Gemini/GPT-4o* | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/charts-dark.png"><img alt="Grouped bar chart" src="docs/screenshots/charts-light.png"></picture> <br> *Over 8 interactive visualization types* |
 
 ---
 

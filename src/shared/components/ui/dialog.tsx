@@ -4,7 +4,6 @@ import { X } from "lucide-react";
 
 import { cn } from "@/shared/lib/utils"
 import { Hint } from "@/shared/components/Hint";
-import { Ornament } from "@/shared/components/ornament";
 
 const Dialog = DialogPrimitive.Root;
 
@@ -21,7 +20,7 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      "fixed inset-0 z-50 bg-black/45 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
       className
     )}
     {...props}
@@ -31,31 +30,23 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
-    /**
-     * Batch 6 framed dialog: card surface, double rule and corner flourishes (the top-right
-     * corner is left to the close button). Phase B makes this the default.
-     */
-    ornate?: boolean
-    /** Corner flourishes (off where content runs to the edge, e.g. the command palette). */
-    corners?: boolean
-  }
->(({ className, children, ornate = true, corners = true, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
+>(({ className, children, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        ornate && "frame-double !bg-card max-h-[calc(100dvh-2rem)] overflow-y-auto",
-        "fixed left-[50%] top-[50%] z-50 w-full max-w-lg translate-x-[-50%] translate-y-[-50%] border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-1/2 data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-1/2 rounded-lg",
+        // Floating glass (batch 7); OVERLAY_ALPHA in themes.ts matches bg-black/45 above.
+        "surface-float max-h-[calc(100dvh-2rem)] overflow-y-auto",
+        "fixed left-[50%] top-[50%] z-50 w-full max-w-lg translate-x-[-50%] translate-y-[-50%] p-6 duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-1/2 data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-1/2 rounded-2xl",
         className
       )}
       {...props}
     >
-      {ornate && corners && <Ornament.Corners omit={["tr"]} />}
       {children}
       <Hint label="Close" shortcut={["Esc"]}>
-        <DialogPrimitive.Close className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+        <DialogPrimitive.Close className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-lg text-frame-muted transition-colors hover:bg-accent hover:text-foreground hover:shadow-[inset_0_0_0_1px_hsl(var(--border-strong))] focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
           <X className="h-4 w-4" />
         </DialogPrimitive.Close>
       </Hint>
@@ -99,7 +90,7 @@ const DialogTitle = React.forwardRef<
   <DialogPrimitive.Title
     ref={ref}
     className={cn(
-      "font-display text-h1 font-semibold leading-tight",
+      "text-h1",
       className
     )}
     {...props}

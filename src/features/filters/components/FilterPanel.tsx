@@ -20,6 +20,18 @@ import { useDatasetStore } from "@/store/datasetStore";
 import { buildFilterQuery } from "@/features/dashboards/store/dashboardStore";
 import { NoDatasetPlate } from "@/shared/components/NoDatasetPlate";
 import { columnsOfType, getEffectiveColumnType } from "@/shared/utils/columnType";
+import { columnValueCounts, visibleValues } from "@/shared/utils/valueCounts";
+import type { DataRow, Dataset } from "@/shared/types";
+
+/** Values listed per categorical column; the rest are reached by typing in its search box. */
+export const FILTER_VALUE_LIMIT = 50;
+
+// The dataset, filters and resulting rows this view last wrote to the store. Opening the view
+// again with none changed skips re-running the query over every row (and handing every
+// filteredData subscriber, Pivot included, a new array to recompute from). The rows are
+// compared too, so a write from elsewhere (persistenceService on a dataset switch) re-runs it.
+// Module-level: it outlives the view's unmount.
+let lastApplied: { dataset: Dataset; filters: FilterState; rows: DataRow[] } | null = null;
 
 export function FilterPanel() {
   const dataset = useDatasetStore((state) => state.activeDataset);
@@ -46,8 +58,15 @@ export function FilterPanel() {
   // Apply filters and grouping
   useEffect(() => {
     if (!dataset) return;
+    if (
+      lastApplied &&
+      lastApplied.dataset === dataset &&
+      lastApplied.filters === filters &&
+      lastApplied.rows === useFilterStore.getState().filteredData
+    ) return;
 
     const queryResult = queryEngine.execute(dataset, buildFilterQuery(filters));
+    lastApplied = { dataset, filters, rows: queryResult.rows };
     setFiltersChange(queryResult.rows, filters);
   }, [filters, dataset, setFiltersChange]);
 
@@ -149,13 +168,6 @@ export function FilterPanel() {
     });
   };
 
-  const getUniqueValues = (column: string) => {
-    const values = Array.from(new Set(dataset.data.map(row => String(row[column]))))
-      .filter(Boolean)
-      .sort();
-    return values;
-  };
-
   const activeNumericRangeFilters = Object.entries(filters.numericRangeFilters || {})
     .filter(([, range]) => range.min !== undefined || range.max !== undefined);
   const activeTextSearchFilters = Object.entries(filters.textSearchFilters || {})
@@ -166,8 +178,9 @@ export function FilterPanel() {
     activeNumericRangeFilters.length +
     activeTextSearchFilters.length;
 
+  // Solid, not glass: a backdrop blur behind the scrolling value lists repaints on every scroll frame.
   return (
-    <Card className="glass">
+    <Card surface="solid" data-testid="filter-panel">
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
@@ -241,47 +254,17 @@ export function FilterPanel() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {/* Categorical Filters */}
-          {categoricalColumns.map(column => {
-            const uniqueValues = getUniqueValues(column);
-            const selectedValues = filters.categoricalFilters[column] || [];
-            const searchText = filters.textSearchFilters?.[column] || '';
-
-            return (
-              <div key={column} className="space-y-3">
-                <Label className="font-medium">{column}</Label>
-                <div className="relative">
-                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                  <Input
-                    placeholder={`Search ${column}...`}
-                    value={searchText}
-                    onChange={(e) => updateTextSearchFilter(column, e.target.value)}
-                    className="h-8 pl-7 text-xs"
-                  />
-                </div>
-                <ScrollArea className="h-32 border rounded-md p-2">
-                  <div className="space-y-2">
-                    {uniqueValues.map(value => (
-                      <div key={value} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`${column}-${value}`}
-                          checked={selectedValues.includes(value)}
-                          onCheckedChange={(checked) => 
-                            updateCategoricalFilter(column, value, !!checked)
-                          }
-                        />
-                        <Label 
-                          htmlFor={`${column}-${value}`}
-                          className="text-sm cursor-pointer"
-                        >
-                          {value}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
-              </div>
-            );
-          })}
+          {categoricalColumns.map(column => (
+            <CategoricalFilter
+              key={column}
+              dataset={dataset}
+              column={column}
+              selected={filters.categoricalFilters[column] || []}
+              searchText={filters.textSearchFilters?.[column] || ''}
+              onSearch={(text) => updateTextSearchFilter(column, text)}
+              onToggle={(value, checked) => updateCategoricalFilter(column, value, checked)}
+            />
+          ))}
 
           {/* Date Range Filters */}
           {dateColumns.map(column => {
@@ -429,5 +412,74 @@ export function FilterPanel() {
         </div>
       </CardContent>
     </Card>
+  );
+}
+/**
+ * One categorical column's picker. Only the most common FILTER_VALUE_LIMIT values (plus any
+ * selected) are in the DOM: a column like the Play Store's "App" has ~9,700 distinct values,
+ * and rendering a checkbox for each froze the view for seconds. The search box narrows the
+ * list (and, as before, filters the rows to values containing the text).
+ */
+function CategoricalFilter({
+  dataset,
+  column,
+  selected,
+  searchText,
+  onSearch,
+  onToggle,
+}: {
+  dataset: Dataset;
+  column: string;
+  selected: string[];
+  searchText: string;
+  onSearch: (text: string) => void;
+  onToggle: (value: string, checked: boolean) => void;
+}) {
+  const all = useMemo(() => columnValueCounts(dataset.data, column), [dataset.data, column]);
+  const { shown, hidden } = useMemo(
+    () => visibleValues(all, selected, searchText, FILTER_VALUE_LIMIT),
+    [all, selected, searchText]
+  );
+  const idBase = `filter-${column.replace(/[^A-Za-z0-9_-]/g, "_")}`;
+
+  return (
+    <div className="space-y-3" data-testid={`filter-column-${column}`}>
+      <Label className="font-medium" htmlFor={`${idBase}-search`}>{column}</Label>
+      <div className="relative">
+        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+        <Input
+          id={`${idBase}-search`}
+          placeholder={`Search ${all.length.toLocaleString()} values...`}
+          value={searchText}
+          onChange={(e) => onSearch(e.target.value)}
+          className="h-8 pl-7 text-xs"
+        />
+      </div>
+      <ScrollArea className="surface-solid h-32 rounded-md p-2">
+        <div className="space-y-2">
+          {shown.map(({ value, count }, i) => (
+            <div key={value} className="flex items-center space-x-2">
+              <Checkbox
+                id={`${idBase}-${i}`}
+                checked={selected.includes(value)}
+                onCheckedChange={(checked) => onToggle(value, !!checked)}
+              />
+              <Label htmlFor={`${idBase}-${i}`} className="min-w-0 flex-1 truncate text-sm cursor-pointer" title={value}>
+                {value}
+              </Label>
+              <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{count.toLocaleString()}</span>
+            </div>
+          ))}
+          {shown.length === 0 && (
+            <p className="text-xs text-muted-foreground">No values match “{searchText.trim()}”.</p>
+          )}
+        </div>
+      </ScrollArea>
+      {hidden > 0 && (
+        <p className="text-xs text-muted-foreground" data-testid="filter-values-more">
+          {`${hidden.toLocaleString()} more ${searchText.trim() ? "matching " : ""}value${hidden === 1 ? "" : "s"}; the most common are listed. Type to search.`}
+        </p>
+      )}
+    </div>
   );
 }

@@ -6,36 +6,25 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/shared/lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-smooth focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        // Batch 6: every primary action is the engraved oxblood plate, every secondary one
-        // the embossed card plate (the phase A `engraved`/`plate` names stay as aliases).
-        default:
-          "emboss border border-tertiary/50 bg-primary font-semibold text-primary-foreground hover:bg-primary-glow",
-        destructive:
-          "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-        outline:
-          "emboss border border-borderStrong bg-card text-foreground hover:bg-accent hover:text-accent-foreground",
-        secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
+        // Filled accent for the main action; outline (≥3:1 boundary, transparent so it takes the
+        // glass or data surface under it) for the rest. Ghost (nav items, icon buttons) has no
+        // resting border: its icon is ≥3:1 and hover draws the accent fill plus a ≥3:1 inset
+        // edge (contrastAudit: borderStrong on accent), focus the ring.
+        default: "bg-primary font-medium text-primary-foreground shadow-sm hover:bg-primary-glow",
+        destructive: "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
+        outline: "border border-borderStrong bg-transparent text-foreground hover:bg-accent hover:text-accent-foreground",
+        secondary: "border border-borderStrong bg-secondary text-secondary-foreground hover:bg-accent",
+        ghost: "text-foreground hover:bg-accent hover:text-accent-foreground hover:shadow-[inset_0_0_0_1px_hsl(var(--border-strong))]",
         link: "text-primary-ink underline-offset-4 hover:underline",
-        premium:
-          "emboss border border-tertiary/50 bg-primary font-semibold text-primary-foreground hover:bg-primary-glow",
-        glass: "emboss border border-borderStrong bg-card text-foreground hover:bg-accent",
-        // Batch 6 frame buttons (Dark Academia). Embossed oxblood with a gilt edge for the
-        // main action, an embossed plate for secondary ones. Phase B makes these the defaults.
-        engraved:
-          "emboss border border-tertiary/50 bg-primary font-semibold text-primary-foreground hover:bg-primary-glow",
-        plate:
-          "emboss border border-borderStrong bg-card text-foreground hover:bg-accent hover:text-accent-foreground",
       },
       size: {
         default: "h-10 px-4 py-2",
-        sm: "h-9 rounded-md px-3",
-        lg: "h-11 rounded-md px-8",
+        sm: "h-9 px-3",
+        lg: "h-11 px-6",
         icon: "h-10 w-10",
       },
     },

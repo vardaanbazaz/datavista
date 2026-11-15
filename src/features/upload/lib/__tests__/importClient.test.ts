@@ -63,7 +63,9 @@ describe("importFile with a worker", () => {
     const job = importFile(fakeFile("a.csv", 10), h, () => worker);
     expect(worker.sent[0].type).toBe("start");
     worker.emit({ type: "progress", stage: "parsing", fraction: 0.5 });
-    expect(h.onProgress).toHaveBeenCalledWith("parsing", 0.5);
+    expect(h.onProgress).toHaveBeenCalledWith("parsing", 0.5, undefined);
+    worker.emit({ type: "progress", stage: "parsing", fraction: null, detail: "Reading workbook" });
+    expect(h.onProgress).toHaveBeenLastCalledWith("parsing", null, "Reading workbook");
     const dataset = { id: "x", name: "a", data: [], columns: [], columnTypes: {} };
     worker.emit({ type: "done", dataset, sentAt: performance.timeOrigin + performance.now() });
     await expect(job.promise).resolves.toMatchObject({ dataset });

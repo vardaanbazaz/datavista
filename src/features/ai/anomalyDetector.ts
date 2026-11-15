@@ -1,7 +1,8 @@
 import { ChartConfig, DataRow, Dataset } from "@/shared/types";
 import { computeOutliers } from "@/shared/services/stats/outliers";
 import { mean as meanOf, numericValues } from "@/shared/utils/numeric";
-import { aggregationFlag } from "@/shared/utils/columnRoles";
+import { aggregationFlag, isIdName } from "@/shared/utils/columnRoles";
+import { HIGH_CARDINALITY_SHARE } from "@/shared/services/dataQuality";
 import { chartReduction } from "@/features/charts/lib/chartAggregation";
 import { columnsOfType, getEffectiveColumnType } from "@/shared/utils/columnType";
 
@@ -13,6 +14,11 @@ export interface DetectedAnomaly {
   dimensionKey?: string; // e.g. "Tuesday" or "North"
   /** The column dimensionKey is a value of, e.g. "Attrition"; absent when the key is a row number. */
   dimensionColumn?: string;
+  /**
+   * dimensionColumn is near-unique (an app name, an ID): the value names one row, not a group,
+   * so it is shown as "Reviews (App: Facebook)", never "for App = Facebook".
+   */
+  rowLevel?: boolean;
   value: number;
   score: number;
   type: 'spike' | 'drop';
@@ -20,15 +26,71 @@ export interface DetectedAnomaly {
   description: string;
 }
 
-/** "MonthlyIncome for Attrition = No: 19,999, 207% above average." (or "in row 12" without a grouping column). */
-export function anomalyLabel(a: Pick<DetectedAnomaly, "columnName" | "dimensionColumn" | "dimensionKey">): string {
+type LabelParts = Pick<DetectedAnomaly, "columnName" | "dimensionColumn" | "dimensionKey" | "rowLevel">;
+
+/**
+ * "MonthlyIncome for Attrition = No" (a group), "Reviews (App: Facebook)" (a near-unique
+ * column: one row), or "Rating in row 12" (no label column).
+ */
+export function anomalyLabel(a: LabelParts): string {
+  if (a.dimensionColumn && a.rowLevel) return `${a.columnName} (${a.dimensionColumn}: ${a.dimensionKey})`;
   if (a.dimensionColumn) return `${a.columnName} for ${a.dimensionColumn} = ${a.dimensionKey}`;
   return a.dimensionKey ? `${a.columnName} in ${a.dimensionKey.replace(/^Row /, "row ")}` : a.columnName;
 }
 
-function describeAnomaly(column: string, dimColumn: string | undefined, dimKey: string, value: number, diffPct: number, isSpike: boolean): string {
-  const label = anomalyLabel({ columnName: column, dimensionColumn: dimColumn, dimensionKey: dimKey });
-  return `${label}: ${value.toLocaleString()}, ${Math.round(diffPct)}% ${isSpike ? "above" : "below"} average.`;
+/** Chip text: "Reviews: 78,158,306 (App: Facebook)" or "MonthlyIncome for Attrition = No: 19,999". */
+export function anomalyChipText(a: LabelParts & Pick<DetectedAnomaly, "value">): string {
+  if (a.dimensionColumn && a.rowLevel) return `${a.columnName}: ${a.value.toLocaleString()} (${a.dimensionColumn}: ${a.dimensionKey})`;
+  return `${anomalyLabel(a)}: ${a.value.toLocaleString()}`;
+}
+
+/** "Reviews: 78,158,306 (App: Facebook), 17497% above average." / "MonthlyIncome for Attrition = No: 19,999, 207% above average." */
+function describeAnomaly(parts: LabelParts, value: number, diffPct: number, isSpike: boolean): string {
+  const tail = `${Math.round(diffPct)}% ${isSpike ? "above" : "below"} average.`;
+  if (parts.dimensionColumn && parts.rowLevel) {
+    return `${parts.columnName}: ${value.toLocaleString()} (${parts.dimensionColumn}: ${parts.dimensionKey}), ${tail}`;
+  }
+  return `${anomalyLabel(parts)}: ${value.toLocaleString()}, ${tail}`;
+}
+
+/**
+ * A column whose values name single rows rather than groups: an ID-like name, the
+ * "identifier" role, or more than half of its non-blank values distinct (Play Store "App":
+ * 9,660 distinct in 10,841 rows). Decided from the import metadata (all rows) when there is
+ * one, so a filter that leaves few rows does not make an ordinary column look unique.
+ */
+export function isNearUniqueColumn(dataset: Dataset | null | undefined, column: string, rows: DataRow[]): boolean {
+  if (isIdName(column)) return true;
+  const meta = dataset?.metadata?.columns.find((c) => c.name === column);
+  if (meta) {
+    if (meta.role === "identifier") return true;
+    const nonBlank = (dataset!.data.length || rows.length) - meta.missingValueCount;
+    return nonBlank > 0 && meta.uniqueValueCount / nonBlank > HIGH_CARDINALITY_SHARE;
+  }
+  const seen = new Set<string>();
+  let nonBlank = 0;
+  for (const r of rows) {
+    const v = r[column];
+    if (v === null || v === undefined || v === "") continue;
+    nonBlank++;
+    seen.add(String(v));
+  }
+  return nonBlank > 0 && seen.size / nonBlank > HIGH_CARDINALITY_SHARE;
+}
+
+/**
+ * One finding per value column and label: duplicate rows (Play Store lists Facebook twice,
+ * with 78,158,306 and 78,128,208 reviews) would otherwise repeat the same app. Keeps the first,
+ * so callers sort by importance first.
+ */
+export function dedupeAnomalies(list: DetectedAnomaly[]): DetectedAnomaly[] {
+  const seen = new Set<string>();
+  return list.filter((a) => {
+    const key = `${a.widgetId ?? ""}\u0000${a.columnName}\u0000${a.dimensionColumn ?? ""}\u0000${a.dimensionKey ?? ""}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 export const anomalyDetector = {
@@ -63,8 +125,10 @@ export const anomalyDetector = {
     if (outlierResult.count === 0) return [];
 
     const mean = meanOf(numericValues(rawValues));
+    const rowLevel = Boolean(dimCol && isNearUniqueColumn(dataset, dimCol, rows));
+    const ranked = [...outlierResult.outliers].sort((a, b) => Math.abs(b.value - mean) - Math.abs(a.value - mean));
 
-    return outlierResult.outliers.map((outlier, idx) => {
+    return dedupeAnomalies(ranked.map((outlier, idx) => {
       const row = rows[outlier.index];
       const hasDim = Boolean(dimCol && row[dimCol] !== undefined);
       const dimensionKey = hasDim ? String(row[dimCol!]) : `Row ${outlier.index + 1}`;
@@ -81,13 +145,17 @@ export const anomalyDetector = {
         columnName: valueCol,
         dimensionKey,
         dimensionColumn: hasDim ? dimCol : undefined,
+        ...(hasDim && rowLevel ? { rowLevel: true } : {}),
         value: outlier.value,
         score: outlier.score,
         type,
         severity,
-        description: describeAnomaly(valueCol, hasDim ? dimCol : undefined, dimensionKey, outlier.value, diffPct, isSpike),
+        description: describeAnomaly(
+          { columnName: valueCol, dimensionColumn: hasDim ? dimCol : undefined, dimensionKey, rowLevel: hasDim && rowLevel },
+          outlier.value, diffPct, isSpike
+        ),
       };
-    });
+    }));
   },
 
   /**
@@ -113,7 +181,9 @@ export const anomalyDetector = {
     const numericCols = columnsOfType(dataset, "numeric").filter((c) => !aggregationFlag(dataset, c));
 
     // Name each outlier by the first categorical column, e.g. "for Attrition = No".
+    // A near-unique one (an app name) labels the row instead: "Reviews: 78,158,306 (App: Facebook)".
     const categoryCol = dataset.columns.find(c => getEffectiveColumnType(dataset, c) === 'categorical');
+    const rowLevel = Boolean(categoryCol && isNearUniqueColumn(dataset, categoryCol, data));
     const anomalies: DetectedAnomaly[] = [];
 
     for (const col of numericCols) {
@@ -127,7 +197,8 @@ export const anomalyDetector = {
 
       // Largest deviation first, so the summary names the most unusual value.
       const ranked = [...res.outliers].sort((a, b) => Math.abs(b.value - mean) - Math.abs(a.value - mean));
-      ranked.slice(0, 3).forEach((outlier, idx) => {
+      const found: DetectedAnomaly[] = [];
+      ranked.forEach((outlier, idx) => {
         const row = data[outlier.index];
         const hasDim = Boolean(categoryCol && row[categoryCol] !== null && row[categoryCol] !== undefined && row[categoryCol] !== "");
         const dimVal = hasDim ? String(row[categoryCol!]) : `Row ${outlier.index + 1}`;
@@ -136,18 +207,23 @@ export const anomalyDetector = {
         const diffPct = mean !== 0 ? Math.abs(((outlier.value - mean) / mean) * 100) : 0;
         const severity: 'high' | 'medium' | 'low' = diffPct > 100 ? 'high' : diffPct > 40 ? 'medium' : 'low';
 
-        anomalies.push({
+        found.push({
           id: `ds-anomaly-${col}-${idx}`,
           columnName: col,
           dimensionKey: dimVal,
           dimensionColumn: hasDim ? categoryCol : undefined,
+          ...(hasDim && rowLevel ? { rowLevel: true } : {}),
           value: outlier.value,
           score: outlier.score,
           type,
           severity,
-          description: describeAnomaly(col, hasDim ? categoryCol : undefined, dimVal, outlier.value, diffPct, isSpike),
+          description: describeAnomaly(
+            { columnName: col, dimensionColumn: hasDim ? categoryCol : undefined, dimensionKey: dimVal, rowLevel: hasDim && rowLevel },
+            outlier.value, diffPct, isSpike
+          ),
         });
       });
+      anomalies.push(...dedupeAnomalies(found).slice(0, 3));
     }
 
     return anomalies.sort((a, b) => b.score - a.score);

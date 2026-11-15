@@ -13,7 +13,7 @@ let answerSheet: ((choice: SheetChoice) => void) | null = null;
 let answerReview: ((answer: { exclude: boolean }) => void) | null = null;
 
 const io: ImportIO = {
-  progress: (stage, fraction) => post({ type: "progress", stage, fraction }),
+  progress: (stage, fraction, detail) => post({ type: "progress", stage, fraction, detail }),
   chooseSheet: (sheets, canAppend) =>
     new Promise(resolve => {
       answerSheet = resolve;

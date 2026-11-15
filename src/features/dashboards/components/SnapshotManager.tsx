@@ -54,7 +54,7 @@ export function SnapshotManager({ isOpen, onClose }: SnapshotManagerProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col glass border-border">
+      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
             <Camera className="h-5 w-5 text-primary-ink" />
@@ -155,7 +155,7 @@ export function SnapshotManager({ isOpen, onClose }: SnapshotManagerProps) {
                   {snapshots.map((snap) => (
                     <div
                       key={snap.id}
-                      className="p-3 rounded-lg border border-border/60 bg-card hover:bg-accent/5 transition-colors flex items-center justify-between gap-4"
+                      className="p-3 rounded-lg border border-border/60 bg-card hover:bg-accent hover:border-borderStrong transition-colors flex items-center justify-between gap-4"
                     >
                       <div className="space-y-1 min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -287,7 +287,7 @@ export function SnapshotManager({ isOpen, onClose }: SnapshotManagerProps) {
                       return (
                         <div
                           key={`past-${idx}`}
-                          className="p-2.5 rounded-lg border border-border/60 bg-card hover:bg-accent/5 flex items-center justify-between gap-3 text-xs"
+                          className="p-2.5 rounded-lg border border-border/60 bg-card hover:bg-accent hover:border-borderStrong flex items-center justify-between gap-3 text-xs"
                         >
                           <div className="flex items-center gap-2 min-w-0">
                             <Badge variant="secondary" className="text-xs">

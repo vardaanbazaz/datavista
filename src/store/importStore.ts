@@ -19,6 +19,8 @@ interface ImportState {
   stage: ImportStage;
   /** null while the stage can't tell how far it is. */
   fraction: number | null;
+  /** What the stage is doing, when it says more than the stage name ("Reading workbook — …"). */
+  detail: string | null;
   startedAt: number;
   stageStartedAt: number;
   /** False once the dataset is being saved: terminating the worker can't undo that. */
@@ -45,7 +47,7 @@ export const useImportStore = create<ImportState>((set, get) => {
     job = null;
     pendingSheet = null;
     pendingReview = null;
-    set({ phase: "idle", sheets: [], canAppend: false, review: null, cancellable: true, fraction: null });
+    set({ phase: "idle", sheets: [], canAppend: false, review: null, cancellable: true, fraction: null, detail: null });
   };
 
   /** Runs the shared pipeline; reports rejection, cancellation and errors; null when no dataset came back. */
@@ -56,8 +58,13 @@ export const useImportStore = create<ImportState>((set, get) => {
     }
     const now = Date.now();
     const current = importFile(file, {
-      onProgress: (stage, fraction) =>
-        set(s => ({ stage, fraction, stageStartedAt: s.stage === stage ? s.stageStartedAt : Date.now() })),
+      onProgress: (stage, fraction, detail) =>
+        set(s => ({
+          stage,
+          fraction,
+          detail: detail ?? null,
+          stageStartedAt: s.stage === stage && s.detail === (detail ?? null) ? s.stageStartedAt : Date.now(),
+        })),
       chooseSheet: (sheets, canAppend) =>
         new Promise(resolve => {
           pendingSheet = resolve;
@@ -78,6 +85,7 @@ export const useImportStore = create<ImportState>((set, get) => {
         fileName: file.name,
         stage: "reading",
         fraction: 0,
+        detail: null,
         startedAt: now,
         stageStartedAt: now,
         cancellable: true,
@@ -112,6 +120,7 @@ export const useImportStore = create<ImportState>((set, get) => {
     fileName: "",
     stage: "reading",
     fraction: null,
+    detail: null,
     startedAt: 0,
     stageStartedAt: 0,
     cancellable: true,
@@ -123,7 +132,7 @@ export const useImportStore = create<ImportState>((set, get) => {
       const dataset = await run(file);
       if (!dataset) return;
       const now = Date.now();
-      set({ phase: "running", stage: "saving", fraction: null, stageStartedAt: now, cancellable: false });
+      set({ phase: "running", stage: "saving", fraction: null, detail: null, stageStartedAt: now, cancellable: false });
       try {
         await useDatasetStore.getState().uploadDataset(dataset);
       } finally {

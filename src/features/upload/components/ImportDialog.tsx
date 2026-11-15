@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/shared/components/ui/dialog";
 import { Button } from "@/shared/components/ui/button";
 import { Progress } from "@/shared/components/ui/progress";
-import { Hint } from "@/shared/components/Hint";
 import type { ImportIssuesSummary } from "@/shared/types";
 import type { ImportStage, SheetChoice } from "@/features/upload/lib/importCore";
 import { useImportStore } from "@/store/importStore";
@@ -41,7 +40,17 @@ export function ImportIssueList({ issues }: { issues: ImportIssuesSummary }) {
                 <tr key={`${issue.row}-${i}`} className="border-t border-border align-top" data-testid="import-issue-row">
                   <td className="p-2 tabular-nums">{issue.row.toLocaleString()}</td>
                   <td className="p-2">{issue.message}</td>
-                  <td className="p-2 font-mono break-all">{issue.raw.join(" | ")}</td>
+                  <td className="p-2 font-mono">
+                    {/* Wraps only between values (or at spaces inside one), never inside "3.0M" or "2018". */}
+                    {issue.raw.map((v, j) => (
+                      <span key={j}>
+                        {j > 0 && " | "}
+                        {v.split(" ").map((word, k) => (
+                          <span key={k} className="whitespace-nowrap">{k > 0 && " "}{word}</span>
+                        ))}
+                      </span>
+                    ))}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -67,7 +76,7 @@ function useTicker(active: boolean) {
 }
 
 function ProgressView() {
-  const { fileName, stage, fraction, startedAt, stageStartedAt, cancellable, cancel } = useImportStore();
+  const { fileName, stage, fraction, detail, startedAt, stageStartedAt, cancellable, cancel } = useImportStore();
   useTicker(true);
   const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
   const stageElapsed = ((Date.now() - stageStartedAt) / 1000).toFixed(1);
@@ -92,18 +101,32 @@ function ProgressView() {
           </li>
         ))}
       </ol>
-      <div className="space-y-1">
-        <Progress value={percent ?? 0} className={percent === null ? "animate-pulse" : undefined} />
+      <div className="space-y-1.5">
+        <Progress
+          value={percent ?? 0}
+          indeterminate={percent === null}
+          className="h-2"
+          aria-label={detail ?? STAGES[current]?.label}
+          data-testid="import-progress-bar"
+        />
         <p className="text-sm text-muted-foreground" data-testid="import-progress-text">
-          {STAGES[current]?.label}: {percent === null ? `working… ${stageElapsed} s` : `${percent}%`}
+          {detail ?? STAGES[current]?.label}
+          <span className="whitespace-nowrap tabular-nums"> · {percent === null ? `${stageElapsed} s` : `${percent}%`}</span>
         </p>
       </div>
-      <DialogFooter>
-        <Hint label="Cancel import" disabledReason={cancellable ? undefined : "The dataset is being saved and can't be cancelled now"}>
-          <Button variant="outline" onClick={cancel} disabled={!cancellable} data-testid="import-cancel">
-            Cancel
-          </Button>
-        </Hint>
+      {/*
+        Plain button: the Hint tooltip it used to have opened on the dialog's initial focus and
+        sat over the progress bar. The reason it is disabled is written out instead.
+      */}
+      <DialogFooter className="items-center gap-2">
+        {!cancellable && (
+          <p className="text-sm text-muted-foreground sm:mr-auto" data-testid="import-cancel-note">
+            Saving the dataset; this step can't be cancelled.
+          </p>
+        )}
+        <Button variant="outline" onClick={cancel} disabled={!cancellable} data-testid="import-cancel">
+          Cancel
+        </Button>
       </DialogFooter>
     </>
   );
@@ -138,7 +161,7 @@ function SheetPicker() {
             <span className="min-w-0">
               <span className="font-medium">{s.name}</span>{" "}
               <span className="text-sm text-muted-foreground" data-testid="sheet-row-count">
-                {s.rowCount.toLocaleString()} rows
+                {s.rowCount.toLocaleString()}{s.rowCountUnknown ? "+" : ""} rows
               </span>
               <span className="block text-xs text-muted-foreground truncate" title={s.headers.join(", ")}>
                 {s.headers.length > 0 ? s.headers.join(", ") : "Empty sheet"}

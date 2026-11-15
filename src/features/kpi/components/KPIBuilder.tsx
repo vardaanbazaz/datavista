@@ -31,9 +31,11 @@ interface KPIBuilderProps {
   onClose: () => void;
   onSave: (kpi: KPICardConfig) => void;
   editKpi?: KPICardConfig | null;
+  /** Shown under the description, e.g. that saving creates a dashboard. */
+  saveNote?: string;
 }
 
-export function KPIBuilder({ isOpen, onClose, onSave, editKpi = null }: KPIBuilderProps) {
+export function KPIBuilder({ isOpen, onClose, onSave, editKpi = null, saveNote }: KPIBuilderProps) {
   const dataset = useDatasetStore((state) => state.activeDataset);
 
   const [title, setTitle] = useState("");
@@ -125,11 +127,15 @@ export function KPIBuilder({ isOpen, onClose, onSave, editKpi = null }: KPIBuild
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="fixed right-0 top-0 bottom-0 h-full w-full max-w-md left-auto translate-x-0 translate-y-0 rounded-none border-l bg-background p-6 shadow-lg duration-300 flex flex-col">
+      <DialogContent
+        className="fixed right-0 top-0 bottom-0 h-full w-full max-w-md left-auto translate-x-0 translate-y-0 rounded-none border-l p-6 shadow-lg duration-300 flex flex-col"
+        data-testid="kpi-builder"
+      >
         <DialogHeader className="mb-4">
           <DialogTitle>{editKpi ? "Edit KPI Card" : "Add KPI Card"}</DialogTitle>
           <DialogDescription>
             Configure the metrics, PoP comparisons, and style settings for this card.
+            {saveNote && <span className="mt-1 block" data-testid="kpi-builder-note">{saveNote}</span>}
           </DialogDescription>
         </DialogHeader>
 
@@ -158,7 +164,7 @@ export function KPIBuilder({ isOpen, onClose, onSave, editKpi = null }: KPIBuild
                     if (!aggregationTouched) setAggregation(aggregationFlag(dataset, col) ? "count" : "sum");
                   }}
                 >
-                  <SelectTrigger id="metric-col" className="glass">
+                  <SelectTrigger id="metric-col">
                     <SelectValue placeholder="Select column" />
                   </SelectTrigger>
                   <SelectContent>
@@ -180,7 +186,7 @@ export function KPIBuilder({ isOpen, onClose, onSave, editKpi = null }: KPIBuild
                     setAggregationTouched(true);
                   }}
                 >
-                  <SelectTrigger id="aggregation" className="glass">
+                  <SelectTrigger id="aggregation">
                     <SelectValue placeholder="Select agg" />
                   </SelectTrigger>
                   <SelectContent>
@@ -206,7 +212,7 @@ export function KPIBuilder({ isOpen, onClose, onSave, editKpi = null }: KPIBuild
             <div className="space-y-2">
               <Label htmlFor="polarity" className="text-sm font-semibold">Metric Polarity</Label>
               <Select value={polarity} onValueChange={(val: "positive" | "negative") => setPolarity(val)}>
-                <SelectTrigger id="polarity" className="glass">
+                <SelectTrigger id="polarity">
                   <SelectValue placeholder="Select polarity" />
                 </SelectTrigger>
                 <SelectContent>
@@ -247,7 +253,7 @@ export function KPIBuilder({ isOpen, onClose, onSave, editKpi = null }: KPIBuild
                 <div className="space-y-2">
                   <Label htmlFor="trend-date-col" className="text-sm font-semibold">Date Column</Label>
                   <Select value={trendDateCol} onValueChange={setTrendDateCol}>
-                    <SelectTrigger id="trend-date-col" className="bg-background">
+                    <SelectTrigger id="trend-date-col">
                       <SelectValue placeholder="Select date column" />
                     </SelectTrigger>
                     <SelectContent>
@@ -268,7 +274,7 @@ export function KPIBuilder({ isOpen, onClose, onSave, editKpi = null }: KPIBuild
                 <div className="space-y-2">
                   <Label htmlFor="comparison-period" className="text-sm font-semibold">Comparison Period</Label>
                   <Select value={comparisonPeriod} onValueChange={(val: "day" | "week" | "month" | "quarter" | "year") => setComparisonPeriod(val)}>
-                    <SelectTrigger id="comparison-period" className="bg-background">
+                    <SelectTrigger id="comparison-period">
                       <SelectValue placeholder="Select period" />
                     </SelectTrigger>
                     <SelectContent>
@@ -308,9 +314,9 @@ export function KPIBuilder({ isOpen, onClose, onSave, editKpi = null }: KPIBuild
 
             {/* Nested Formatting Dialog */}
             <Dialog open={isFormattingModalOpen} onOpenChange={setIsFormattingModalOpen}>
-              <DialogContent className="max-w-3xl glass border-border shadow-2xl p-6">
+              <DialogContent className="max-w-3xl p-6">
                 <DialogHeader>
-                  <DialogTitle className="text-xl font-bold flex items-center gap-2">
+                  <DialogTitle className="text-h2 flex items-center gap-2">
                     <Palette className="h-5 w-5 text-primary-ink" />
                     KPI Threshold Formatting Rules
                   </DialogTitle>
@@ -330,7 +336,7 @@ export function KPIBuilder({ isOpen, onClose, onSave, editKpi = null }: KPIBuild
             <Button type="button" variant="outline" onClick={onClose} className="w-full sm:w-auto">
               Cancel
             </Button>
-            <Button type="submit" variant="premium" className="w-full sm:w-auto">
+            <Button type="submit" variant="default" className="w-full sm:w-auto" data-testid="kpi-builder-save">
               {editKpi ? "Save Changes" : "Create Card"}
             </Button>
           </DialogFooter>

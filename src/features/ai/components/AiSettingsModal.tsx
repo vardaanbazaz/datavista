@@ -79,13 +79,13 @@ export function AiSettingsModal({ isOpen: externalIsOpen, onClose: externalOnClo
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
 
-      <DialogContent className="max-w-md bg-card border border-border shadow-2xl p-6 text-foreground">
+      <DialogContent className="max-w-md p-6 text-foreground" data-testid="ai-settings-dialog">
         <DialogHeader className="space-y-2">
-          <DialogTitle className="text-xl font-bold flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-foreground animate-pulse" />
+          <DialogTitle className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-primary-ink" aria-hidden />
             AI Co-Pilot Settings
           </DialogTitle>
-          <DialogDescription className="text-xs text-muted-foreground">
+          <DialogDescription className="text-sm text-frame-muted">
             Configure your AI provider and API key to enable natural language queries and formula generation.
           </DialogDescription>
         </DialogHeader>
@@ -94,16 +94,16 @@ export function AiSettingsModal({ isOpen: externalIsOpen, onClose: externalOnClo
           {/* AI Active / Offline Status Banner — reflects the currently SAVED provider/key,
               not the unsaved draft inputs below, so it never claims AI is active mid-edit. */}
           {llmApiKey ? (
-            <div className="rounded-md border border-success/50 bg-success/10 px-3 py-2 flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-success shrink-0" />
-              <p className="text-xs font-semibold text-success">
+            <div className="rounded-lg border border-success/60 px-3 py-2 flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-success shrink-0" aria-hidden />
+              <p className="text-sm font-medium text-success">
                 AI Active — {providerDisplayName(llmProvider)}
               </p>
             </div>
           ) : (
-            <div className="rounded-md border border-border bg-muted px-3 py-2 flex items-center gap-2">
-              <CloudOff className="h-4 w-4 text-muted-foreground shrink-0" />
-              <p className="text-xs font-semibold text-muted-foreground">
+            <div className="rounded-lg border border-border bg-muted px-3 py-2 flex items-center gap-2">
+              <CloudOff className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden />
+              <p className="text-sm font-medium text-muted-foreground">
                 Offline Mode — heuristic-based insights only
               </p>
             </div>
@@ -111,7 +111,7 @@ export function AiSettingsModal({ isOpen: externalIsOpen, onClose: externalOnClo
 
           {/* Provider Selector */}
           <div className="space-y-2">
-            <Label className="text-xs font-semibold flex items-center gap-1.5">
+            <Label className="text-sm font-medium flex items-center gap-1.5">
               <Cpu className="h-3.5 w-3.5 text-primary-ink" /> LLM Provider
             </Label>
             <div className="grid grid-cols-2 gap-2">
@@ -119,8 +119,8 @@ export function AiSettingsModal({ isOpen: externalIsOpen, onClose: externalOnClo
                 <TooltipTrigger asChild>
                   <Button
                     type="button"
-                    variant={providerInput === "gemini" ? "premium" : "outline"}
-                    className="justify-center gap-2 h-10 text-xs"
+                    variant={providerInput === "gemini" ? "default" : "outline"}
+                    className="justify-center gap-2 h-10 text-sm"
                     onClick={() => setProviderInput("gemini")}
                   >
                     Google Gemini
@@ -140,8 +140,8 @@ export function AiSettingsModal({ isOpen: externalIsOpen, onClose: externalOnClo
                 <TooltipTrigger asChild>
                   <Button
                     type="button"
-                    variant={providerInput === "openai" ? "premium" : "outline"}
-                    className="justify-center gap-2 h-10 text-xs"
+                    variant={providerInput === "openai" ? "default" : "outline"}
+                    className="justify-center gap-2 h-10 text-sm"
                     onClick={() => setProviderInput("openai")}
                   >
                     OpenAI GPT-4o
@@ -161,7 +161,7 @@ export function AiSettingsModal({ isOpen: externalIsOpen, onClose: externalOnClo
 
           {/* API Key Input */}
           <div className="space-y-2">
-            <Label htmlFor="api-key" className="text-xs font-semibold flex items-center gap-1.5">
+            <Label htmlFor="api-key" className="text-sm font-medium flex items-center gap-1.5">
               <Key className="h-3.5 w-3.5 text-primary-ink" /> API Key
             </Label>
             <div className="relative flex items-center">
@@ -185,7 +185,7 @@ export function AiSettingsModal({ isOpen: externalIsOpen, onClose: externalOnClo
                 </Button>
               </Hint>
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-frame-muted">
               {apiKeyInput ? (
                 <span className="text-success font-medium flex items-center gap-1">
                   <Check className="h-3 w-3" /> Saved in this browser&apos;s localStorage (not encrypted). Empty the field and save to remove it.
@@ -197,7 +197,7 @@ export function AiSettingsModal({ isOpen: externalIsOpen, onClose: externalOnClo
           </div>
 
           {/* Data Disclosure */}
-          <div className="rounded-md border border-tertiary/50 bg-tertiary/10 p-3">
+          <div className="rounded-lg border border-border bg-card p-3">
             <div className="text-sm leading-relaxed text-foreground space-y-1" data-testid="ai-data-disclosure">
               <p>
                 <span className="font-semibold">Sent to the provider (Google or OpenAI), only when you use an AI feature:</span>
@@ -242,7 +242,7 @@ export function AiSettingsModal({ isOpen: externalIsOpen, onClose: externalOnClo
               type="button"
               variant="outline"
               size="sm"
-              className="gap-1.5 text-xs text-muted-foreground"
+              className="gap-1.5 text-xs"
               onClick={() => {
                 setIsOpen(false);
                 resetTour();
@@ -258,7 +258,7 @@ export function AiSettingsModal({ isOpen: externalIsOpen, onClose: externalOnClo
               </Button>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="premium" size="sm" onClick={handleSave} className="gap-1.5">
+                  <Button size="sm" onClick={handleSave} className="gap-1.5">
                     {isSaved ? <Check className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
                     Save Configuration
                   </Button>

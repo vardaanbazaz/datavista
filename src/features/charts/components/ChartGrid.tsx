@@ -42,7 +42,7 @@ export function ChartGrid() {
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="text-center py-12 text-muted-foreground"
+        className="text-center py-12 text-frame-muted"
       >
         <p>No charts created yet. Use the chart builder above to get started.</p>
       </motion.div>
@@ -78,7 +78,7 @@ export function ChartGrid() {
             className="relative group"
             data-testid="chart-card"
           >
-            <div className="glass border border-border rounded-lg p-4 transition-shadow hover:shadow-elegant">
+            <div className="surface-solid rounded-xl p-4">
               <div className="flex items-center justify-between mb-4 gap-2">
                 <div className="flex items-center gap-2 min-w-0">
                   {activeDashboard && (

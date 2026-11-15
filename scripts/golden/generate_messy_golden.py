@@ -25,7 +25,7 @@ counting fields with the csv module.
 Dates (DATE_COLUMNS below) are parsed with an explicit strptime format per column via
 pd.to_datetime(format=..., errors="coerce") after ASCII trimming; nothing about the app's
 format detection is mirrored. "Missing" uses the app's ingest null rule (cleanValue: "",
-"null", "undefined", "n/a", case-insensitive); every other value that doesn't match the
+"n/a", "nan", "null", "none", "#n/a", "undefined", case-insensitive); every other value that doesn't match the
 format (or isn't a real calendar date) is "invalid". Per column: valid/invalid/missing
 counts, min, max (YYYY-MM-DD) and per-year counts of valid dates.
 
@@ -52,7 +52,7 @@ DATE_COLUMNS = {
     "playstore.csv": {"Last Updated": "%B %d, %Y"},
     "cafe.csv": {"Transaction Date": "%Y-%m-%d"},
 }
-INGEST_NULLS = {"", "null", "undefined", "n/a"}
+INGEST_NULLS = {"", "n/a", "nan", "null", "none", "#n/a", "undefined"}
 
 # Applied by every import (the column is converted automatically).
 AUTO_FIXES = {

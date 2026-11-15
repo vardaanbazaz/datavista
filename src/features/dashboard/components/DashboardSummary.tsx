@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
-import { Badge } from "@/shared/components/ui/badge";
 import { Progress } from "@/shared/components/ui/progress";
 import { useDatasetStore } from "@/store/datasetStore";
 import { useFilterStore } from "@/store/filterStore";
@@ -9,7 +8,7 @@ import { useDashboardStore } from "@/features/dashboards/store/dashboardStore";
 import { DashboardGrid } from "@/features/dashboards/components/DashboardGrid";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select";
 import { Button } from "@/shared/components/ui/button";
-import { Database, Filter, PieChart, TrendingUp, Users, LayoutDashboard, Calendar, AlertCircle, Plus, LayoutTemplate, RotateCcw, RotateCw, Camera } from "lucide-react";
+import { Database, PieChart, TrendingUp, Columns3, LayoutDashboard, AlertCircle, Plus, LayoutTemplate, RotateCcw, RotateCw, Camera, CircleAlert } from "lucide-react";
 import { GlobalFilterBar } from "@/features/dashboards/components/GlobalFilterBar";
 import { ExecutiveSummaryPanel } from "@/features/ai/components/ExecutiveSummaryPanel";
 import { DrillThroughModal } from "@/features/dashboards/components/DrillThroughModal";
@@ -23,12 +22,13 @@ import { templateEngine } from "@/features/dashboards/services/templateEngine";
 import { getEffectiveColumnTypes } from "@/shared/utils/columnType";
 import { summarizeCategoricalColumns } from "@/shared/services/stats/columnSummary";
 import { profileNumericColumns } from "@/shared/services/stats/columnProfile";
-import { NumericLedger } from "./NumericLedger";
-import { CategoryLedger } from "./CategorySummary";
+import { NumericSummaryTable } from "./NumericSummary";
+import { CategorySummaryTable } from "./CategorySummary";
 import { useUiStore } from "@/store/uiStore";
 import { Hint } from "@/shared/components/Hint";
-import { Panel, Rule, SectionHeading, Bookplate } from "@/shared/components/ornament";
+import { DataPanel, EmptyState, GlassPanel, PageHeader } from "@/shared/components/surface";
 import { modKey } from "@/shared/lib/platform";
+import { formatPercent, formatShare } from "@/shared/utils/percent";
 
 export function DashboardSummary() {
   const dataset = useDatasetStore((state) => state.activeDataset);
@@ -40,6 +40,7 @@ export function DashboardSummary() {
   const dashboards = useDashboardStore((state) => state.dashboards);
   const loadDashboard = useDashboardStore((state) => state.loadDashboard);
   const addKpiCard = useDashboardStore((state) => state.addKpiCard);
+  const createDashboard = useDashboardStore((state) => state.createDashboard);
   const updateKpiCard = useDashboardStore((state) => state.updateKpiCard);
 
   const undo = useDashboardStore((state) => state.undo);
@@ -72,6 +73,27 @@ export function DashboardSummary() {
     addTemplate(template);
   };
 
+  /**
+   * KPI cards live on a dashboard. From the plain Overview (no dashboard open) the first
+   * saved KPI creates one for this dataset ("<dataset> KPIs", numbered if taken) and opens
+   * it, so the card shows at once; cancelling the builder creates nothing.
+   */
+  const saveKpi = (kpi: KPICardConfig) => {
+    if (activeDashboard) {
+      if (editKpi) updateKpiCard(activeDashboard.id, kpi.id, kpi);
+      else addKpiCard(activeDashboard.id, kpi);
+      return;
+    }
+    if (!dataset) return;
+    const taken = new Set(dashboards.filter((d) => d.datasetId === dataset.id).map((d) => d.name.toLowerCase()));
+    const base = `${dataset.name} KPIs`;
+    let name = base;
+    for (let i = 2; taken.has(name.toLowerCase()); i++) name = `${base} ${i}`;
+    createDashboard(name, dataset.id);
+    const created = useDashboardStore.getState().activeDashboardId;
+    if (created) addKpiCard(created, kpi);
+  };
+
   const charts = useMemo(() => {
     if (!dataset) return [];
     const datasetCharts = allCharts.filter((c) => c.datasetId === dataset.id);
@@ -92,18 +114,19 @@ export function DashboardSummary() {
     const numericColumns = dataset.columns.filter(col => effectiveTypes[col] === 'numeric');
     const categoricalColumns = dataset.columns.filter(col => effectiveTypes[col] === 'categorical');
 
-    const activeFilterCount = Object.keys(activeFilters.categoricalFilters || {}).length + 
+    const activeFilterCount = Object.keys(activeFilters.categoricalFilters || {}).length +
                              Object.keys(activeFilters.dateRangeFilters || {}).length;
 
-    // Real count/sum/avg/min/max of the valid numbers in the rows shown (shared numeric rule).
-    // No metadata shortcut: metadata has no valid-number count, and rowCount − missing
-    // counted junk strings, which inflated count and sum.
-    // Ledger rows: count/sum/mean/min/max of the valid numbers in the rows shown (shared
-    // numeric rule, via summarizeNumericColumns), plus missing/invalid and the column's
-    // display role (ID/year: no sum or average; constant: one line).
+    // Numeric summary rows: count/sum/mean/min/max of the valid numbers in the rows shown
+    // (shared numeric rule, via summarizeNumericColumns; no metadata shortcut: metadata has no
+    // valid-number count), plus missing/invalid and the column's display role (ID/year: no
+    // sum or average; constant: one line).
     const numericStats = profileNumericColumns(filteredData, numericColumns, dataset);
 
     const categoryStats = summarizeCategoricalColumns(filteredData, categoricalColumns, dataset);
+    const missingValues =
+      numericStats.reduce((n, p) => n + p.missing, 0) + categoryStats.reduce((n, c) => n + c.missing, 0);
+    const invalidValues = numericStats.reduce((n, p) => n + p.invalid, 0);
 
     return {
       categoryStats,
@@ -112,6 +135,11 @@ export function DashboardSummary() {
       filterProgress,
       numericColumns: numericColumns.length,
       categoricalColumns: categoricalColumns.length,
+      otherColumns: dataset.columns.length - numericColumns.length - categoricalColumns.length,
+      missingValues,
+      invalidValues,
+      // Cells the missing count is taken over: the numeric and categorical columns of the rows shown.
+      summarisedCells: filteredRows * (numericColumns.length + categoricalColumns.length),
       totalColumns: dataset.columns.length,
       chartsCreated: charts.length,
       numericStats,
@@ -125,8 +153,9 @@ export function DashboardSummary() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="text-center py-12 max-w-md mx-auto"
+        data-tour="view-overview"
       >
-        <Card className="glass border-destructive/50">
+        <Card surface="glass" className="border-destructive/60">
           <CardHeader>
             <CardTitle className="text-destructive flex items-center justify-center gap-2">
               <AlertCircle className="h-6 w-6" />
@@ -152,10 +181,11 @@ export function DashboardSummary() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="py-12"
+        data-tour="view-overview"
       >
-        <Bookplate inscription="Overview" title="No Data Loaded" emblem={<Database aria-hidden />}>
-          Upload a dataset to see your dashboard summary
-        </Bookplate>
+        <EmptyState title="No rows to summarise" icon={<Database aria-hidden />}>
+          Upload a dataset, or clear the filters, to see the summary.
+        </EmptyState>
       </motion.div>
     );
   }
@@ -167,251 +197,177 @@ export function DashboardSummary() {
       transition={{ duration: 0.5 }}
       className="flex flex-col gap-6"
     >
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-        <div className="flex items-center gap-3 min-w-0">
-          {activeDashboard ? (
-            <LayoutDashboard className="hidden sm:block h-6 w-6 shrink-0 text-ornament" aria-hidden />
+      <PageHeader
+        className="pt-2"
+        tourId="overview"
+        icon={activeDashboard ? <LayoutDashboard /> : <TrendingUp />}
+        title={activeDashboard ? activeDashboard.name : "Overview"}
+        description={
+          activeDashboard ? (
+            <span className="tabular-nums">
+              Created {new Date(activeDashboard.createdAt).toLocaleDateString()} · Updated {new Date(activeDashboard.updatedAt).toLocaleDateString()}
+            </span>
           ) : (
-            <TrendingUp className="hidden sm:block h-6 w-6 shrink-0 text-ornament" aria-hidden />
-          )}
-          <div className="min-w-0">
-            <SectionHeading
-              numeral="I"
-              label={activeDashboard ? "Dashboard" : "Overview"}
-              title={activeDashboard ? activeDashboard.name : "Dashboard Overview"}
-              level={2}
-              className="[&_h2]:text-h1"
-            />
-            {activeDashboard ? (
-              <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <Calendar className="h-3 w-3" />
-                  Created {new Date(activeDashboard.createdAt).toLocaleDateString()}
-                </span>
-                <span>•</span>
-                <span>
-                  Updated {new Date(activeDashboard.updatedAt).toLocaleDateString()}
-                </span>
-              </div>
-            ) : (
-              <p className="hidden sm:block text-body text-muted-foreground mt-0.5">
-                Executive summary and interactive analytics
-              </p>
-            )}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3 flex-wrap">
-          {/* Undo/Redo & Snapshot Toolbar Controls */}
-          <div className="flex items-center gap-1.5 border-r border-border pr-3 mr-1">
+            <>Summary of “{dataset!.name}” in the rows shown</>
+          )
+        }
+        actions={
+          <>
             <Hint label="Undo last change" disabledReason="nothing to undo yet" shortcut={[modKey, "Z"]}>
-              <Button
-                size="icon"
-                variant="plate"
-                className="h-9 w-9"
-                onClick={undo}
-                disabled={past.length === 0}
-              >
+              <Button size="icon" variant="ghost" className="h-9 w-9" onClick={undo} disabled={past.length === 0}>
                 <RotateCcw className="h-4 w-4" />
               </Button>
             </Hint>
             <Hint label="Redo last undone change" disabledReason="nothing to redo" shortcut={[modKey, "⇧", "Z"]}>
-              <Button
-                size="icon"
-                variant="plate"
-                className="h-9 w-9"
-                onClick={redo}
-                disabled={future.length === 0}
-              >
+              <Button size="icon" variant="ghost" className="h-9 w-9" onClick={redo} disabled={future.length === 0}>
                 <RotateCw className="h-4 w-4" />
               </Button>
             </Hint>
             <Button
-              variant="plate"
+              variant="outline"
               size="sm"
-              className="gap-1.5 ml-1"
-              onClick={() => setIsSnapshotManagerOpen(true)}
-              title="Manage Workspace Snapshots & History"
+              className="gap-1.5"
+              data-testid="overview-add-kpi"
+              onClick={() => {
+                setEditKpi(null);
+                setIsKpiBuilderOpen(true);
+              }}
             >
+              <Plus className="h-4 w-4" />
+              Add KPI
+            </Button>
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setIsSnapshotManagerOpen(true)} title="Manage Workspace Snapshots & History">
               <Camera className="h-4 w-4" />
               Snapshots
             </Button>
+
+            {activeDashboard && (
+              <>
+                <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setIsCreateTemplateOpen(true)}>
+                  <LayoutTemplate className="h-4 w-4" />
+                  Save as Template
+                </Button>
+                <CreateTemplateModal isOpen={isCreateTemplateOpen} onClose={() => setIsCreateTemplateOpen(false)} onSave={handleSaveTemplate} />
+              </>
+            )}
+
+            {dashboards.length > 0 && (
+              <div className="flex items-center gap-2 pl-1">
+                <span id="switch-dashboard-label" className="whitespace-nowrap text-sm text-frame-muted">
+                  Dashboard:
+                </span>
+                <Select
+                  value={activeDashboardId || "none"}
+                  onValueChange={(val) => {
+                    if (val === "none") {
+                      useDashboardStore.setState({ activeDashboardId: null });
+                    } else {
+                      loadDashboard(val);
+                    }
+                  }}
+                >
+                  <SelectTrigger className="h-9 w-[12.5rem]" aria-labelledby="switch-dashboard-label">
+                    <SelectValue placeholder="Select dashboard" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None (Dataset Overview)</SelectItem>
+                    {dashboards.map((d) => (
+                      <SelectItem key={d.id} value={d.id}>
+                        {d.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </>
+        }
+      />
+
+      {/*
+        Bento: glass tiles on the frame, one row on large screens (Rows a little wider: it holds
+        the filter bar), 2 x 2 below with Rows across the top. On phones they come first, then the
+        tables, then the AI summary.
+      */}
+      <div className="order-2 grid grid-cols-2 gap-3 lg:order-none lg:grid-cols-[1.35fr_1.15fr_1fr_1fr]" data-testid="overview-bento">
+        <GlassPanel className="col-span-2 p-5 lg:col-span-1" data-testid="tile-rows">
+          <div className="flex items-center gap-2 text-sm font-medium text-frame-muted">
+            <Database className="h-4 w-4 text-primary-ink" aria-hidden />
+            Rows
           </div>
+          <p className="mt-2 text-kpi tabular-nums text-foreground" data-testid="kpi-rows">
+            {insights.totalRows.toLocaleString()}
+          </p>
+          <p className="mt-1 text-sm text-frame-muted tabular-nums" data-testid="tile-rows-subtitle">
+            {insights.filteredRows === insights.totalRows
+              ? insights.activeFilterCount > 0
+                ? `All shown · ${insights.activeFilterCount} ${insights.activeFilterCount === 1 ? "filter" : "filters"} active`
+                : "All rows shown · no filters"
+              : `${insights.filteredRows.toLocaleString()} shown (${formatPercent(insights.filterProgress)}) · ${insights.activeFilterCount} ${insights.activeFilterCount === 1 ? "filter" : "filters"}`}
+          </p>
+          <Progress value={insights.filterProgress} className="mt-2 h-1.5 bg-foreground/10" aria-label="Share of rows shown after filters" />
+        </GlassPanel>
 
-          {activeDashboard && (
-            <>
-              <Button
-                variant="plate"
-                size="sm"
-                className="gap-1.5"
-                onClick={() => setIsCreateTemplateOpen(true)}
-              >
-                <LayoutTemplate className="h-4 w-4" />
-                Save as Template
-              </Button>
+        <GlassPanel className="col-span-2 p-5 lg:col-span-1" data-testid="tile-columns">
+          <div className="flex items-center gap-2 text-sm font-medium text-frame-muted">
+            <Columns3 className="h-4 w-4 text-primary-ink" aria-hidden />
+            Columns
+          </div>
+          <p className="mt-2 text-kpi tabular-nums text-foreground">{insights.totalColumns}</p>
+          <p className="mt-1 text-sm text-frame-muted tabular-nums" data-testid="tile-columns-subtitle">
+            {insights.numericColumns} numeric · {insights.categoricalColumns} categorical
+            {insights.otherColumns > 0 && ` · ${insights.otherColumns} other`}
+          </p>
+        </GlassPanel>
 
-              <Button
-                variant="plate"
-                size="sm"
-                className="gap-1.5"
-                onClick={() => {
-                  setEditKpi(null);
-                  setIsKpiBuilderOpen(true);
-                }}
-              >
-                <Plus className="h-4 w-4" />
-                Add KPI Card
-              </Button>
+        <GlassPanel className="p-5" data-testid="tile-charts">
+          <div className="flex items-center gap-2 text-sm font-medium text-frame-muted">
+            <PieChart className="h-4 w-4 text-primary-ink" aria-hidden />
+            Charts
+          </div>
+          <p className="mt-2 text-kpi tabular-nums text-foreground">{insights.chartsCreated}</p>
+          <p className="mt-1 text-sm text-frame-muted" data-testid="tile-charts-subtitle">
+            {insights.chartsCreated === 0
+              ? "None yet: build one in Charts"
+              : activeDashboard
+                ? "On this dashboard"
+                : "Saved for this dataset"}
+          </p>
+        </GlassPanel>
 
-              <CreateTemplateModal
-                isOpen={isCreateTemplateOpen}
-                onClose={() => setIsCreateTemplateOpen(false)}
-                onSave={handleSaveTemplate}
-              />
-            </>
-          )}
-
-          {dashboards.length > 0 && (
-            <div className="flex items-center gap-2">
-              <span id="switch-dashboard-label" className="text-sm text-muted-foreground whitespace-nowrap">Switch Dashboard:</span>
-              <Select
-                value={activeDashboardId || "none"}
-                onValueChange={(val) => {
-                  if (val === "none") {
-                    useDashboardStore.setState({ activeDashboardId: null });
-                  } else {
-                    loadDashboard(val);
-                  }
-                }}
-              >
-                <SelectTrigger className="w-[12.5rem] bg-card border border-borderStrong" aria-labelledby="switch-dashboard-label">
-                  <SelectValue placeholder="Select dashboard" />
-                </SelectTrigger>
-                <SelectContent className="bg-popover border border-border text-popover-foreground">
-                  <SelectItem value="none">None (Dataset Overview)</SelectItem>
-                  {dashboards.map((d) => (
-                    <SelectItem key={d.id} value={d.id}>
-                      {d.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-        </div>
+        <GlassPanel className="p-5" data-testid="tile-missing">
+          <div className="flex items-center gap-2 text-sm font-medium text-frame-muted">
+            <CircleAlert className="h-4 w-4 text-primary-ink" aria-hidden />
+            Missing values
+          </div>
+          <p className="mt-2 text-kpi tabular-nums text-foreground">{insights.missingValues.toLocaleString()}</p>
+          <p className="mt-1 text-sm text-frame-muted tabular-nums" data-testid="tile-missing-subtitle">
+            {insights.missingValues > 0 ? `${formatShare(insights.missingValues, insights.summarisedCells)} of cells` : "No blank cells"}
+            {" · "}
+            {insights.invalidValues > 0
+              ? `${insights.invalidValues.toLocaleString()} invalid ${insights.invalidValues === 1 ? "number" : "numbers"}`
+              : "no invalid numbers"}
+          </p>
+        </GlassPanel>
       </div>
-
-      <Rule fleuron className="-mt-2 hidden sm:flex" />
 
       {/* AI Executive Summary Banner */}
       <div className="order-4 lg:order-none">
         <ExecutiveSummaryPanel />
       </div>
 
-      {/* Key Metrics Grid */}
-      <div className="order-2 lg:order-none grid grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(min(100%,15rem),1fr))] gap-3 sm:gap-4">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.1 }}
-        >
-          <Card className="frame-double h-full rounded-md bg-card shadow-none transition-colors">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="hidden sm:block p-2 rounded-full border border-ornament/50 text-ornament">
-                  <Database className="h-5 w-5" aria-hidden />
-                </div>
-                <div>
-                  <p className="catalogue-label text-muted-foreground">Total Rows</p>
-                  <p className="font-mono text-kpi text-foreground">{insights.totalRows.toLocaleString()}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.2 }}
-        >
-          <Card className="frame-double h-full rounded-md bg-card shadow-none transition-colors">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="hidden sm:block p-2 rounded-full border border-ornament/50 text-ornament">
-                  <Users className="h-5 w-5" aria-hidden />
-                </div>
-                <div>
-                  <p className="catalogue-label text-muted-foreground">Columns</p>
-                  <p className="font-mono text-kpi text-foreground">{insights.totalColumns}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {insights.numericColumns} numeric · {insights.categoricalColumns} categorical
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.3 }}
-        >
-          <Card className="frame-double h-full rounded-md bg-card shadow-none transition-colors">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="hidden sm:block p-2 rounded-full border border-ornament/50 text-ornament">
-                  <Filter className="h-5 w-5" aria-hidden />
-                </div>
-                <div>
-                  <p className="catalogue-label text-muted-foreground">Filtered Rows</p>
-                  <p className="font-mono text-kpi text-foreground">{insights.filteredRows.toLocaleString()}</p>
-                  <Progress value={insights.filterProgress} className="h-1 mt-2 bg-muted" aria-label="Share of rows shown after filters" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.4 }}
-        >
-          <Card className="frame-double h-full rounded-md bg-card shadow-none transition-colors">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="hidden sm:block p-2 rounded-full border border-ornament/50 text-ornament">
-                  <PieChart className="h-5 w-5" aria-hidden />
-                </div>
-                <div>
-                  <p className="catalogue-label text-muted-foreground">Charts Created</p>
-                  <p className="font-mono text-kpi text-foreground">{insights.chartsCreated}</p>
-                  {insights.activeFilterCount > 0 && (
-                    <Badge className="mt-1 text-xs font-medium bg-muted text-foreground border border-border hover:bg-muted">
-                      {insights.activeFilterCount} filters active
-                    </Badge>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      </div>
-
-      {/* Numeric columns ledger. On phones the AI banner moves below it (order), so data is on the first screen. */}
+      {/* Numeric columns. On phones the AI banner moves below the tables (order), so data is on the first screen. */}
       {insights.numericStats.length > 0 && (
-        <Panel numeral="II" label="Numeric columns" title="Ledger" className="order-3 lg:order-none">
-          <NumericLedger profiles={insights.numericStats} />
-        </Panel>
+        <DataPanel title="Numeric columns" description="Summary of the rows shown. Select a header to sort." flush className="order-3 lg:order-none">
+          <NumericSummaryTable profiles={insights.numericStats} />
+        </DataPanel>
       )}
 
       {/* Categorical columns: distinct, missing, top values */}
       {insights.categoryStats.length > 0 && (
-        <Panel numeral="III" label="Categorical columns" title="Categories" data-testid="category-tiles" className="order-5 lg:order-none">
-          <CategoryLedger stats={insights.categoryStats} />
-        </Panel>
+        <DataPanel title="Categorical columns" description="Distinct and missing values, and the most common values." flush data-testid="category-panel" className="order-5 lg:order-none">
+          <CategorySummaryTable stats={insights.categoryStats} />
+        </DataPanel>
       )}
 
       {/* Dashboard Charts Grid */}
@@ -422,7 +378,7 @@ export function DashboardSummary() {
           transition={{ delay: 0.7 }}
           className="order-6 lg:order-none mt-8 space-y-4"
         >
-          <div className="border-t pt-6 space-y-4">
+          <div className="space-y-4">
             <GlobalFilterBar />
             
             <h3 className="text-h2 flex items-center gap-2">
@@ -430,10 +386,10 @@ export function DashboardSummary() {
               Dashboard Widgets ({charts.length + (activeDashboard.kpis?.length || 0)})
             </h3>
             {charts.length === 0 && (!activeDashboard.kpis || activeDashboard.kpis.length === 0) ? (
-              <Card className="glass border-dashed border-2 py-12 text-center text-muted-foreground">
+              <Card surface="glass" className="py-12 text-center text-muted-foreground">
                 <CardContent className="space-y-2">
                   <p>No widgets added to this dashboard yet.</p>
-                  <p className="text-xs">Go to the "Charts" builder or click "Add KPI Card" above to get started.</p>
+                  <p className="text-xs">Go to the "Charts" builder or click "Add KPI" above to get started.</p>
                 </CardContent>
               </Card>
             ) : (
@@ -457,14 +413,8 @@ export function DashboardSummary() {
           setIsKpiBuilderOpen(false);
           setEditKpi(null);
         }}
-        onSave={(kpi) => {
-          if (!activeDashboard) return;
-          if (editKpi) {
-            updateKpiCard(activeDashboard.id, kpi.id, kpi);
-          } else {
-            addKpiCard(activeDashboard.id, kpi);
-          }
-        }}
+        onSave={saveKpi}
+        saveNote={activeDashboard ? undefined : `The card goes on a new dashboard for “${dataset!.name}”, opened here when you save.`}
         editKpi={editKpi}
       />
 

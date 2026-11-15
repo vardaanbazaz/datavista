@@ -83,7 +83,7 @@ const MIN_FIT_HEIGHT = 250;
 function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizationProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   // Reading comfort text size: chart text and margins scale with the root font size.
-  const textSize = useUiStore((state) => state.readingComfort.textSize);
+  const textSize = useUiStore((state) => state.appearance.textSize);
   // Extra left margin measured after a draw, so the Y title never overlaps the tick labels.
   const [leftMargin, setLeftMargin] = useState(60);
   // Legend for charts that colour marks by a group (rendered as HTML above the plot).
@@ -1448,14 +1448,14 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
   if (pluginChartDef) {
     const PluginComponent = pluginChartDef.component;
     return (
-      <div ref={containerRef} className="h-full w-full flex flex-col p-2 bg-background overflow-hidden">
+      <div ref={containerRef} className="h-full w-full flex flex-col p-2 bg-card overflow-hidden">
         <PluginComponent chart={chart} data={chartData} />
       </div>
     );
   }
 
   return (
-    <div ref={containerRef} className="h-full w-full flex flex-col p-4 bg-background animate-chart-animate relative" data-chart-id={chart.id}>
+    <div ref={containerRef} className="h-full w-full flex flex-col p-4 bg-card animate-chart-animate relative" data-chart-id={chart.id}>
       {/* Chart Toolbar (for Drill-Down controls) */}
       {chart.drillPath && chart.drillPath.length > 0 && (
         <div className="flex items-center justify-between text-xs border-b border-border/40 pb-2 px-1 flex-shrink-0">
@@ -1544,7 +1544,7 @@ function ChartVisualizationContent({ chart, fitHeight = false }: ChartVisualizat
           </Badge>
         )}
         {(barHint || (chart.type === 'bar' && chart.topN)) && (
-          <div className="absolute top-1 left-2 z-10 max-w-[80%] flex flex-wrap items-center gap-1 rounded-md border border-border bg-background/95 px-2 py-1 text-xs text-muted-foreground" data-testid="chart-density-hint">
+          <div className="absolute top-1 left-2 z-10 max-w-[80%] flex flex-wrap items-center gap-1 rounded-md border border-border bg-card px-2 py-1 text-xs text-muted-foreground" data-testid="chart-density-hint">
             {barHint ? (
               <>
                 <span>{barHint.bars.toLocaleString()} bars is too many to read.</span>

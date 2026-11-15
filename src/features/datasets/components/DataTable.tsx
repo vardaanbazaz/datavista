@@ -22,7 +22,7 @@ import { ConditionalFormattingBuilder } from "@/features/dashboards/components/C
 import { DatasetUpdateModal } from "./DatasetUpdateModal";
 import { getEffectiveColumnType, mightBeCategorical } from "@/shared/utils/columnType";
 import { profileNumericColumns, roleLabel } from "@/shared/services/stats/columnProfile";
-import { Panel } from "@/shared/components/ornament";
+import { DataPanel } from "@/shared/components/surface";
 import { useImportStore } from "@/store/importStore";
 import { ImportIssuesDialog } from "@/features/upload/components/ImportDialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/components/ui/popover";
@@ -243,14 +243,14 @@ export function DataTable({
   }
 
   return (
-    <div data-testid="data-table-container" data-tour="dataset-grid" className="space-y-6">
-      {/* Controls */}
-      <Card className="glass">
+    <div data-testid="data-table-container" className="space-y-6">
+      {/* Controls (a form: glass); the grid below is data (solid). */}
+      <Card surface="glass" data-testid="data-explorer-controls">
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span className="flex items-center gap-2">
               <Search className="w-5 h-5" />
-              Data Explorer
+              Search and tools
             </span>
             <div className="flex gap-2">
               {!hideCalculatedFields && <CalculatedFieldsManager />}
@@ -261,7 +261,7 @@ export function DataTable({
                       <Button
                         onClick={() => fileInputRef.current?.click()}
                         variant="outline"
-                        className="gap-2 glass border-primary/20 text-foreground hover:bg-primary/5"
+                        className="gap-2"
                       >
                         <RefreshCw className="w-4 h-4 text-primary-ink" />
                         Update Version
@@ -324,7 +324,7 @@ export function DataTable({
 
         {/* Conditional Formatting Dialog */}
         <Dialog open={isFormattingOpen} onOpenChange={setIsFormattingOpen}>
-          <DialogContent className="max-w-4xl glass border-border shadow-2xl p-6">
+          <DialogContent className="max-w-4xl p-6">
             <DialogHeader>
               <DialogTitle className="text-h2 flex items-center gap-2">
                 <Palette className="h-5 w-5 text-primary-ink" />
@@ -457,20 +457,20 @@ export function DataTable({
 
       {/* Summary Statistics */}
       {summaryStats.length > 0 && (
-        <Panel numeral="II" label="Numeric columns" title="Summary Statistics">
+        <DataPanel title="Numeric columns" description="Summary statistics of the rows shown">
           <ul className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,15rem),1fr))] gap-3">
             {summaryStats.map((stats) => {
               const tag = roleLabel(stats.role);
               return (
-                <li key={stats.column} className="p-3 bg-background/40 border border-border rounded-sm" data-testid={`column-stats-${stats.column}`}>
+                <li key={stats.column} className="p-3 bg-muted/60 border border-border rounded-lg" data-testid={`column-stats-${stats.column}`}>
                   <h3 className="font-semibold mb-1 truncate" title={stats.column}>
                     {stats.column}
                     {tag && <span className="ml-2 text-xs font-normal text-muted-foreground">{tag}</span>}
                   </h3>
                   {stats.role === 'constant' ? (
-                    <p className="font-mono text-dataTable">constant: {stats.min.toLocaleString()}</p>
+                    <p className="text-dataTable">constant: {stats.min.toLocaleString()}</p>
                   ) : (
-                    <div className="space-y-0.5 font-mono text-dataTable">
+                    <div className="space-y-0.5 text-dataTable tabular-nums">
                       <div>Count: {stats.count}</div>
                       {stats.distinct !== null && <div>Distinct: {stats.distinct}</div>}
                       <div>Min: {stats.min.toFixed(2)}</div>
@@ -482,11 +482,11 @@ export function DataTable({
               );
             })}
           </ul>
-        </Panel>
+        </DataPanel>
       )}
 
       {/* Data Table */}
-      <Card className="glass">
+      <Card className="surface-solid">
         <CardContent className="p-0">
           <div 
             ref={parentRef} 
@@ -684,7 +684,7 @@ export function DataTable({
                                     : undefined
                                 }
                               >
-                                <div className={isNumeric ? "truncate text-right font-mono text-dataTable tabular-nums" : "truncate text-body"}>
+                                <div className={isNumeric ? "truncate text-right text-dataTable tabular-nums" : "truncate text-body"}>
                                   {row[column] === null || row[column] === undefined ? (
                                     <span className="text-muted-foreground italic font-sans">null</span>
                                   ) : currency && typeof row[column] === 'number' ? (
@@ -736,7 +736,7 @@ export function DataTable({
               return (
                 <Button
                   key={page}
-                  variant={currentPage === page ? "premium" : "outline"}
+                  variant={currentPage === page ? "default" : "outline"}
                   onClick={() => setCurrentPage(page)}
                 >
                   {page}

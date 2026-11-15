@@ -76,9 +76,9 @@ export function InstantiateTemplateModal({ isOpen, onClose }: InstantiateTemplat
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-xl glass border-border shadow-2xl p-6">
+      <DialogContent className="max-w-xl p-6">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold flex items-center gap-2">
+          <DialogTitle className="text-h2 flex items-center gap-2">
             <LayoutTemplate className="h-5 w-5 text-primary-ink" />
             Create Dashboard from Template
           </DialogTitle>
@@ -172,7 +172,7 @@ export function InstantiateTemplateModal({ isOpen, onClose }: InstantiateTemplat
 
               {schemaValidation.missingColumns.length > 0 && (
                 <div className="space-y-1 pl-6">
-                  <p className="catalogue-label">Missing columns</p>
+                  <p className="text-caption font-semibold">Missing columns</p>
                   <div className="flex flex-wrap gap-1">
                     {schemaValidation.missingColumns.map((col) => (
                       <Badge key={col} variant="destructive" className="text-xs">
@@ -185,7 +185,7 @@ export function InstantiateTemplateModal({ isOpen, onClose }: InstantiateTemplat
 
               {schemaValidation.typeMismatches.length > 0 && (
                 <div className="space-y-1 pl-6">
-                  <p className="catalogue-label">Wrong type</p>
+                  <p className="text-caption font-semibold">Wrong type</p>
                   <div className="flex flex-wrap gap-1">
                     {schemaValidation.typeMismatches.map((m) => (
                       <Badge key={m.name} variant="destructive" className="text-xs">
@@ -227,7 +227,7 @@ export function InstantiateTemplateModal({ isOpen, onClose }: InstantiateTemplat
           </Button>
           <Button
             type="button"
-            variant="premium"
+            variant="default"
             disabled={!selectedTemplate || !targetDataset || !schemaValidation?.valid}
             onClick={handleInstantiate}
           >

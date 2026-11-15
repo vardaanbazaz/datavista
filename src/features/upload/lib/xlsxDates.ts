@@ -35,12 +35,14 @@ export function excelSerialToCalendar(serial: number, date1904: boolean, withSec
  * Reads an XLSX/XLS file so that date cells come out as calendar strings instead of Excel
  * serial numbers (40148.32): every numeric cell with a date number format is rewritten in
  * place before `sheet_to_json`, so processRawData sees "2009-12-01T07:40:48" and types the
- * column as a date. Respects the workbook's 1904 date system and keeps times.
+ * column as a date. Respects the workbook's 1904 date system and keeps times. `sheets`
+ * limits parsing to those sheets (the others are not in `Sheets`).
  */
-export function readWorkbookWithCalendarDates(data: ArrayBuffer): XLSX.WorkBook {
-  const workbook = XLSX.read(data, { type: "array", cellNF: true });
+export function readWorkbookWithCalendarDates(data: ArrayBuffer, sheets?: string[]): XLSX.WorkBook {
+  const workbook = XLSX.read(data, { type: "array", cellNF: true, ...(sheets ? { sheets } : {}) });
   const date1904 = !!workbook.Workbook?.WBProps?.date1904;
-  for (const name of workbook.SheetNames) {
+  // With `sheets`, SheetNames still lists every sheet but Sheets holds only the parsed ones.
+  for (const name of Object.keys(workbook.Sheets)) {
     const sheet = workbook.Sheets[name];
     for (const ref of Object.keys(sheet)) {
       if (ref.startsWith("!")) continue;

@@ -158,9 +158,9 @@ export const WindowExplorer: React.FC = () => {
       <div className="lg:col-span-4 space-y-6">
         
         {/* Form Panel */}
-        <Card className="glass shadow-xl border-border/80">
+        <Card surface="glass" data-testid="window-builder-form">
           <CardHeader className="pb-3 select-none">
-            <CardTitle className="flex items-center gap-2 text-md font-bold">
+            <CardTitle className="flex items-center gap-2 text-h3">
               <Plus className="w-5 h-5 text-primary-ink" />
               Add Window Column
             </CardTitle>
@@ -347,7 +347,7 @@ export const WindowExplorer: React.FC = () => {
                 </div>
 
                 {orderByMissing && (
-                  <div className="flex items-start gap-1.5 text-xs text-destructive bg-destructive/10 border border-destructive/30 rounded-md p-2">
+                  <div className="flex items-start gap-1.5 text-xs text-destructive border border-destructive/60 rounded-md p-2">
                     <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                     <span>{orderByRequiredReason}</span>
                   </div>
@@ -447,7 +447,7 @@ export const WindowExplorer: React.FC = () => {
         
         {/* Configured Columns Card */}
         {activeDataset.windowQueries && activeDataset.windowQueries.length > 0 && (
-          <Card className="glass border-border/80 shadow-md">
+          <Card surface="glass">
             <CardHeader className="pb-3 select-none">
               <CardTitle className="text-sm font-bold flex items-center gap-2">
                 <Columns className="w-5 h-5 text-primary-ink" />

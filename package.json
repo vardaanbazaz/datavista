@@ -17,12 +17,13 @@
     "test:e2e:ui": "playwright test --ui",
     "test:bigfiles": "node scripts/bigfiles/run.mjs",
     "golden:regen": "python3 scripts/golden/generate_hr_golden.py",
-    "golden:regen-messy": "python3 scripts/golden/generate_messy_golden.py"
+    "golden:regen-messy": "python3 scripts/golden/generate_messy_golden.py",
+    "theme:css": "vite-node scripts/theme/generate-theme-css.ts",
+    "brand:assets": "vite-node scripts/brand/generate-brand-assets.ts"
   },
   "dependencies": {
-    "@fontsource/cormorant-garamond": "^5.3.0",
+    "@fontsource-variable/inter": "^5.3.0",
     "@fontsource/jetbrains-mono": "^5.3.0",
-    "@fontsource/source-serif-4": "^5.3.1",
     "@radix-ui/react-checkbox": "^1.3.2",
     "@radix-ui/react-dialog": "^1.1.14",
     "@radix-ui/react-dropdown-menu": "^2.1.15",
@@ -46,7 +47,6 @@
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
     "lucide-react": "^0.462.0",
-    "next-themes": "^0.3.0",
     "papaparse": "^5.5.3",
     "react": "^18.3.1",
     "react-day-picker": "^8.10.1",

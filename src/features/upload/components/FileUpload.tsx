@@ -1,12 +1,11 @@
 import { useState, useCallback } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
+import { DataPanel } from "@/shared/components/surface";
 import { Button } from "@/shared/components/ui/button";
 import { Upload, FileText, AlertCircle, CheckCircle, ShieldCheck } from "lucide-react";
 import { useUiStore } from "@/store/uiStore";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/components/ui/tooltip";
 import { useImportStore } from "@/store/importStore";
 import { MAX_IMPORT_BYTES } from "@/features/upload/lib/importLimits";
-import { Ornament } from "@/shared/components/ornament";
 
 export function FileUpload() {
   const importForUpload = useImportStore((state) => state.importForUpload);
@@ -49,20 +48,10 @@ export function FileUpload() {
   }, [handleFile]);
 
   return (
-    <Card data-tour="sidebar-upload">
-      <Ornament.Corners />
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Upload className="w-5 h-5 text-ornament" aria-hidden />
-          Upload Dataset
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
+    <DataPanel surface="glass" title="Upload a file" data-testid="upload-panel">
         <div
-          className={`border-2 border-dashed rounded-lg p-8 text-center transition-all duration-300 ${
-            dragActive 
-              ? "border-primary bg-primary/5 scale-105 animate-pulse-glow" 
-              : "border-borderStrong hover:border-primary hover:bg-muted/40"
+          className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors ${
+            dragActive ? "border-primary-ink bg-primary/10" : "border-borderStrong bg-background/30 hover:border-primary-ink hover:bg-accent/60"
           }`}
           onDragEnter={handleDrag}
           onDragLeave={handleDrag}
@@ -72,15 +61,15 @@ export function FileUpload() {
         >
           {isImporting ? (
             <div className="space-y-4">
-              <div className="w-16 h-16 mx-auto gradient-primary rounded-full flex items-center justify-center">
-                <Upload className="w-8 h-8 text-primary-foreground animate-pulse" />
+              <div className="w-12 h-12 mx-auto bg-primary rounded-xl flex items-center justify-center">
+                <Upload className="w-6 h-6 text-primary-foreground animate-pulse" aria-hidden />
               </div>
               <p className="font-medium">Importing your data...</p>
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="w-16 h-16 mx-auto rounded-full border border-ornament/60 ring-1 ring-ornament/30 ring-offset-4 ring-offset-card flex items-center justify-center">
-                <FileText className="w-7 h-7 text-ornament" aria-hidden />
+              <div className="w-12 h-12 mx-auto rounded-xl bg-primary/10 flex items-center justify-center">
+                <FileText className="w-6 h-6 text-primary-ink" aria-hidden />
               </div>
               <div>
                 <p className="text-lg font-medium mb-2">
@@ -150,7 +139,6 @@ export function FileUpload() {
             </div>
           </div>
         </div>
-      </CardContent>
-    </Card>
+    </DataPanel>
   );
 }

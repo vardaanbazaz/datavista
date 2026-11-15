@@ -31,9 +31,9 @@ export function SaveViewModal({ isOpen, onClose, onSave }: SaveViewModalProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md glass border-border shadow-2xl p-6">
+      <DialogContent className="max-w-md p-6">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold flex items-center gap-2">
+          <DialogTitle className="text-h2 flex items-center gap-2">
             <Bookmark className="h-5 w-5 text-primary-ink" />
             Bookmark Current View
           </DialogTitle>
@@ -59,7 +59,7 @@ export function SaveViewModal({ isOpen, onClose, onSave }: SaveViewModalProps) {
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" variant="premium" disabled={!name.trim()}>
+            <Button type="submit" variant="default" disabled={!name.trim()}>
               Save View
             </Button>
           </DialogFooter>

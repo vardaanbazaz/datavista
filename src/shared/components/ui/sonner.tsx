@@ -1,11 +1,12 @@
 /* eslint-disable react-refresh/only-export-components */
-import { useTheme } from "next-themes"
+import { useUiStore } from "@/store/uiStore"
+import { THEME_BY_ID } from "@/shared/theme/themes"
 import { Toaster as Sonner, toast } from "sonner"
 
 type ToasterProps = React.ComponentProps<typeof Sonner>
 
 const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = "system" } = useTheme()
+  const theme = THEME_BY_ID[useUiStore((s) => s.resolvedTheme)].scheme
 
   return (
     <Sonner
@@ -14,7 +15,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
       toastOptions={{
         classNames: {
           toast:
-            "group toast group-[.toaster]:bg-background group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-lg",
+            "group toast group-[.toaster]:surface-float group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-lg",
           description: "group-[.toast]:text-muted-foreground",
           actionButton:
             "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground",

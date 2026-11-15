@@ -20,56 +20,28 @@ export default {
 		},
 		extend: {
 			fontFamily: {
-				// Body and UI text: Source Serif 4 (a text serif built for small sizes). The key
-				// stays `sans` so every existing component picks it up without a class change.
-				sans: ['"Source Serif 4"', 'Georgia', 'Cambria', '"Times New Roman"', 'serif'],
-				// Headings and the frame: Cormorant Garamond (display only, never below 18px).
-				display: ['"Cormorant Garamond"', '"Source Serif 4"', 'Georgia', 'serif'],
-				mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+				// Inter (variable) for all UI and data text; tabular figures are switched on for
+				// tables in index.css. `display` is kept as an alias of sans for views not yet
+				// restyled (phase B removes the class).
+				sans: ['"Inter Variable"', 'Inter', 'ui-sans-serif', 'system-ui', '-apple-system', '"Segoe UI"', 'sans-serif'],
+				display: ['"Inter Variable"', 'Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+				// JetBrains Mono: formulas, code and keyboard shortcuts only.
+				mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
 			},
 			fontSize: {
-				// rem throughout, so Reading comfort's root size scales all of it. Display sizes
-				// are a step larger than before: Cormorant has a small x-height.
-				display: ['2.5rem', { lineHeight: '3rem', fontWeight: '600' }],
-				h1: ['1.875rem', { lineHeight: '2.25rem', fontWeight: '600' }],
-				h2: ['1.375rem', { lineHeight: '1.75rem', fontWeight: '600' }],
-				h3: ['1.0625rem', { lineHeight: '1.5rem', fontWeight: '600' }],
-				body: ['1rem', { lineHeight: '1.5rem', fontWeight: '400' }],
-				caption: ['0.75rem', { lineHeight: '1rem', fontWeight: '600', letterSpacing: '0.12em' }],
-				kpi: ['1.75rem', { lineHeight: '2rem', fontWeight: '700' }],
-				dataTable: ['0.875rem', { lineHeight: '1.25rem', fontWeight: '500' }],
+				// rem throughout, so Appearance's text size scales all of it.
+				display: ['2.25rem', { lineHeight: '2.75rem', fontWeight: '650', letterSpacing: '-0.022em' }],
+				h1: ['1.625rem', { lineHeight: '2.125rem', fontWeight: '650', letterSpacing: '-0.018em' }],
+				h2: ['1.125rem', { lineHeight: '1.625rem', fontWeight: '600', letterSpacing: '-0.011em' }],
+				h3: ['0.9375rem', { lineHeight: '1.375rem', fontWeight: '600' }],
+				body: ['0.9375rem', { lineHeight: '1.5rem', fontWeight: '400' }],
+				caption: ['0.75rem', { lineHeight: '1rem', fontWeight: '500' }],
+				kpi: ['1.75rem', { lineHeight: '2.125rem', fontWeight: '600', letterSpacing: '-0.02em' }],
+				dataTable: ['0.8125rem', { lineHeight: '1.25rem', fontWeight: '400' }],
 			},
 			colors: {
-				// Raw zinc/gray literals not yet moved to tokens (pages outside the batch 6 phase A
-				// scope) are remapped to the warm ink / parchment neutrals so they don't sit cold
-				// next to the new shell. Phase B replaces the literals with tokens.
-				zinc: {
-					50: '#FBF7EE',
-					100: '#F2E9D8',
-					200: '#E6DAC3',
-					300: '#C4B49C',
-					400: '#A8977F',
-					500: '#7A6550',
-					600: '#4A3D33',
-					700: '#3E3229',
-					800: '#2B231D',
-					900: '#1E1814',
-					950: '#15100C',
-				},
-				gray: {
-					50: '#F7F1E5',
-					100: '#EDE3D0',
-					200: '#D9CBB0',
-					300: '#C7B697',
-					400: '#A8977F',
-					500: '#7A6550',
-					600: '#5F4B3B',
-					700: '#4A3D33',
-					800: '#2B231D',
-					900: '#1E1814',
-					950: '#15100C',
-				},
-				ornament: 'hsl(var(--ornament))',
+				frameMuted: 'hsl(var(--frame-muted))',
+				glass: 'hsl(var(--glass))',
 				tertiary: {
 					DEFAULT: 'hsl(var(--tertiary))',
 					foreground: 'hsl(var(--tertiary-foreground))',
@@ -86,7 +58,7 @@ export default {
 					DEFAULT: 'hsl(var(--primary))',
 					foreground: 'hsl(var(--primary-foreground))',
 					glow: 'hsl(var(--primary-glow))',
-					// Oxblood for text and icons: Main itself is too dark on the dark surfaces.
+					// The accent as text / icon colour, readable on frame, glass and data.
 					ink: 'hsl(var(--primary-ink))'
 				},
 				secondary: {
@@ -113,7 +85,6 @@ export default {
 					DEFAULT: 'hsl(var(--card))',
 					foreground: 'hsl(var(--card-foreground))'
 				},
-				glass: 'hsl(var(--glass))',
 				chart: {
 					1: 'hsl(var(--chart-1))',
 					2: 'hsl(var(--chart-2))',

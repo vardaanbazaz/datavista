@@ -1,38 +1,43 @@
 import { test, type Page } from "@playwright/test";
 
 /**
- * The four README screenshots (docs/dashboard-, pivot-, ai-, charts-screenshot.png), dark
- * theme, HR fixture. `npx playwright test --config scripts/design/playwright.design.config.ts
- * scripts/design/readme.spec.ts`.
+ * The README screenshots, HR fixture, in Light and Dark (the README shows the one matching the
+ * reader's GitHub theme): docs/screenshots/{dashboard,charts,pivot,ai}-{light,dark}.png.
+ * `npx playwright test --config scripts/design/playwright.design.config.ts scripts/design/readme.spec.ts`.
  */
 
-test.use({ viewport: { width: 1600, height: 1000 }, colorScheme: "dark" });
+test.use({ viewport: { width: 1600, height: 1000 } });
 
 async function settle(page: Page) {
   await page.mouse.move(1598, 998);
   await page.evaluate(() => document.fonts.ready);
   await page.waitForTimeout(500);
   await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== "running"), null, { timeout: 15_000 }).catch(() => {});
-  await page.waitForTimeout(3000);
+  await page.waitForTimeout(1500);
 }
 
-test("README screenshots", async ({ page }) => {
+for (const theme of ["light", "dark"] as const) {
+test(`README screenshots ${theme}`, async ({ page }) => {
   test.setTimeout(180_000);
-  await page.emulateMedia({ reducedMotion: "reduce", colorScheme: "dark" });
-  await page.addInitScript(() => {
+  const shot = (name: string) => `docs/screenshots/${name}-${theme}.png`;
+  await page.emulateMedia({ reducedMotion: "reduce", colorScheme: theme });
+  await page.addInitScript((t) => {
     if (sessionStorage.getItem("readme-seeded")) return;
     sessionStorage.setItem("readme-seeded", "1");
     localStorage.clear();
-    localStorage.setItem("datavista-ui-storage", JSON.stringify({ state: { hasSeenTour: true, theme: "dark" }, version: 1 }));
+    localStorage.setItem(
+      "datavista-ui-storage",
+      JSON.stringify({ state: { hasSeenTour: true, hasCompletedSetup: true, themeSetting: { mode: "fixed", theme: t, day: "light", night: "dark", trigger: "device", dayStart: "07:00", nightStart: "19:00" } }, version: 3 })
+    );
     localStorage.setItem("datavista-visited", "true");
-  });
+  }, theme);
   await page.goto("/");
   await page.getByTestId("sidebar-nav-upload").click();
   await page.getByTestId("file-upload-input").setInputFiles("tests/fixtures/hr-attrition.csv");
-  await page.getByTestId("numeric-ledger").waitFor({ timeout: 30_000 });
+  await page.getByTestId("numeric-summary").waitFor({ timeout: 30_000 });
   await page.getByText("Dataset uploaded successfully").first().waitFor({ state: "hidden", timeout: 15_000 }).catch(() => {});
   await settle(page);
-  await page.screenshot({ path: "docs/dashboard-screenshot.png" });
+  await page.screenshot({ path: shot("dashboard") });
 
   // Charts: grouped bar with legend + average line.
   await page.getByTestId("sidebar-nav-charts").click();
@@ -55,7 +60,7 @@ test("README screenshots", async ({ page }) => {
   await page.getByTestId("chart-card").nth(1).waitFor();
   await page.getByText("Chart created").first().waitFor({ state: "hidden", timeout: 15_000 }).catch(() => {});
   await settle(page);
-  await page.getByTestId("chart-card").nth(0).screenshot({ path: "docs/charts-screenshot.png" });
+  await page.getByTestId("chart-card").nth(0).screenshot({ path: shot("charts") });
 
   // Pivot: Department across the columns.
   await page.getByTestId("sidebar-nav-pivot").click();
@@ -64,7 +69,7 @@ test("README screenshots", async ({ page }) => {
   const department = fields.locator("> div").filter({ has: page.getByText("Department", { exact: true }) });
   await department.getByRole("button", { name: "Col", exact: true }).click({ timeout: 10_000 });
   await settle(page);
-  await page.locator("#main-content").screenshot({ path: "docs/pivot-screenshot.png" });
+  await page.locator("#main-content").screenshot({ path: shot("pivot") });
 
   // AI Co-Pilot settings dialog, from the command palette.
   await page.keyboard.press("Control+k");
@@ -75,5 +80,6 @@ test("README screenshots", async ({ page }) => {
   // Focus moves to the first button and opens its tooltip; not wanted in the README image.
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await settle(page);
-  await settings.screenshot({ path: "docs/ai-screenshot.png" });
+  await settings.screenshot({ path: shot("ai") });
 });
+}

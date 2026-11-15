@@ -334,7 +334,6 @@ const debounceFilters = createDebouncer(250);
 const last = {
   activeDatasetId: undefined as string | undefined,
   filters: undefined as FilterState | undefined,
-  theme: undefined as unknown,
   activeView: undefined as unknown,
   showWelcome: undefined as unknown,
   activeDashboardId: undefined as string | null | undefined,
@@ -343,7 +342,6 @@ const last = {
 function seedBaselines() {
   last.activeDatasetId = useDatasetStore.getState().activeDataset?.id;
   last.filters = useFilterStore.getState().activeFilters;
-  last.theme = useUiStore.getState().theme;
   last.activeView = useUiStore.getState().activeView;
   last.showWelcome = useUiStore.getState().showWelcome;
   last.activeDashboardId = useDashboardStore.getState().activeDashboardId;
@@ -537,15 +535,9 @@ export const persistenceService = {
         }
       }
 
-      // 8. Hydrate uiStore preferences
-      if (prefs["theme"]) {
-        useUiStore.setState({ theme: prefs["theme"] });
-        if (prefs["theme"] === "dark") {
-          document.documentElement.classList.add("dark");
-        } else {
-          document.documentElement.classList.remove("dark");
-        }
-      }
+      // 8. Hydrate uiStore preferences. The theme is not read from here (an old database may
+      // still hold a "theme" row): it lives in localStorage only, so it is known before the
+      // first paint and never flips after hydration.
       if (prefs["activeView"]) {
         useUiStore.setState({ activeView: prefs["activeView"] });
       }
@@ -746,14 +738,6 @@ export const persistenceService = {
     useUiStore.subscribe(async (state) => {
       if (this.isHydrating || this.stopped) return;
 
-      if (state.theme !== last.theme) {
-        last.theme = state.theme;
-        try {
-          await db.uiState.put({ key: "theme", value: state.theme });
-        } catch (e) {
-          console.error("Failed to sync theme preference:", e);
-        }
-      }
       if (state.activeView !== last.activeView) {
         last.activeView = state.activeView;
         try {

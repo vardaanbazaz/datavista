@@ -110,13 +110,13 @@ test("full Play Store file: 483 duplicate rows (local file only)", async ({ page
 
 const LABS = ["Lab,Value", ...Array.from({ length: 12 }, (_, i) => `${i % 3 === 0 ? "lab a" : i % 3 === 1 ? "Lab A" : "Lab B"},${i}`), "Lab A,99"].join("\n");
 
-test("label variants: merge 'lab a' into 'Lab A', then undo; categorical ledger shows top values", async ({ page }) => {
+test("label variants: merge 'lab a' into 'Lab A', then undo; categorical summary shows top values", async ({ page }) => {
   await startFreshSessionWithoutTour(page);
   await page.goto("/");
   await importFile(page, { name: "labs.csv", mimeType: "text/csv", buffer: Buffer.from(LABS) }, "labs");
 
-  // Overview categorical ledger row: distinct 3, missing 0, top values with shares.
-  const tile = page.getByTestId("category-tile-Lab");
+  // Overview categorical summary row: distinct 3, missing 0, top values with shares.
+  const tile = page.getByTestId("category-row-Lab");
   await expect(tile.getByRole("cell").nth(0)).toHaveText("3");
   await expect(tile.getByRole("cell").nth(1)).toHaveText("0");
   await expect(tile).toContainText("Lab A 38.5%");
@@ -129,8 +129,8 @@ test("label variants: merge 'lab a' into 'Lab A', then undo; categorical ledger 
   await expect(page.getByTestId("fix-badge-Lab")).toContainText("merged 'lab a' into 'Lab A'");
 
   await page.getByTestId("sidebar-nav-overview").click();
-  await expect(page.getByTestId("category-tile-Lab").getByRole("cell").nth(0)).toHaveText("2");
-  await expect(page.getByTestId("category-tile-Lab")).toContainText("Lab A 69.2%");
+  await expect(page.getByTestId("category-row-Lab").getByRole("cell").nth(0)).toHaveText("2");
+  await expect(page.getByTestId("category-row-Lab")).toContainText("Lab A 69.2%");
 
   await openData(page);
   await page.getByTestId("fix-badge-Lab").click();

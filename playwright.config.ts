@@ -5,7 +5,8 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  // Two workers in CI (GitHub runners have 4 cores): a11y.spec's three tests and the rest split across them.
+  workers: process.env.CI ? 2 : undefined,
   reporter: "list",
   use: {
     baseURL: "http://localhost:8080",

@@ -136,9 +136,9 @@ export function CalculatedFieldsManager({ trigger }: CalculatedFieldsManagerProp
         )}
       </DialogTrigger>
       
-      <DialogContent className="max-w-3xl glass border-border shadow-2xl p-6">
+      <DialogContent className="max-w-3xl p-6">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+          <DialogTitle className="text-h2 flex items-center gap-2">
             <Code className="h-6 w-6 text-primary-ink" />
             Calculated Fields & Formulas
           </DialogTitle>
@@ -165,7 +165,7 @@ export function CalculatedFieldsManager({ trigger }: CalculatedFieldsManagerProp
                   <TooltipTrigger asChild>
                     <Button
                       size="sm"
-                      variant="premium"
+                      variant="default"
                       onClick={handleGenerateAiFormula}
                       disabled={isGeneratingAi || !aiPrompt.trim()}
                       className="h-8 text-xs shrink-0 gap-1"
@@ -286,7 +286,7 @@ export function CalculatedFieldsManager({ trigger }: CalculatedFieldsManagerProp
               <div className="space-y-4">
                 {/* Columns */}
                 <div>
-                  <h5 className="catalogue-label text-muted-foreground mb-2">Columns (Double-click to insert)</h5>
+                  <h5 className="text-caption font-semibold text-muted-foreground mb-2">Columns (Double-click to insert)</h5>
                   <div className="flex flex-wrap gap-1">
                     {existingColumns.map(col => (
                       <Badge
@@ -303,7 +303,7 @@ export function CalculatedFieldsManager({ trigger }: CalculatedFieldsManagerProp
 
                 {/* Built-in Functions */}
                 <div>
-                  <h5 className="catalogue-label text-muted-foreground mb-2">Functions (Click to insert)</h5>
+                  <h5 className="text-caption font-semibold text-muted-foreground mb-2">Functions (Click to insert)</h5>
                   <div className="space-y-2">
                     {functionsList.map(func => (
                       <button

@@ -60,3 +60,13 @@ of that script). Same policy as the HR file: committed, never hand-edited. Regen
 pip install -r scripts/golden/requirements.txt
 npm run golden:regen-messy
 ```
+
+## playstore-insights.csv
+
+A second subset of the Kaggle `lava18/google-play-store-apps` file (`googleplaystore.csv`,
+same source and licence as `messy/playstore.csv`: CC BY-SA 4.0): the header plus data rows
+1–300 and 337, 382, 2545, 2546, 2605, 2612, 3905, 3910, 3944, copied line for line. Those
+extra rows are the apps with the most reviews, each listed two or three times in the original
+(Facebook, WhatsApp Messenger, Instagram). Used by
+`src/features/ai/__tests__/anomalyDetector.playstore.test.ts` (row-level labels for a
+near-unique column, one finding per app).

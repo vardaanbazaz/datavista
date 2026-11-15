@@ -1,68 +1,49 @@
-/* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 
 import { useUiStore } from "@/store/uiStore";
+import { applyDisplayPrefs, msUntilNextSwitch } from "@/shared/theme/displayPrefs";
 
-type Theme = "dark" | "light" | "system";
+/**
+ * Keeps <html> in step with the theme and Appearance settings. The first application happens
+ * before the first paint (index.html's boot script, then src/main.tsx); this re-applies on
+ * every settings change, and for Automatic: when the device switches light/dark ("Follow
+ * device") or when the schedule reaches a day/night start ("Schedule"), and when the tab is
+ * shown again (a sleeping laptop misses timers).
+ */
+export function ThemeProvider({ children }: { children: ReactNode }) {
+  const setting = useUiStore((s) => s.themeSetting);
+  const appearance = useUiStore((s) => s.appearance);
+  const setResolvedTheme = useUiStore((s) => s.setResolvedTheme);
 
-type ThemeProviderProps = {
-  children: React.ReactNode;
-  defaultTheme?: Theme;
-  storageKey?: string;
-};
-
-type ThemeProviderState = {
-  theme: Theme;
-  setTheme: (theme: Theme) => void;
-};
-
-const initialState: ThemeProviderState = {
-  theme: "system",
-  setTheme: () => null,
-};
-
-const ThemeProviderContext = createContext<ThemeProviderState>(initialState);
-
-export function ThemeProvider({
-  children,
-  ...props
-}: ThemeProviderProps) {
-  const theme = useUiStore((state) => state.theme);
-  const setTheme = useUiStore((state) => state.setTheme);
-
-  // The class itself is set by shared/theme/displayPrefs.ts (src/main.tsx, before the first
-  // paint and on every change). Here only "system" needs a listener for the OS switching.
   useEffect(() => {
-    if (theme !== "system") return;
-    const media = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => {
-      const root = window.document.documentElement;
-      root.classList.remove("light", "dark");
-      root.classList.add(media.matches ? "dark" : "light");
+    const apply = () => setResolvedTheme(applyDisplayPrefs(setting, appearance));
+    apply();
+    if (setting.mode !== "auto") return;
+
+    const cleanups: (() => void)[] = [];
+    const onVisible = () => {
+      if (document.visibilityState === "visible") apply();
     };
-    media.addEventListener("change", onChange);
-    return () => media.removeEventListener("change", onChange);
-  }, [theme]);
+    document.addEventListener("visibilitychange", onVisible);
+    cleanups.push(() => document.removeEventListener("visibilitychange", onVisible));
 
-  const value = {
-    theme,
-    setTheme: (newTheme: Theme) => {
-      setTheme(newTheme);
-    },
-  };
+    if (setting.trigger === "device") {
+      const mq = window.matchMedia("(prefers-color-scheme: dark)");
+      mq.addEventListener("change", apply);
+      cleanups.push(() => mq.removeEventListener("change", apply));
+    } else {
+      let timer: number;
+      const schedule = () => {
+        timer = window.setTimeout(() => {
+          apply();
+          schedule();
+        }, msUntilNextSwitch(setting) + 500);
+      };
+      schedule();
+      cleanups.push(() => window.clearTimeout(timer));
+    }
+    return () => cleanups.forEach((c) => c());
+  }, [setting, appearance, setResolvedTheme]);
 
-  return (
-    <ThemeProviderContext.Provider {...props} value={value}>
-      {children}
-    </ThemeProviderContext.Provider>
-  );
+  return <>{children}</>;
 }
-
-export const useTheme = () => {
-  const context = useContext(ThemeProviderContext);
-
-  if (context === undefined)
-    throw new Error("useTheme must be used within a ThemeProvider");
-
-  return context;
-};

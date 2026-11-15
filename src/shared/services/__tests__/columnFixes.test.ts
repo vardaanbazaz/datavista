@@ -24,12 +24,12 @@ describe("column fixes", () => {
   });
 
   it("undo of an import currency fix gives back the original text and type", () => {
-    const ds = load([{ p: "ksh 6976" }, { p: "100" }, { p: "ksh 0" }, { p: "NaN" }, { p: "50" }]);
+    const ds = load([{ p: "ksh 6976" }, { p: "100" }, { p: "ksh 0" }, { p: "NA" }, { p: "50" }]);
     expect(ds.columnTypes.p).toBe("numeric");
     const fix = ds.metadata!.columnFixes![0];
     expect(fix).toMatchObject({ kind: "currency", currency: { code: "KES", symbol: "ksh" }, previousType: "categorical" });
     const undone = removeColumnFix(ds, fix.id);
-    expect(undone.data.map(r => r.p)).toEqual(["ksh 6976", 100, "ksh 0", "NaN", 50]);
+    expect(undone.data.map(r => r.p)).toEqual(["ksh 6976", 100, "ksh 0", "NA", 50]);
     expect(undone.columnTypes.p).toBe("categorical");
     expect(undone.metadata!.columns[0].inferredDataType).toBe("categorical");
   });

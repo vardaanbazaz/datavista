@@ -6,8 +6,11 @@ import { MainContent } from "@/app/layout/MainContent";
 import { FileUpload } from "@/features/upload/components/FileUpload";
 import { ImportDialog } from "@/features/upload/components/ImportDialog";
 import { DataPrivacyDialog } from "@/features/privacy/components/DataPrivacyDialog";
-import { ReadingComfortPanel } from "@/features/settings/components/ReadingComfortPanel";
-import { Bookplate, SectionHeading } from "@/shared/components/ornament";
+import { AppearancePanel } from "@/features/settings/components/AppearancePanel";
+import { SetupFlow, shouldOfferSetup } from "@/features/settings/components/SetupFlow";
+import { loadSampleDataset } from "@/features/datasets/sampleData";
+import { AuroraRibbon, EmptyState, GlassPanel, PageHeader } from "@/shared/components/surface";
+import { Logo } from "@/shared/brand/Logo";
 import { NoDatasetPlate } from "@/shared/components/NoDatasetPlate";
 import { ChartBuilder } from "@/features/charts/components/ChartBuilder";
 import { DataTable } from "@/features/datasets/components/DataTable";
@@ -15,7 +18,6 @@ import { FilterPanel } from "@/features/filters/components/FilterPanel";
 import { ExportPanel } from "@/features/export/components/ExportPanel";
 import { ChartGrid } from "@/features/charts/components/ChartGrid";
 import { DashboardSummary } from "./DashboardSummary";
-import { WelcomeOverlay } from "./WelcomeOverlay";
 import { OnboardingTour } from "@/features/ui/components/OnboardingTour";
 import { LoadingProgress, LoadingState } from "@/shared/components/LoadingSpinner";
 import { perfMark, perfMeasure } from "@/shared/lib/perfMarks";
@@ -26,7 +28,7 @@ const StatsExplorer = lazy(() => import("@/features/stats/components/StatsExplor
 const WindowExplorer = lazy(() => import("@/features/window/components/WindowExplorer").then(m => ({ default: m.WindowExplorer })));
 import { Button } from "@/shared/components/ui/button";
 import { motion } from "framer-motion";
-import { BarChart3, Upload, Filter } from "lucide-react";
+import { BarChart3, Upload, Filter, Table, Grid, Sigma, Columns, Download } from "lucide-react";
 
 import { useUiStore } from "@/store/uiStore";
 import { useDatasetStore } from "@/store/datasetStore";
@@ -44,7 +46,7 @@ export type FilterState = SharedFilterState;
 export function Dashboard() {
   const activeView = useUiStore((state) => state.activeView);
   const setActiveView = useUiStore((state) => state.setActiveView);
-  const setShowWelcome = useUiStore((state) => state.setShowWelcome);
+  const setIsSetupOpen = useUiStore((state) => state.setIsSetupOpen);
   const isLoading = useUiStore((state) => state.isLoading);
   // The real IndexedDB load, not the synchronous localStorage-only `isHydrated` flag
   // (see uiStore.ts) - gating on that one let the dashboard render before actual data
@@ -54,7 +56,6 @@ export function Dashboard() {
   const setIsSnapshotManagerOpen = useUiStore((state) => state.setIsSnapshotManagerOpen);
 
   const activeDataset = useDatasetStore((state) => state.activeDataset);
-  const uploadDataset = useDatasetStore((state) => state.uploadDataset);
 
   const filteredData = useFilterStore((state) => state.filteredData);
 
@@ -102,15 +103,22 @@ export function Dashboard() {
     }, 0));
   }, [isDataHydrated]);
 
-  // Show welcome overlay on first visit
+  // First visit: the setup (look, effects, optional AI key, then tour or sample data). Not for
+  // returning users (hasCompletedSetup / hasSeenTour / the older `datavista-visited` flag) and
+  // never when the workspace already holds data. Checked once, after IndexedDB has loaded.
   useEffect(() => {
     if (!isDataHydrated) return;
-    const hasVisited = localStorage.getItem('datavista-visited');
-    if (!hasVisited) {
-      setShowWelcome(true);
-      localStorage.setItem('datavista-visited', 'true');
+    const ui = useUiStore.getState();
+    let visited = false;
+    try {
+      visited = localStorage.getItem('datavista-visited') !== null;
+    } catch {
+      visited = false;
     }
-  }, [isDataHydrated, setShowWelcome]);
+    if (shouldOfferSetup({ hasCompletedSetup: ui.hasCompletedSetup, hasSeenTour: ui.hasSeenTour, datasetCount: useDatasetStore.getState().datasets.length, visited })) {
+      setIsSetupOpen(true);
+    }
+  }, [isDataHydrated, setIsSetupOpen]);
 
   if (!isDataHydrated) {
     return (
@@ -125,37 +133,14 @@ export function Dashboard() {
     );
   }
 
-  // Load sample data on first visit
-  const loadSampleData = () => {
-    const sampleDataset: Dataset = {
-      id: "sample-sales-data",
-      name: "Sample Sales Data",
-      data: [
-        { Product: "Laptop", Category: "Electronics", Sales: 1200, Profit: 300, Region: "North" },
-        { Product: "Phone", Category: "Electronics", Sales: 800, Profit: 200, Region: "South" },
-        { Product: "Tablet", Category: "Electronics", Sales: 600, Profit: 150, Region: "East" },
-        { Product: "Desk Chair", Category: "Furniture", Sales: 350, Profit: 80, Region: "West" },
-        { Product: "Bookshelf", Category: "Furniture", Sales: 280, Profit: 70, Region: "North" },
-        { Product: "Coffee Maker", Category: "Appliances", Sales: 120, Profit: 30, Region: "South" },
-        { Product: "Monitor", Category: "Electronics", Sales: 400, Profit: 100, Region: "North" },
-        { Product: "Office Chair", Category: "Furniture", Sales: 320, Profit: 90, Region: "South" },
-        { Product: "Keyboard", Category: "Electronics", Sales: 150, Profit: 40, Region: "West" },
-        { Product: "Mouse", Category: "Electronics", Sales: 50, Profit: 15, Region: "North" }
-      ],
-      columns: ["Product", "Category", "Sales", "Profit", "Region"],
-      columnTypes: {
-        Product: "categorical",
-        Category: "categorical", 
-        Sales: "numeric",
-        Profit: "numeric",
-        Region: "categorical"
-      }
-    };
-    uploadDataset(sampleDataset);
-  };
+  const loadSampleData = loadSampleDataset;
+
+  const isHero = !isLoading && ((activeView === 'overview' && !activeDataset) || activeView === 'upload');
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col lg:flex-row transition-colors">
+    <div className="relative min-h-screen bg-background text-foreground flex flex-col lg:flex-row">
+      {/* The aurora ribbon behind the top of every view (larger on the welcome and upload screens). */}
+      <AuroraRibbon variant={isHero ? "hero" : "page"} />
       <Sidebar
         onOpenSearch={() => {
           setSearchInitialQuery(undefined);
@@ -167,7 +152,12 @@ export function Dashboard() {
         }}
       />
       
-      <MainContent>
+      <MainContent
+        onOpenSearch={() => {
+          setSearchInitialQuery(undefined);
+          setIsSearchOpen(true);
+        }}
+      >
         {isLoading && (
           <LoadingState 
             title="Processing your data..." 
@@ -184,49 +174,35 @@ export function Dashboard() {
             {activeDataset ? (
               <DashboardSummary />
             ) : (
-              // Empty workspace: the ex-libris bookplate (batch 6 empty-state style).
-              <div className="mx-auto max-w-4xl space-y-8">
-                <Bookplate
-                  inscription="Ex libris · DataVista"
-                  title="DataVista Dashboard"
-                  level={1}
-                  emblem={<BarChart3 aria-hidden />}
-                  data-testid="overview-empty"
-                  actions={
-                    <>
-                      <Button
-                        data-testid="sample-data-button"
-                        onClick={loadSampleData}
-                        variant="engraved"
-                        size="lg"
-                        className="text-base px-8"
-                      >
-                        Try with Sample Data
-                      </Button>
-                      <Button
-                        onClick={() => setActiveView('upload')}
-                        variant="plate"
-                        size="lg"
-                        className="text-base px-8"
-                      >
-                        Upload Your Data
-                      </Button>
-                    </>
-                  }
-                >
-                  Transform your data into clear, interactive visualizations with professional-grade analytics tools.
-                </Bookplate>
+              // Empty workspace: the welcome hero over the large ribbon.
+              <div className="mx-auto max-w-4xl space-y-10 pt-6 sm:pt-12" data-testid="overview-empty">
+                <div className="text-center" data-tour="view-overview">
+                  <Logo size={64} className="mx-auto" />
+                  <h2 className="mt-5 text-display text-foreground">Explore your data in DataVista</h2>
+                  <p className="mx-auto mt-3 max-w-xl text-body text-frame-muted">
+                    Charts, pivots and statistics from CSV, TSV and Excel files. Your files are read and kept in this browser.
+                  </p>
+                  <GlassPanel className="mx-auto mt-7 flex w-fit flex-col gap-2 p-2 sm:flex-row">
+                    <Button data-testid="sample-data-button" onClick={loadSampleData} size="lg">
+                      Try with sample data
+                    </Button>
+                    <Button onClick={() => setActiveView('upload')} variant="outline" size="lg" className="gap-2">
+                      <Upload className="h-4 w-4" aria-hidden />
+                      Upload your data
+                    </Button>
+                  </GlassPanel>
+                </div>
 
-                <ul className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <ul className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                   {[
-                    { icon: Upload, title: "Import Data", text: "Upload CSV, TSV, or XLSX files to get started" },
-                    { icon: Filter, title: "Smart Filtering", text: "Advanced filters with real-time data grouping" },
-                    { icon: BarChart3, title: "8 Chart Types", text: "Create clear visualizations with our chart library" },
+                    { icon: Upload, title: "Import", text: "CSV, TSV or XLSX. Column types are detected for you." },
+                    { icon: Filter, title: "Filter and group", text: "Narrow the rows and compare groups side by side." },
+                    { icon: BarChart3, title: "Chart and summarise", text: "Bar, line, pie, scatter and more, with pivots and statistics." },
                   ].map(({ icon: Icon, title, text }) => (
-                    <li key={title} className="frame-double rounded-md bg-card p-6 text-center">
-                      <Icon className="mx-auto mb-3 h-8 w-8 text-ornament" aria-hidden />
-                      <h2 className="font-display text-h2">{title}</h2>
-                      <p className="mt-1 text-sm text-muted-foreground">{text}</p>
+                    <li key={title} className="surface-glass rounded-xl p-5">
+                      <Icon className="mb-3 h-5 w-5 text-primary-ink" aria-hidden />
+                      <h3 className="text-h3">{title}</h3>
+                      <p className="mt-1 text-sm text-frame-muted">{text}</p>
                     </li>
                   ))}
                 </ul>
@@ -242,15 +218,18 @@ export function Dashboard() {
             transition={{ duration: 0.5 }}
             className="max-w-2xl mx-auto"
           >
-            <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <SectionHeading numeral="II" label="Upload Data" title="Add a dataset" className="[&_h2]:text-h1" />
-                <p className="mt-1 text-body text-muted-foreground">CSV, TSV or XLSX, read and kept in this browser.</p>
-              </div>
-              <Button onClick={loadSampleData} variant="outline">
-                Try with Sample Data
-              </Button>
-            </div>
+            <PageHeader
+              className="mb-6 pt-4"
+              tourId="upload"
+              icon={<Upload />}
+              title="Add a dataset"
+              description="CSV, TSV or XLSX, read and kept in this browser."
+              actions={
+                <Button onClick={loadSampleData} variant="outline">
+                  Try with Sample Data
+                </Button>
+              }
+            />
             <FileUpload />
           </motion.div>
         )}
@@ -268,25 +247,22 @@ export function Dashboard() {
               transition={{ delay: 0.1, duration: 0.4 }}
               className="flex flex-wrap items-end justify-between gap-3"
             >
-              <SectionHeading numeral="III" label="Filters" title="Data Filters" className="[&_h2]:text-h1" />
-              <div className="flex gap-2">
-                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setActiveView('charts')}
-                  >
-                    Create Charts
-                  </Button>
-                </motion.div>
-                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setActiveView('data')}
-                  >
-                    View Data
-                  </Button>
-                </motion.div>
-              </div>
+              <PageHeader
+                className="w-full"
+                tourId="filters"
+                icon={<Filter />}
+                title="Data Filters"
+                actions={
+                  <>
+                    <Button variant="outline" onClick={() => setActiveView('charts')}>
+                      Create Charts
+                    </Button>
+                    <Button variant="outline" onClick={() => setActiveView('data')}>
+                      View Data
+                    </Button>
+                  </>
+                }
+              />
             </motion.div>
             
             <FilterPanel />
@@ -306,29 +282,24 @@ export function Dashboard() {
               transition={{ delay: 0.1, duration: 0.4 }}
               className="flex flex-wrap items-end justify-between gap-3"
             >
-              <SectionHeading numeral="IV" label="Charts" title="Chart Builder" className="[&_h2]:text-h1" />
-              <div className="flex gap-2">
-                {!activeDataset && (
-                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setActiveView('upload')}
-                    >
-                      Upload Data First
-                    </Button>
-                  </motion.div>
-                )}
-                {activeDataset && (
-                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setActiveView('filters')}
-                    >
+              <PageHeader
+                className="w-full"
+                tourId="charts"
+                icon={<BarChart3 />}
+                title="Chart Builder"
+                description={activeDataset ? `Build charts from “${activeDataset.name}”.` : undefined}
+                actions={
+                  activeDataset ? (
+                    <Button variant="outline" onClick={() => setActiveView('filters')}>
                       Back to Filters
                     </Button>
-                  </motion.div>
-                )}
-              </div>
+                  ) : (
+                    <Button variant="outline" onClick={() => setActiveView('upload')}>
+                      Upload Data First
+                    </Button>
+                  )
+                }
+              />
             </motion.div>
             
             {activeDataset ? (
@@ -337,16 +308,15 @@ export function Dashboard() {
                   <>
                     <ChartBuilder />
                     <div className="mt-8">
-                      <h3 className="font-display text-h2 font-semibold mb-4">Your Charts</h3>
+                      <h3 className="text-h2 mb-4">Your Charts</h3>
                       <ChartGrid />
                     </div>
                   </>
                 ) : (
-                  <Bookplate
-                    inscription="Charts"
+                  <EmptyState
                     title="No rows match the filters"
                     level={3}
-                    emblem={<Filter aria-hidden />}
+                    icon={<Filter aria-hidden />}
                     actions={
                       <Button variant="outline" onClick={() => setActiveView('filters')}>
                         Adjust Filters
@@ -354,7 +324,7 @@ export function Dashboard() {
                     }
                   >
                     Every row is filtered out. Change or clear the filters to chart the data.
-                  </Bookplate>
+                  </EmptyState>
                 )}
               </>
             ) : (
@@ -367,34 +337,36 @@ export function Dashboard() {
 
         {!isLoading && activeView === 'data' && (
           <div className="space-y-6 animate-fade-in">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <SectionHeading numeral="V" label="Data Explorer" title="Data Explorer" className="[&_h2]:text-h1" />
-              {activeDataset && (
-                <Button 
-                  variant="outline" 
-                  onClick={() => setActiveView('filters')}
-                >
-                  Back to Filters
-                </Button>
-              )}
-            </div>
+            <PageHeader
+              tourId="data"
+              icon={<Table />}
+              title="Data Explorer"
+              actions={
+                activeDataset ? (
+                  <Button variant="outline" onClick={() => setActiveView('filters')}>
+                    Back to Filters
+                  </Button>
+                ) : undefined
+              }
+            />
             <DataTable />
           </div>
         )}
 
         {!isLoading && activeView === 'pivot' && (
           <div className="space-y-6 animate-fade-in w-full">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <SectionHeading numeral="VI" label="Pivot Table" title="Pivot Analyzer" className="[&_h2]:text-h1" />
-              {activeDataset && (
-                <Button 
-                  variant="outline" 
-                  onClick={() => setActiveView('filters')}
-                >
-                  Back to Filters
-                </Button>
-              )}
-            </div>
+            <PageHeader
+              tourId="pivot"
+              icon={<Grid />}
+              title="Pivot Analyzer"
+              actions={
+                activeDataset ? (
+                  <Button variant="outline" onClick={() => setActiveView('filters')}>
+                    Back to Filters
+                  </Button>
+                ) : undefined
+              }
+            />
             <ErrorBoundary fallback={(props) => <FullPageError {...props} />}>
               <Suspense fallback={<LoadingState title="Loading Pivot Analyzer..." description="Preparing pivot engine and view..." />}>
                 <PivotExplorer />
@@ -405,17 +377,18 @@ export function Dashboard() {
 
         {!isLoading && activeView === 'stats' && (
           <div className="space-y-6 animate-fade-in w-full">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <SectionHeading numeral="VII" label="Statistics" title="Statistical Summary" className="[&_h2]:text-h1" />
-              {activeDataset && (
-                <Button 
-                  variant="outline" 
-                  onClick={() => setActiveView('filters')}
-                >
-                  Back to Filters
-                </Button>
-              )}
-            </div>
+            <PageHeader
+              tourId="stats"
+              icon={<Sigma />}
+              title="Statistical Summary"
+              actions={
+                activeDataset ? (
+                  <Button variant="outline" onClick={() => setActiveView('filters')}>
+                    Back to Filters
+                  </Button>
+                ) : undefined
+              }
+            />
             <ErrorBoundary fallback={(props) => <FullPageError {...props} />}>
               <Suspense fallback={<LoadingState title="Loading Statistical Engine..." description="Calculating summary statistics..." />}>
                 <StatsExplorer />
@@ -426,17 +399,18 @@ export function Dashboard() {
 
         {!isLoading && activeView === 'window-builder' && (
           <div className="space-y-6 animate-fade-in w-full">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <SectionHeading numeral="VIII" label="Window Functions" title="Window & Ranking Builder" className="[&_h2]:text-h1" />
-              {activeDataset && (
-                <Button 
-                  variant="outline" 
-                  onClick={() => setActiveView('filters')}
-                >
-                  Back to Filters
-                </Button>
-              )}
-            </div>
+            <PageHeader
+              tourId="window-builder"
+              icon={<Columns />}
+              title="Window & Ranking Builder"
+              actions={
+                activeDataset ? (
+                  <Button variant="outline" onClick={() => setActiveView('filters')}>
+                    Back to Filters
+                  </Button>
+                ) : undefined
+              }
+            />
             <ErrorBoundary fallback={(props) => <FullPageError {...props} />}>
               <Suspense fallback={<LoadingState title="Loading Window Builder..." description="Initializing window calculation module..." />}>
                 <WindowExplorer />
@@ -446,13 +420,19 @@ export function Dashboard() {
         )}
 
         {!isLoading && activeView === 'export' && (
-          <div className="animate-fade-in">
+          <div className="space-y-6 animate-fade-in">
+            <PageHeader
+              tourId="export"
+              icon={<Download />}
+              title="Export"
+              description={activeDataset ? `Download “${activeDataset.name}” as CSV, its charts as images, or a PDF report.` : undefined}
+            />
             <ExportPanel />
           </div>
         )}
       </MainContent>
       
-      <WelcomeOverlay />
+      <SetupFlow />
       <OnboardingTour />
       
       <GlobalSearchModal
@@ -467,7 +447,7 @@ export function Dashboard() {
       />
       <ImportDialog />
       <DataPrivacyDialog />
-      <ReadingComfortPanel />
+      <AppearancePanel />
     </div>
   );
 }

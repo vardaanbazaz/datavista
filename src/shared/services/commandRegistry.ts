@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { CommandDefinition } from "@/shared/types/commands";
+import { THEME_BY_ID } from "@/shared/theme/themes";
 import { useUiStore } from "@/store/uiStore";
 import { useDashboardStore } from "@/features/dashboards/store/dashboardStore";
 import { useFilterStore } from "@/store/filterStore";
@@ -20,22 +21,19 @@ export const defaultCommands: CommandDefinition[] = [
   {
     id: "theme-toggle",
     label: "Toggle Theme (Dark / Light)",
-    description: "Switch workspace theme between Dark and Light mode",
+    description: "Switch between the Light and Dark themes (other themes: Appearance)",
     category: "Theme",
     icon: "Sun",
     shortcut: ["Alt", "T"],
     execute: () => {
-      const currentTheme = useUiStore.getState().theme;
-      const newTheme = currentTheme === "dark" ? "light" : "dark";
-      useUiStore.getState().setTheme(newTheme);
-      if (newTheme === "dark") {
-        document.documentElement.classList.add("dark");
-      } else {
-        document.documentElement.classList.remove("dark");
-      }
+      // From any dark-data theme to Light, from anything else to Dark; fixes the theme
+      // (leaves Automatic). ThemeProvider applies it.
+      const { resolvedTheme, setThemeSetting } = useUiStore.getState();
+      const newTheme = THEME_BY_ID[resolvedTheme].scheme === "dark" ? "light" : "dark";
+      setThemeSetting({ mode: "fixed", theme: newTheme });
       toast({
-        title: "Theme Toggled",
-        description: `Theme set to ${newTheme}.`,
+        title: "Theme changed",
+        description: `${THEME_BY_ID[newTheme].label} theme.`,
       });
     },
   },

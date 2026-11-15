@@ -91,13 +91,13 @@ describe('Lab-style mixed formats', () => {
     expect(ds.data[3].signout_date).toBe('2023/13/01');
     expect(ds.data[9].signout_date).toBe('2023-02-30');
     const c = col(ds, 'signout_date');
-    expect(c.invalidDateCount).toBe(4); // 2023/13/01, invalid, NaN, 2023-02-30
-    expect(c.missingValueCount).toBe(1);
+    expect(c.invalidDateCount).toBe(3); // 2023/13/01, invalid, 2023-02-30 ("NaN" is missing)
+    expect(c.missingValueCount).toBe(2);
     expect(c.earliestDate).toBe('2020-02-29');
     expect(c.latestDate).toBe('2023-06-20');
     // Invalid values join no period bucket.
     const years = groupCounts(ds, 'signout_date', 'year');
-    expect(Object.values(years).reduce((a, b) => (a as number) + (b as number), 0)).toBe(raw.length - 1 - 4);
+    expect(Object.values(years).reduce((a, b) => (a as number) + (b as number), 0)).toBe(raw.length - 2 - 3);
     expect(years['2023']).toBe(2);
   });
 });

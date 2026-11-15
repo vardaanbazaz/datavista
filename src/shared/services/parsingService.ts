@@ -2,7 +2,7 @@ import { Dataset, DataRow, DatasetMetadata, ColumnMetadata, ImportIssuesSummary,
 import { columnQuality, detectImportConversion, findDuplicateRows } from "./dataQuality";
 import { transformColumn } from "./columnFixTransforms";
 import { isIdName } from "@/shared/utils/columnRoles";
-import { parseStrictNumber, toNumberOrNull, trimAscii } from "@/shared/utils/numeric";
+import { MISSING_TEXT_TOKENS, parseStrictNumber, toNumberOrNull, trimAscii } from "@/shared/utils/numeric";
 import { analyzeDateColumn, DateColumnAnalysis, localeDayFirst, parseDateValue, parseStoredDate, partsToUtcMs } from "@/shared/utils/dates";
 
 /** Version of the date rule in utils/dates.ts that wrote a dataset's date cells (see DatasetMetadata.dateParserVersion). */
@@ -21,15 +21,15 @@ export interface ProcessOptions {
 }
 
 /**
- * Trims ASCII whitespace and handles empty strings, converting them to null. Non-breaking
- * and other Unicode spaces are part of the value and are kept.
+ * Trims ASCII whitespace and turns blanks and missing-value text ("", N/A, NaN, null, None,
+ * #N/A, undefined; utils/numeric.ts MISSING_TEXT_TOKENS) into null, in every column. "NA" and
+ * "-" are kept (they can be real categories). Non-breaking and other Unicode spaces are part
+ * of the value and are kept.
  */
 export const cleanValue = (val: unknown): string | number | null => {
   if (val === null || val === undefined) return null;
   const strVal = trimAscii(String(val));
-  if (strVal === "" || strVal.toLowerCase() === "null" || strVal.toLowerCase() === "undefined" || strVal.toLowerCase() === "n/a") {
-    return null;
-  }
+  if (MISSING_TEXT_TOKENS.has(strVal.toLowerCase())) return null;
   return strVal;
 };
 

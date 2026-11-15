@@ -37,14 +37,11 @@ import { useUiStore } from "@/store/uiStore";
 import { useDatasetStore } from "@/store/datasetStore";
 import { useDashboardStore } from "@/features/dashboards/store/dashboardStore";
 import { InstantiateTemplateModal } from "@/features/dashboards/components/InstantiateTemplateModal";
-import { Seal } from "@/shared/components/ornament";
+import { CountBadge } from "@/shared/components/surface";
+import { Logo } from "@/shared/brand/Logo";
 import { Hint } from "@/shared/components/Hint";
-import { modKey, formatShortcut } from "@/shared/lib/platform";
-import { motion } from "framer-motion";
-import { Sparkles, ShieldCheck, BookOpen } from "lucide-react";
+import { Sparkles, ShieldCheck, Palette } from "lucide-react";
 import { datasetRowCount } from "@/shared/services/datasetRows";
-
-const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
 
 export function Sidebar({
   onOpenSearch,
@@ -57,7 +54,7 @@ export function Sidebar({
   const onViewChange = useUiStore((state) => state.setActiveView);
   const resetTour = useUiStore((state) => state.resetTour);
   const openPrivacy = useUiStore((state) => state.setIsPrivacyOpen);
-  const openReadingComfort = useUiStore((state) => state.setIsReadingComfortOpen);
+  const openAppearance = useUiStore((state) => state.setIsAppearanceOpen);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isInstantiateModalOpen, setIsInstantiateModalOpen] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -215,42 +212,46 @@ export function Sidebar({
     setIsMobileOpen(false);
   };
 
+  // Search and Appearance live in the top header on large screens (MainContent); on phones the
+  // header is this sidebar's compact row, so Appearance is in the menu here.
   const tools = [
-    { label: "Co-Pilot", hint: "Ask the AI Co-Pilot about your data (settings inside)", icon: Sparkles, onClick: () => onOpenAiCoPilot?.(), tour: "header-copilot", testId: undefined, wide: false },
-    { label: "Privacy", hint: "Data & privacy (clear all local data)", icon: ShieldCheck, onClick: () => openPrivacy(true), tour: undefined, testId: "open-privacy", wide: false },
-    { label: "Tour", hint: "Restart the onboarding tour", icon: HelpCircle, onClick: resetTour, tour: "header-tutorial", testId: undefined, wide: false },
-    // Reading comfort holds the theme too (Alt+T still toggles light/dark); the tour's
-    // "header-theme" step points here.
-    { label: "Reading comfort", hint: "Reading comfort and theme (text size, contrast, motion)", icon: BookOpen, onClick: () => openReadingComfort(true), tour: "header-theme", testId: "open-reading-comfort", wide: true },
+    { label: "Co-Pilot", hint: "Ask the AI Co-Pilot about your data (settings inside)", icon: Sparkles, onClick: () => onOpenAiCoPilot?.(), tour: "header-copilot", testId: undefined, mobileOnly: false },
+    { label: "Privacy", hint: "Data & privacy (clear all local data)", icon: ShieldCheck, onClick: () => openPrivacy(true), tour: undefined, testId: "open-privacy", mobileOnly: false },
+    { label: "Tour", hint: "Restart the onboarding tour", icon: HelpCircle, onClick: () => {
+      // On phones the open menu would push every view below the fold under the tour's sheet.
+      setIsMobileOpen(false);
+      resetTour();
+    }, tour: "header-tutorial", testId: "restart-tour", mobileOnly: false },
+    { label: "Appearance", hint: "Theme, transparency, animation, text size, contrast", icon: Palette, onClick: () => openAppearance(true), tour: "appearance", testId: "open-appearance-mobile", mobileOnly: true },
   ];
 
   const activeNavLabel = navItems.find((item) => item.id === activeView)?.label ?? "Menu";
 
   return (
-    <motion.div 
+    <div
       ref={sidebarRef}
       data-testid="sidebar"
-      initial={{ x: -100, opacity: 0 }}
-      animate={{ x: 0, opacity: 1 }}
-      transition={{ duration: 0.3 }}
-      className="sidebar-frame w-full lg:w-80 bg-sidebar text-sidebar-foreground border-b lg:border-b-0 lg:border-r border-sidebar-border flex flex-col shrink-0 transition-colors"
+      className={cn(
+        // Frame glass. Phones: a sticky top bar; while its menu is open it scrolls with the page
+        // and pushes the view down, so the view stays reachable below it. Large screens: a sticky
+        // full-height column that scrolls on its own.
+        "surface-glass top-0 z-40 w-full shrink-0 rounded-none border-x-0 border-t-0 text-sidebar-foreground flex flex-col",
+        isMobileOpen ? "relative lg:sticky" : "sticky",
+        "lg:h-screen lg:overflow-y-auto lg:w-72 lg:border-b-0 lg:border-r"
+      )}
     >
       {/* Header. Phones: one compact row (brand, search, menu) so data is on the first
           screen; the tools, search and sections live in the menu. Large screens: the brand,
           then the always-open menu below it. */}
-      <div className="px-4 py-3 lg:p-6 border-b border-sidebar-border">
-        <div className="flex items-center gap-3">
-          {/* Emblem: the mark in a gilt ring, like a library stamp. */}
-          <div className="w-9 h-9 lg:w-11 lg:h-11 rounded-full border border-ornament/70 ring-1 ring-ornament/30 ring-offset-2 ring-offset-sidebar flex items-center justify-center shrink-0">
-            <TrendingUp className="w-4 h-4 lg:w-5 lg:h-5 text-tertiary" aria-hidden />
-          </div>
+      <div className="px-4 py-3 lg:px-5 lg:pt-5 lg:pb-4">
+        <div className="flex items-center gap-2.5">
+          <Logo size={28} />
           <div className="flex-1 min-w-0">
-            <h1 className="font-display text-h2 lg:text-h1 leading-none text-foreground">DataVista</h1>
-            <p className="catalogue-label mt-1 hidden lg:block text-muted-foreground">Data Visualization</p>
+            <h1 className="text-h2 font-semibold leading-none text-foreground">DataVista</h1>
           </div>
 
           <Hint label="Global search: charts, datasets and views">
-            <Button variant="plate" size="icon" className="lg:hidden h-11 w-11 shrink-0" onClick={() => onOpenSearch?.()}>
+            <Button variant="outline" size="icon" className="lg:hidden h-11 w-11 shrink-0" onClick={() => onOpenSearch?.()}>
               <Search className="h-5 w-5" />
             </Button>
           </Hint>
@@ -258,7 +259,7 @@ export function Sidebar({
           {/* Mobile section menu toggle: visible text label (touch has no hover tooltips),
               showing the current section so a selection is visibly confirmed. */}
           <Button
-            variant="plate"
+            variant="outline"
             className="lg:hidden h-11 px-3 gap-2 max-w-[55%]"
             onClick={() => setIsMobileOpen(!isMobileOpen)}
             aria-expanded={isMobileOpen}
@@ -267,7 +268,7 @@ export function Sidebar({
           >
             {isMobileOpen ? <X className="h-4 w-4 shrink-0" /> : <Menu className="h-4 w-4 shrink-0" />}
             <span className="font-semibold">{isMobileOpen ? "Close" : "Menu"}</span>
-            <span className="text-sm text-muted-foreground truncate" data-testid="mobile-menu-current">
+            <span className="text-sm text-frame-muted truncate" data-testid="mobile-menu-current">
               {activeNavLabel}
             </span>
           </Button>
@@ -280,103 +281,55 @@ export function Sidebar({
         className={cn("flex-col flex-1", isMobileOpen ? "flex" : "hidden lg:flex")}
       >
         {/* Tools with visible names (older users, touch screens); the tooltip says more. */}
-        <div className="px-4 pt-4 lg:px-6 lg:pt-0 lg:-mt-px">
+        <div className="px-3 pt-2 lg:px-4 lg:pt-0">
           <div className="grid grid-cols-3 gap-1">
             {tools.map((tool) => (
               <Hint key={tool.label} label={tool.hint}>
                 <Button
                   variant="ghost"
                   className={cn(
-                    "text-sm text-muted-foreground hover:text-foreground hover:bg-sidebar-accent",
-                    // Three short tools side by side (icon over its name); Reading comfort gets a full row.
-                    tool.wide ? "col-span-3 h-11 justify-start gap-2 px-2" : "h-auto flex-col gap-1 px-1 py-2"
+                    "h-auto flex-col gap-1 px-1 py-2 text-xs text-frame-muted hover:text-foreground",
+                    tool.mobileOnly && "col-span-3 h-11 flex-row justify-start gap-2 px-2 text-sm lg:hidden"
                   )}
                   onClick={tool.onClick}
                   data-tour={tool.tour}
                   data-testid={tool.testId}
                 >
-                  <tool.icon className="h-5 w-5 shrink-0 text-ornament" />
+                  <tool.icon className="h-5 w-5 shrink-0 text-primary-ink" />
                   <span className="max-w-full truncate">{tool.label}</span>
                 </Button>
               </Hint>
             ))}
           </div>
-
-          {/* The name starts with the visible text (WCAG 2.5.3). The shortcut badge is CSS generated
-              content, so it isn't part of the label; the tooltip and name still give it. */}
-          <Hint label="Global search: charts, datasets and views" shortcut={[modKey, "K"]}>
-            <Button
-              variant="outline"
-              data-tour="global-search"
-              className="hidden lg:flex w-full mt-3 justify-between h-10 px-3 text-muted-foreground hover:text-foreground text-sm bg-background border border-borderStrong"
-              onClick={() => onOpenSearch?.()}
-            >
-              <div className="flex items-center gap-2">
-                <Search className="h-4 w-4" />
-                <span>Global search</span>
-              </div>
-              <kbd aria-hidden="true" data-keys={formatShortcut([modKey, "K"])} className="inline-block border border-border bg-muted text-muted-foreground text-xs rounded px-1.5 py-0.5 font-mono after:content-[attr(data-keys)]" />
-            </Button>
-          </Hint>
         </div>
 
-        <div className="p-4">
-        <nav className="space-y-1" aria-label="Sections">
-          {navItems.map((item, index) => {
+        <div className="px-3 py-3 lg:px-4">
+        <nav className="space-y-0.5" aria-label="Sections">
+          {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeView === item.id;
-            const tourAttr = 
-              item.id === 'overview' ? 'nav-dashboard' : 
-              item.id === 'upload' ? 'nav-upload' : 
-              item.id === 'filters' ? 'tool-filters' : 
-              item.id === 'charts' ? 'nav-charts' : 
-              item.id === 'data' ? 'dataset-grid' : 
-              item.id === 'pivot' ? 'nav-pivot' : 
-              item.id === 'stats' ? 'tool-statistics' : 
-              item.id === 'window-builder' ? 'tool-window-functions' : 
-              item.id === 'export' ? 'tool-export' : 
-              undefined;
-            
             return (
-              <motion.div
+              <Button
                 key={item.id}
-                initial={{ x: -50, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                transition={{ delay: index * 0.1, duration: 0.3 }}
+                data-testid={`sidebar-nav-${item.id}`}
+                variant="ghost"
+                className={cn(
+                  "relative w-full justify-start h-auto gap-3 py-2 pl-3 pr-3 whitespace-normal",
+                  // Active: accent fill, a bar on the left and the accent icon (not colour alone).
+                  isActive && "bg-accent before:absolute before:left-0 before:inset-y-2 before:w-[3px] before:rounded-full before:bg-primary-ink"
+                )}
+                aria-current={isActive ? "page" : undefined}
+                onClick={() => {
+                  onViewChange(item.id);
+                  setIsMobileOpen(false);
+                }}
               >
-                <Button
-                  data-testid={`sidebar-nav-${item.id}`}
-                  data-tour={tourAttr}
-                  variant={isActive ? "engraved" : "ghost"}
-                  className={cn(
-                    "relative w-full justify-start h-auto py-3 pl-3 pr-4 whitespace-normal transition-all duration-200",
-                    // Active: oxblood plate with a gilt bar on the left (not colour alone).
-                    isActive && "before:absolute before:left-0 before:inset-y-2 before:w-1 before:rounded-r before:bg-tertiary"
-                  )}
-                  aria-current={isActive ? "page" : undefined}
-                  onClick={() => {
-                    onViewChange(item.id);
-                    setIsMobileOpen(false);
-                  }}
-                >
-                  <span
-                    className={cn("w-7 shrink-0 text-right font-display text-lg leading-none", isActive ? "text-primary-foreground" : "text-tertiary")}
-                    aria-hidden
-                  >
-                    {ROMAN[index]}
-                  </span>
-                  <Icon className="w-5 h-5 mx-2 flex-shrink-0" />
-                  <div className="text-left flex-1 min-w-0">
-                    <div className="font-semibold text-base">{item.label}</div>
-                    <div className={cn(
-                      "text-sm",
-                      isActive ? "text-primary-foreground/90" : "text-muted-foreground"
-                    )}>
-                      {item.description}
-                    </div>
-                  </div>
-                </Button>
-              </motion.div>
+                <Icon className={cn("w-[1.125rem] h-[1.125rem] flex-shrink-0", isActive ? "text-primary-ink" : "text-frame-muted")} />
+                <div className="text-left flex-1 min-w-0">
+                  <div className={cn("text-sm", isActive ? "font-semibold" : "font-medium")}>{item.label}</div>
+                  <div className="text-xs text-frame-muted">{item.description}</div>
+                </div>
+              </Button>
             );
           })}
         </nav>
@@ -384,20 +337,20 @@ export function Sidebar({
 
       <Separator className="bg-sidebar-border" />
 
-      <div className="p-4 flex flex-col h-[13rem] border-b border-sidebar-border" data-tour="nav-datasets">
-        <div className="flex items-center gap-2 mb-3">
-          <Database className="w-4 h-4 text-ornament" aria-hidden />
-          <h2 className="catalogue-label text-muted-foreground">Datasets</h2>
-          <Seal className="ml-auto" label={`${datasets.length} datasets`}>
+      <div className="px-4 py-3 flex flex-col h-[13rem] border-b border-sidebar-border" data-tour="nav-datasets">
+        <div className="flex items-center gap-2 mb-2">
+          <Database className="w-4 h-4 text-frame-muted" aria-hidden />
+          <h2 className="text-xs font-semibold text-frame-muted">Datasets</h2>
+          <CountBadge className="ml-auto" label={`${datasets.length} datasets`}>
             {datasets.length}
-          </Seal>
+          </CountBadge>
         </div>
         
         <ScrollArea className="flex-1 min-h-0">
           {datasets.length === 0 ? (
             <div className="text-center py-4">
-              <FileText className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
-              <p className="text-sm text-muted-foreground">No datasets uploaded</p>
+              <FileText className="w-6 h-6 mx-auto text-frame-muted mb-2" aria-hidden />
+              <p className="text-sm text-frame-muted">No datasets yet</p>
             </div>
           ) : (
             <div className="space-y-1 pr-3">
@@ -406,17 +359,17 @@ export function Sidebar({
                   key={index}
                   className={cn(
                     "flex items-center gap-1 rounded-md group pr-1 transition-colors w-full",
-                    activeDataset === dataset && !activeDashboardId ? "bg-primary/15" : "hover:bg-muted/50"
+                    activeDataset === dataset && !activeDashboardId ? "bg-accent" : "hover:bg-accent/60"
                   )}
                 >
                   <Button
                     variant="ghost"
-                    className="flex-1 justify-start text-left h-auto p-3 bg-transparent hover:bg-transparent overflow-hidden"
+                    className="flex-1 justify-start text-left h-auto px-2.5 py-2 bg-transparent hover:bg-transparent overflow-hidden"
                     onClick={() => handleDatasetSelect(dataset)}
                   >
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium truncate">{dataset.name}</div>
-                      <div className="text-xs text-muted-foreground">
+                      <div className="text-sm font-medium truncate">{dataset.name}</div>
+                      <div className="text-xs text-frame-muted tabular-nums">
                         {datasetRowCount(dataset).toLocaleString()} rows, {dataset.columns.length} columns
                       </div>
                     </div>
@@ -464,21 +417,21 @@ export function Sidebar({
         </ScrollArea>
       </div>
 
-      <div className="p-4 flex flex-col h-[13rem]" data-tour="nav-dashboards">
-        <div className="flex items-center gap-2 mb-3">
-          <LayoutDashboard className="w-4 h-4 text-ornament" aria-hidden />
-          <h2 className="catalogue-label text-muted-foreground">Dashboards</h2>
-          <Seal className="ml-auto" label={`${dashboards.length} dashboards`}>
+      <div className="px-4 py-3 flex flex-col h-[13rem]" data-tour="nav-dashboards">
+        <div className="flex items-center gap-2 mb-2">
+          <LayoutDashboard className="w-4 h-4 text-frame-muted" aria-hidden />
+          <h2 className="text-xs font-semibold text-frame-muted">Dashboards</h2>
+          <CountBadge className="ml-auto" label={`${dashboards.length} dashboards`}>
             {dashboards.length}
-          </Seal>
+          </CountBadge>
           <Hint label="Create dashboard from template">
             <Button 
               variant="ghost" 
               size="icon" 
-              className="h-8 w-8 hover:bg-muted"
+              className="h-8 w-8"
               onClick={() => setIsInstantiateModalOpen(true)}
             >
-              <LayoutTemplate className="h-4 w-4 text-tertiary" />
+              <LayoutTemplate className="h-4 w-4" />
             </Button>
           </Hint>
 
@@ -486,7 +439,7 @@ export function Sidebar({
             <Button 
               variant="ghost" 
               size="icon" 
-              className="h-8 w-8 hover:bg-muted"
+              className="h-8 w-8"
               onClick={handleCreateDashboard}
             >
               <Plus className="h-4 w-4" />
@@ -502,8 +455,8 @@ export function Sidebar({
         <ScrollArea className="flex-1 min-h-0">
           {dashboards.length === 0 ? (
             <div className="text-center py-4">
-              <LayoutDashboard className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
-              <p className="text-sm text-muted-foreground">No dashboards saved</p>
+              <LayoutDashboard className="w-6 h-6 mx-auto text-frame-muted mb-2" aria-hidden />
+              <p className="text-sm text-frame-muted">No dashboards yet</p>
             </div>
           ) : (
             <div className="space-y-1 pr-3">
@@ -512,17 +465,17 @@ export function Sidebar({
                   key={dash.id}
                   className={cn(
                     "flex items-center gap-1 rounded-md group pr-1 transition-colors w-full",
-                    activeDashboardId === dash.id ? "bg-primary/15" : "hover:bg-muted/50"
+                    activeDashboardId === dash.id ? "bg-accent" : "hover:bg-accent/60"
                   )}
                 >
                   <Button
                     variant="ghost"
-                    className="flex-1 justify-start text-left h-auto p-3 bg-transparent hover:bg-transparent overflow-hidden"
+                    className="flex-1 justify-start text-left h-auto px-2.5 py-2 bg-transparent hover:bg-transparent overflow-hidden"
                     onClick={() => handleDashboardSelect(dash.id)}
                   >
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium truncate">{dash.name}</div>
-                      <div className="text-xs text-muted-foreground">
+                      <div className="text-sm font-medium truncate">{dash.name}</div>
+                      <div className="text-xs text-frame-muted tabular-nums">
                         {dash.chartIds.length} charts
                       </div>
                     </div>
@@ -570,6 +523,6 @@ export function Sidebar({
         </ScrollArea>
       </div>
       </div>
-    </motion.div>
+    </div>
   );
 }

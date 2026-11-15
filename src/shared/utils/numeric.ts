@@ -23,6 +23,15 @@ export const NULL_TOKENS: ReadonlySet<string> = new Set([
   "undefined",
 ]);
 
+/**
+ * Text that means "no value" in ANY column, numeric or not: the import (parsingService.cleanValue)
+ * stores such cells as null, so they count as missing everywhere (Overview, charts, filters,
+ * pivot). Case-insensitive, after ASCII trimming. A subset of NULL_TOKENS: "na" and "-" are left
+ * out because they can be real categories ("NA" = North America, "-" as a label); in a numeric
+ * column they are still not numbers (NULL_TOKENS).
+ */
+export const MISSING_TEXT_TOKENS: ReadonlySet<string> = new Set(["", "n/a", "nan", "null", "none", "#n/a", "undefined"]);
+
 const STRICT_NUMBER = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/;
 // ASCII whitespace only: space, \t, \n, \v, \f, \r. Non-breaking and other Unicode spaces
 // are part of the value and must survive (String.prototype.trim would strip them).
@@ -34,6 +43,10 @@ export function trimAscii(value: string): string {
 
 export function isNullToken(value: string): boolean {
   return NULL_TOKENS.has(trimAscii(value).toLowerCase());
+}
+
+export function isMissingText(value: string): boolean {
+  return MISSING_TEXT_TOKENS.has(trimAscii(value).toLowerCase());
 }
 
 /** Strict string -> number. Returns null for null tokens and anything that isn't a clean number. */

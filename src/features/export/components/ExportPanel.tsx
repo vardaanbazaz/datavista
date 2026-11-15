@@ -122,13 +122,8 @@ export function ExportPanel() {
         ))}
       </div>
 
-      <div className="flex items-center gap-2">
-        <Download className="h-6 w-6" />
-        <h2 className="text-3xl font-bold">Export Dashboard</h2>
-      </div>
-
       {/* Data Export */}
-      <Card>
+      <Card surface="glass">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileSpreadsheet className="h-5 w-5" />
@@ -152,7 +147,7 @@ export function ExportPanel() {
 
       {/* Chart Exports */}
       {charts.length > 0 && (
-        <Card>
+        <Card surface="glass">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileImage className="h-5 w-5" />
@@ -195,7 +190,7 @@ export function ExportPanel() {
       <Separator />
 
       {/* PDF Report */}
-      <Card>
+      <Card surface="glass">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
@@ -209,7 +204,7 @@ export function ExportPanel() {
           <Button 
             onClick={handlePDFReport}
             disabled={isExporting || charts.length === 0}
-            variant="premium"
+            variant="default"
             className="w-full"
           >
             <FileText className="h-4 w-4 mr-2" />

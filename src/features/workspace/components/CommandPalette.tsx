@@ -336,7 +336,7 @@ export function CommandPalette({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-        <DialogContent corners={false} className="max-w-2xl max-h-[85vh] p-0 overflow-hidden bg-card border border-border shadow-2xl gap-0 text-foreground">
+        <DialogContent className="max-w-2xl max-h-[85vh] p-0 overflow-hidden gap-0 text-foreground">
           <DialogHeader className="p-4 pr-14 pb-2 border-b border-border flex flex-row items-center justify-between">
             <DialogTitle className="sr-only">Command Palette</DialogTitle>
             <div className="relative flex-1 flex items-center pr-2">
@@ -450,7 +450,7 @@ export function CommandPalette({
                   {/* AI Co-Pilot Special Prompt Option */}
                   {query.trim().length > 0 && (
                     <div className="space-y-1" role="group" aria-labelledby="command-group-1">
-                      <div id="command-group-1" className="px-2 py-1 catalogue-label text-primary-ink flex items-center gap-1.5">
+                      <div id="command-group-1" className="px-2 py-1 text-caption font-semibold text-primary-ink flex items-center gap-1.5">
                         <Sparkles className="h-3.5 w-3.5 text-primary-ink" /> AI Natural Language Query
                       </div>
                       {llmApiKey && llmApiKey.trim() !== "" && (
@@ -501,7 +501,7 @@ export function CommandPalette({
                   {/* Registered Executable Commands Section */}
                   {filteredCommands.length > 0 && (
                     <div className="space-y-1" role="group" aria-labelledby="command-group-2">
-                      <div id="command-group-2" className="px-2 py-1 catalogue-label text-muted-foreground flex items-center gap-1.5">
+                      <div id="command-group-2" className="px-2 py-1 text-caption font-semibold text-muted-foreground flex items-center gap-1.5">
                         <Terminal className="h-3.5 w-3.5 text-primary-ink" /> Workspace Commands ({filteredCommands.length})
                       </div>
                       {filteredCommands.map((cmd) => {
@@ -563,7 +563,7 @@ export function CommandPalette({
                   {/* Dashboards Search Results */}
                   {searchResults.dashboards.length > 0 && (
                     <div className="space-y-1" role="group" aria-labelledby="command-group-3">
-                      <div id="command-group-3" className="px-2 py-1 catalogue-label text-muted-foreground flex items-center gap-1.5">
+                      <div id="command-group-3" className="px-2 py-1 text-caption font-semibold text-muted-foreground flex items-center gap-1.5">
                         <LayoutDashboard className="h-3.5 w-3.5 text-primary-ink" /> Dashboards ({searchResults.dashboards.length})
                       </div>
                       {searchResults.dashboards.map((item) => {
@@ -602,7 +602,7 @@ export function CommandPalette({
                   {/* Datasets Search Results */}
                   {searchResults.datasets.length > 0 && (
                     <div className="space-y-1" role="group" aria-labelledby="command-group-4">
-                      <div id="command-group-4" className="px-2 py-1 catalogue-label text-muted-foreground flex items-center gap-1.5">
+                      <div id="command-group-4" className="px-2 py-1 text-caption font-semibold text-muted-foreground flex items-center gap-1.5">
                         <Database className="h-3.5 w-3.5 text-primary-ink" /> Datasets ({searchResults.datasets.length})
                       </div>
                       {searchResults.datasets.map((item) => {
@@ -641,7 +641,7 @@ export function CommandPalette({
                   {/* Columns Search Results */}
                   {searchResults.columns.length > 0 && (
                     <div className="space-y-1" role="group" aria-labelledby="command-group-5">
-                      <div id="command-group-5" className="px-2 py-1 catalogue-label text-muted-foreground flex items-center gap-1.5">
+                      <div id="command-group-5" className="px-2 py-1 text-caption font-semibold text-muted-foreground flex items-center gap-1.5">
                         <Columns className="h-3.5 w-3.5 text-primary-ink" /> Columns ({searchResults.columns.length})
                       </div>
                       {searchResults.columns.map((item) => {
@@ -680,7 +680,7 @@ export function CommandPalette({
                   {/* Templates Search Results */}
                   {searchResults.templates.length > 0 && (
                     <div className="space-y-1" role="group" aria-labelledby="command-group-6">
-                      <div id="command-group-6" className="px-2 py-1 catalogue-label text-muted-foreground flex items-center gap-1.5">
+                      <div id="command-group-6" className="px-2 py-1 text-caption font-semibold text-muted-foreground flex items-center gap-1.5">
                         <LayoutTemplate className="h-3.5 w-3.5 text-primary-ink" /> Templates ({searchResults.templates.length})
                       </div>
                       {searchResults.templates.map((item) => {
@@ -719,7 +719,7 @@ export function CommandPalette({
                   {/* Saved Views Search Results */}
                   {searchResults.views.length > 0 && (
                     <div className="space-y-1" role="group" aria-labelledby="command-group-7">
-                      <div id="command-group-7" className="px-2 py-1 catalogue-label text-muted-foreground flex items-center gap-1.5">
+                      <div id="command-group-7" className="px-2 py-1 text-caption font-semibold text-muted-foreground flex items-center gap-1.5">
                         <Bookmark className="h-3.5 w-3.5 text-primary-ink" /> Saved Views ({searchResults.views.length})
                       </div>
                       {searchResults.views.map((item) => {

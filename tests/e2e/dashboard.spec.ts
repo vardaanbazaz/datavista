@@ -83,6 +83,6 @@ test.describe("DataVista End-to-End Core User Journeys", () => {
     // Export View Navigation
     const exportNav = page.getByTestId("sidebar-nav-export");
     await exportNav.click();
-    await expect(page.getByText("Export Dashboard").first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Export", exact: true })).toBeVisible();
   });
 });

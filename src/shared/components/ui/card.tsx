@@ -2,14 +2,20 @@ import * as React from "react"
 
 import { cn } from "@/shared/lib/utils"
 
+/**
+ * Surface rule (batch 7 phase B): `solid` (default) for dense data (tables, grids, summaries,
+ * chart plots, long lists); `glass` for forms and short info cards (builders, settings, upload,
+ * export actions). Inside glass, muted text switches to the frame's muted colour (index.css).
+ */
 const Card = React.forwardRef<
   HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
+  React.HTMLAttributes<HTMLDivElement> & { surface?: "solid" | "glass" }
+>(({ className, surface = "solid", ...props }, ref) => (
   <div
     ref={ref}
     className={cn(
-      "frame-double rounded-md bg-card text-card-foreground shadow-none transition-colors",
+      surface === "glass" ? "surface-glass" : "surface-solid",
+      "rounded-xl text-card-foreground",
       className
     )}
     {...props}
@@ -36,7 +42,7 @@ const CardTitle = React.forwardRef<
   <h3
     ref={ref}
     className={cn(
-      "font-display text-h2 font-semibold leading-tight",
+      "text-h2",
       className
     )}
     {...props}

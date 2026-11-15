@@ -1,4 +1,5 @@
 import html2canvas from 'html2canvas';
+import { logoShapes } from "@/shared/brand/logoGeometry";
 import { saveAs } from 'file-saver';
 import jsPDF from 'jspdf';
 import { ChartConfig, DataRow, Dataset } from '@/shared/types';
@@ -38,6 +39,28 @@ const inlineStyles = (source: Element, target: Element) => {
     }
   });
 };
+
+
+/**
+ * The DataVista mark (src/shared/brand/logoGeometry.ts) in one colour, drawn as PDF polygons:
+ * shapes are tints of the mark colour instead of opacity, so it prints the same everywhere.
+ */
+function drawMonoLogo(pdf: jsPDF, x: number, y: number, size: number) {
+  // Single-colour mark (logoGeometry.ts): each polygon in MONO_LIGHT_BG (#3730A3) blended
+  // towards white by its mono opacity, so it prints the same as the favicon.
+  const k = size / 32;
+  const [r, gr, b] = [55, 48, 163];
+  const tint = (opacity: number) => [r, gr, b].map((c) => Math.round(c + (255 - c) * (1 - opacity))) as [number, number, number];
+  const poly = (pts: [number, number][]) => {
+    const [x0, y0] = pts[0];
+    const deltas = pts.slice(1).map(([px, py], i) => [(px - pts[i][0]) * k, (py - pts[i][1]) * k]);
+    pdf.lines(deltas, x + x0 * k, y + y0 * k, [1, 1], "F", true);
+  };
+  for (const shape of logoShapes("full")) {
+    pdf.setFillColor(...tint(shape.mono));
+    poly(shape.pts);
+  }
+}
 
 export const exportChartAsPNG = async (chart: ChartConfig): Promise<void> => {
   const chartElement = document.querySelector(`[data-chart-id="${chart.id}"]`) as HTMLElement;
@@ -173,7 +196,8 @@ export const buildPDFReport = async (
   const pageHeight = pdf.internal.pageSize.getHeight();
   let yPosition = 20;
 
-  // Title
+  // Title, with the single-colour prism mark on the left (print-safe, no gradients).
+  drawMonoLogo(pdf, 20, yPosition - 8, 11);
   pdf.setFontSize(20);
   pdf.setFont('helvetica', 'bold');
   pdf.text('DataVista Report', pageWidth / 2, yPosition, { align: 'center' });

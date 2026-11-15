@@ -185,6 +185,13 @@ test("cancel stops the import and leaves the current dataset untouched", async (
 
   const dialog = page.getByTestId("import-dialog");
   await expect(dialog.getByTestId("import-progress-text")).toBeVisible();
+  // The Cancel button sits below the bar and its text, never over them, and no tooltip covers them.
+  const bar = await dialog.getByTestId("import-progress-bar").boundingBox();
+  const text = await dialog.getByTestId("import-progress-text").boundingBox();
+  const cancelBox = await dialog.getByTestId("import-cancel").boundingBox();
+  expect(cancelBox!.y).toBeGreaterThanOrEqual(bar!.y + bar!.height);
+  expect(cancelBox!.y).toBeGreaterThanOrEqual(text!.y + text!.height);
+  await expect(page.getByRole("tooltip")).toHaveCount(0);
   await dialog.getByTestId("import-cancel").click();
   await expect(dialog).toHaveCount(0);
   await expect(page.getByText("Import cancelled").first()).toBeVisible();

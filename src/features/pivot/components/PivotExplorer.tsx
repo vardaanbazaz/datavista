@@ -5,11 +5,14 @@ import { usePivotStore } from "@/store/pivotStore";
 import { pivotEngine, PivotConfig } from "@/shared/services/pivot";
 import { PivotBuilder } from "./PivotBuilder";
 import { PivotTable } from "./PivotTable";
-import { AlertCircle, Grid3X3, RefreshCw } from "lucide-react";
+import { AlertCircle, Filter, Grid3X3 } from "lucide-react";
 import { Dataset } from "@/shared/types";
 import { getEffectiveColumnType } from "@/shared/utils/columnType";
 import { NoDatasetPlate } from "@/shared/components/NoDatasetPlate";
 import { aggregationFlag } from "@/shared/utils/columnRoles";
+import { columnValueCounts } from "@/shared/utils/valueCounts";
+
+const DEFAULT_ROW_MAX_GROUPS = 50;
 
 export const PivotExplorer: React.FC = () => {
   const activeDataset = useDatasetStore((state) => state.activeDataset);
@@ -29,11 +32,19 @@ export const PivotExplorer: React.FC = () => {
 
     const effectiveTypeOf = (name: string) => getEffectiveColumnType(activeDataset, name);
 
-    // Pick first categorical column as default row, numeric as default value
-    const defaultRow = columnNames.find(name => {
+    // Default row: the first categorical/date column with a readable number of groups (2 to
+    // DEFAULT_ROW_MAX_GROUPS distinct values), else the one with the fewest. The first column is
+    // often a name or ID ("App": ~9,700 groups), which made a huge first pivot.
+    const distinct = (name: string) =>
+      activeDataset.metadata?.columns.find(c => c.name === name)?.uniqueValueCount ??
+      columnValueCounts(activeDataset.data, name).length;
+    const groupable = columnNames.filter(name => {
       const t = effectiveTypeOf(name);
       return t === 'categorical' || t === 'date';
     });
+    const defaultRow =
+      groupable.find(name => { const n = distinct(name); return n >= 2 && n <= DEFAULT_ROW_MAX_GROUPS; }) ??
+      [...groupable].sort((a, b) => distinct(a) - distinct(b))[0];
     // Prefer a numeric column whose sum means something; a year/ID-like one is counted.
     const numericCols = columnNames.filter(name => effectiveTypeOf(name) === 'numeric');
     const defaultVal = numericCols.find(name => !aggregationFlag(activeDataset, name)) ?? numericCols[0];
@@ -124,7 +135,7 @@ export const PivotExplorer: React.FC = () => {
               </div>
               {filteredData.length !== activeDataset.data.length && (
                 <div className="flex items-center gap-1.5 text-xs text-primary-ink font-medium bg-primary/10 px-2.5 py-1 rounded-full border border-primary/20">
-                  <RefreshCw className="w-3 h-3 animate-spin-slow" />
+                  <Filter className="w-3 h-3" aria-hidden />
                   <span>Filtered View Active ({filteredData.length} / {activeDataset.data.length} rows)</span>
                 </div>
               )}
@@ -135,7 +146,7 @@ export const PivotExplorer: React.FC = () => {
         ) : pivotError ? (
           <div
             role="alert"
-            className="flex flex-col items-center justify-center h-[50vh] border border-destructive/40 rounded-xl bg-destructive/5 text-center select-none"
+            className="surface-glass flex flex-col items-center justify-center h-[50vh] rounded-xl border-destructive/60 text-center select-none"
           >
             <div className="w-12 h-12 rounded-xl bg-destructive/10 flex items-center justify-center mb-3">
               <AlertCircle className="w-6 h-6 text-destructive" />
@@ -144,12 +155,12 @@ export const PivotExplorer: React.FC = () => {
             <p className="text-xs text-muted-foreground max-w-xs px-4">
               This pivot configuration hit an error while computing results. Try adjusting the value fields or dimensions.
             </p>
-            <p className="text-xs text-destructive/70 max-w-sm px-4 mt-2 font-mono break-words">
+            <p className="text-xs text-destructive max-w-sm px-4 mt-2 font-mono break-words">
               {pivotError}
             </p>
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center h-[50vh] border border-dashed border-border rounded-xl bg-muted/5 text-center select-none">
+          <div className="surface-glass flex flex-col items-center justify-center h-[50vh] rounded-xl text-center select-none" data-testid="pivot-unconfigured">
             <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
               <Grid3X3 className="w-6 h-6 text-primary-ink" />
             </div>

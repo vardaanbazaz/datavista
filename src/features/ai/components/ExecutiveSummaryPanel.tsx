@@ -11,7 +11,7 @@ import { useUiStore } from "@/store/uiStore";
 import { motion, AnimatePresence } from "framer-motion";
 import { ErrorBoundary } from "@/shared/components/ErrorBoundary";
 import { providerDisplayName } from "@/features/ai/providerDisplayName";
-import { anomalyLabel } from "@/features/ai/anomalyDetector";
+import { anomalyChipText } from "@/features/ai/anomalyDetector";
 import { Hint } from "@/shared/components/Hint";
 
 /**
@@ -30,7 +30,7 @@ export function ExecutiveSummaryPanel() {
 function ExecutiveSummaryPanelError() {
   return (
     <div className="w-full my-4">
-      <Card className="bg-card border border-destructive/40 shadow-none">
+      <Card surface="glass" className="border-destructive/60">
         <CardContent className="p-4 sm:p-5 flex items-center gap-3">
           <AlertTriangle className="h-5 w-5 text-destructive shrink-0" aria-hidden />
           <p className="text-xs sm:text-sm text-muted-foreground">
@@ -121,17 +121,17 @@ function ExecutiveSummaryPanelInner() {
         transition={{ duration: 0.3 }}
         className="w-full my-4"
       >
-        <Card className="frame-double rounded-md bg-card shadow-none overflow-hidden transition-colors">
+        <Card surface="glass" className="overflow-hidden">
           <CardContent className="p-4 sm:p-5">
             <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
               <div className="flex items-start gap-3 flex-1 min-w-0">
-                <div className="p-2.5 rounded-full shrink-0 text-tertiary border border-ornament/60">
-                  <Sparkles className={`h-5 w-5 ${isGeneratingSummary ? "animate-spin" : "animate-pulse"}`} />
+                <div className="p-2 rounded-lg shrink-0 bg-primary/10 text-primary-ink">
+                  <Sparkles className={`h-5 w-5 ${isGeneratingSummary ? "animate-spin" : ""}`} />
                 </div>
 
                 <div className="space-y-2 flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap bg-transparent">
-                    <h3 className="catalogue-label text-foreground">
+                    <h3 className="text-h3 text-foreground">
                       Automated Analyst Insights
                     </h3>
                     {executiveSummarySource === "ai" && (
@@ -223,9 +223,7 @@ function ExecutiveSummaryPanelInner() {
                           ) : (
                             <TrendingDown className="h-3.5 w-3.5 text-tertiary" aria-hidden />
                           )}
-                          <span>
-                            {anomalyLabel(anomaly)}: {anomaly.value.toLocaleString()}
-                          </span>
+                          <span>{anomalyChipText(anomaly)}</span>
                         </Badge>
                       ))}
                     </div>

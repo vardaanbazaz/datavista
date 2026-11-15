@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import * as XLSX from "xlsx";
-import { runImport, SOURCE_SHEET_COLUMN, type ImportIO, type ImportStage } from "../importCore";
+import { runImport, SOURCE_SHEET_COLUMN, XLSX_DETAIL, type ImportIO, type ImportStage } from "../importCore";
 import { readWorkbookWithCalendarDates } from "../xlsxDates";
 import { processRawData } from "@/shared/services/parsingService";
 
@@ -127,6 +127,7 @@ describe("runImport, XLSX", () => {
     const { io } = recordingIO({
       chooseSheet: async (sheets, canAppend) => {
         expect(sheets).toEqual([
+          // Exactly fills the 3-row preview (no longer range reported): recounted, so exact.
           { name: "Year 1", rowCount: 2, headers: ["Invoice", "Qty"] },
           { name: "Year 2", rowCount: 1, headers: ["Invoice", "Qty"] },
         ]);
@@ -136,6 +137,36 @@ describe("runImport, XLSX", () => {
     });
     const ds = await runImport(file, file.name, {}, io);
     expect(ds.data).toEqual([{ Invoice: "B1", Qty: 5 }]);
+  });
+
+  it("asks for the sheet from a preview, before the cells are read; long sheets report their declared size", async () => {
+    const long = [["Invoice", "Qty"], ...Array.from({ length: 50 }, (_, i) => [`A${i}`, i])];
+    const file = workbookFile({ Long: long, Short: [["Invoice", "Qty"], ["B1", 5]] });
+    const details: (string | undefined)[] = [];
+    let asked: { name: string; rowCount: number; rowCountUnknown?: boolean }[] = [];
+    const io: ImportIO = {
+      progress: (_stage, _fraction, detail) => { if (details[details.length - 1] !== detail) details.push(detail); },
+      chooseSheet: async sheets => {
+        asked = sheets;
+        // Nothing has been converted yet when the question comes.
+        expect(details).not.toContain(XLSX_DETAIL.rows);
+        return { kind: "one", name: "Long" };
+      },
+      review: () => Promise.reject(new Error("unexpected review")),
+    };
+    const ds = await runImport(file, file.name, {}, io);
+    expect(asked.map(s => [s.name, s.rowCount, s.rowCountUnknown ?? false])).toEqual([["Long", 50, false], ["Short", 1, false]]);
+    expect(ds.data).toHaveLength(50);
+    expect(details.filter(Boolean)).toEqual([XLSX_DETAIL.workbook, XLSX_DETAIL.sheetList, XLSX_DETAIL.sheet("Long"), XLSX_DETAIL.rows]);
+  });
+
+  it("a one-sheet workbook is read once, with no sheet-list step", async () => {
+    const file = workbookFile({ Only: [["a"], [1], [2], [3], [4]] });
+    const details: (string | undefined)[] = [];
+    const io = recordingIO().io;
+    io.progress = (_s, _f, d) => { if (d && details[details.length - 1] !== d) details.push(d); };
+    await runImport(file, file.name, {}, io);
+    expect(details).toEqual([XLSX_DETAIL.workbook, XLSX_DETAIL.rows]);
   });
 
   it("append all stacks sheets and adds a Source sheet column", async () => {

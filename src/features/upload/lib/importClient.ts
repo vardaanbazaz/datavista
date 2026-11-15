@@ -11,7 +11,7 @@ import type { FromWorker, ToWorker } from "./importProtocol";
  */
 
 export interface ImportHandlers {
-  onProgress(stage: ImportStage, fraction: number | null): void;
+  onProgress(stage: ImportStage, fraction: number | null, detail?: string): void;
   /** Resolve null to cancel the import. */
   chooseSheet(sheets: SheetInfo[], canAppend: boolean): Promise<SheetChoice | null>;
   /** Resolve null to cancel the import. */
@@ -88,7 +88,7 @@ export function importFile(
     const msg = event.data;
     switch (msg.type) {
       case "progress":
-        handlers.onProgress(msg.stage, msg.fraction);
+        handlers.onProgress(msg.stage, msg.fraction, msg.detail);
         break;
       case "sheets":
         handlers.chooseSheet(msg.sheets, msg.canAppend).then(choice => (choice ? send({ type: "sheet", choice }) : cancel()));

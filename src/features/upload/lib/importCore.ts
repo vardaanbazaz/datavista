@@ -17,8 +17,16 @@ export type ImportStage = "reading" | "parsing" | "analysing" | "saving";
 
 export interface SheetInfo {
   name: string;
-  /** Data rows (header excluded), from the sheet's used range. */
+  /**
+   * Data rows (header excluded), from the sheet's declared range (its <dimension> tag, read
+   * before the cells). Can count trailing formatted blank rows; the import's own count is exact.
+   */
   rowCount: number;
+  /**
+   * Even the second preview filled up and SheetJS reported no longer range (the sheet
+   * declares no range): it has rowCount rows or more. Shown as "1,000+ rows".
+   */
+  rowCountUnknown?: boolean;
   headers: string[];
 }
 
@@ -34,8 +42,11 @@ export interface ImportReview {
 }
 
 export interface ImportIO {
-  /** `fraction` is null when the stage can't tell how far it is (SheetJS reading a workbook). */
-  progress(stage: ImportStage, fraction: number | null): void;
+  /**
+   * `fraction` is null when the stage can't tell how far it is (SheetJS reading a workbook).
+   * `detail` says what the stage is doing when the stage name isn't enough.
+   */
+  progress(stage: ImportStage, fraction: number | null, detail?: string): void;
   chooseSheet(sheets: SheetInfo[], canAppend: boolean): Promise<SheetChoice>;
   review(review: ImportReview): Promise<{ exclude: boolean }>;
 }
@@ -59,19 +70,29 @@ const RAW_FIELDS_STORED = 40;
 const RAW_FIELD_CHARS = 120;
 const PROGRESS_INTERVAL_MS = 100;
 
-/** Drops progress calls closer than PROGRESS_INTERVAL_MS apart, except stage changes and completion. */
+/** Drops progress calls closer than PROGRESS_INTERVAL_MS apart, except stage or detail changes and completion. */
 function throttledProgress(io: ImportIO): ImportIO["progress"] {
   let lastStage: ImportStage | null = null;
+  let lastDetail: string | undefined;
   let lastAt = 0;
-  return (stage, fraction) => {
+  return (stage, fraction, detail) => {
     const now = Date.now();
-    if (stage !== lastStage || fraction === 1 || now - lastAt >= PROGRESS_INTERVAL_MS) {
+    if (stage !== lastStage || detail !== lastDetail || fraction === 1 || now - lastAt >= PROGRESS_INTERVAL_MS) {
       lastStage = stage;
+      lastDetail = detail;
       lastAt = now;
-      io.progress(stage, fraction);
+      io.progress(stage, fraction, detail);
     }
   };
 }
+
+/** Progress texts for the XLSX stages (ImportDialog shows them in place of the stage name). */
+export const XLSX_DETAIL = {
+  workbook: "Reading workbook — large files can take a minute",
+  sheetList: "Reading workbook — large files can take a minute; you'll choose a sheet next",
+  sheet: (name: string) => `Reading sheet “${name}” — large files can take a minute`,
+  rows: "Converting rows",
+} as const;
 
 async function readSlices(file: Blob, sliceBytes: number, onSlice: (chunk: Uint8Array, done: number) => void) {
   const total = file.size;
@@ -135,6 +156,45 @@ interface SheetPlan {
   range: XLSX.Range | null;
 }
 
+/**
+ * Name, row count and headers of every sheet without reading the cells: `sheetRows` parses
+ * each sheet's first PREVIEW_ROWS rows only, and SheetJS keeps the declared full range in
+ * `!fullref` when the sheet is longer (online_retail_II.xlsx, 44 MB: ~8 s instead of ~60 s).
+ * Without a declared range (some writers omit <dimension>) a sheet that fills the preview has
+ * an unknown length.
+ */
+const PREVIEW_ROWS = 3;
+/** Second, larger preview for sheets the first one could not size (see previewSheets). */
+const RECOUNT_ROWS = 1001;
+
+function readPreview(bytes: ArrayBuffer, names: string[], sheetRows: number): SheetInfo[] {
+  const preview = XLSX.read(bytes, { type: "array", sheetRows, sheets: names });
+  return names.map(name => {
+    const ws = preview.Sheets[name];
+    const ref = ws?.["!ref"];
+    if (!ref) return { name, rowCount: 0, headers: [] };
+    const range = XLSX.utils.decode_range(ref);
+    const full = ws["!fullref"] ? XLSX.utils.decode_range(ws["!fullref"]) : null;
+    const headers = sheetKeys(ws, range);
+    const rows = (full ?? range).e.r - (full ?? range).s.r;
+    const filled = range.e.r - range.s.r >= sheetRows - 1;
+    return full || !filled ? { name, rowCount: rows, headers } : { name, rowCount: rows, rowCountUnknown: true, headers };
+  });
+}
+
+/**
+ * A preview that fills up with no longer range is ambiguous: the sheet has exactly that many
+ * rows, or declares no range. Those sheets (tiny ones, or rare writers) are read again with
+ * RECOUNT_ROWS rows, which gives exact counts up to 1,000 and "1,000+" past that.
+ */
+function previewSheets(bytes: ArrayBuffer, names: string[]): SheetInfo[] {
+  const first = readPreview(bytes, names, PREVIEW_ROWS);
+  const unsure = first.filter(s => s.rowCountUnknown).map(s => s.name);
+  if (unsure.length === 0) return first;
+  const recount = new Map(readPreview(bytes, unsure, RECOUNT_ROWS).map(s => [s.name, s]));
+  return first.map(s => recount.get(s.name) ?? s);
+}
+
 function planSheet(workbook: XLSX.WorkBook, name: string): SheetPlan {
   const ws = workbook.Sheets[name];
   const ref = ws?.["!ref"];
@@ -182,40 +242,48 @@ async function xlsxRecords(
   io: ImportIO,
   progress: ImportIO["progress"]
 ): Promise<Record<string, unknown>[]> {
-  const bytes = await readBytes(file, options.readSliceBytes, progress);
-  progress("parsing", null);
-  // Date cells become calendar strings, not serial numbers (xlsxDates.ts).
-  const workbook = readWorkbookWithCalendarDates(bytes.buffer as ArrayBuffer);
-  const plans = workbook.SheetNames.map(name => planSheet(workbook, name));
+  const bytes = (await readBytes(file, options.readSliceBytes, progress)).buffer as ArrayBuffer;
+  // Sheet names first (workbook.xml only, ~3 s for 44 MB), so a one-sheet file pays for no
+  // preview and a several-sheet file shows the picker before the long read (~8 s, not ~60 s).
+  progress("parsing", null, XLSX_DETAIL.workbook);
+  const names = XLSX.read(bytes, { type: "array", bookSheets: true }).SheetNames;
 
-  let chosen: SheetPlan[] = plans;
+  let chosenNames = names;
   let appendAll = false;
-  if (plans.length > 1) {
-    const withRows = plans.filter(p => p.info.rowCount > 0);
+  if (names.length > 1) {
+    progress("parsing", null, XLSX_DETAIL.sheetList);
+    const infos = previewSheets(bytes, names);
+    const withRows = infos.filter(s => s.rowCount > 0);
     const canAppend =
-      withRows.length > 1 && withRows.every(p => p.info.headers.join("\u0000") === withRows[0].info.headers.join("\u0000"));
-    const choice = await io.chooseSheet(plans.map(p => p.info), canAppend);
+      withRows.length > 1 && withRows.every(s => s.headers.join("\u0000") === withRows[0].headers.join("\u0000"));
+    const choice = await io.chooseSheet(infos, canAppend);
     if (choice.kind === "append" && canAppend) {
-      chosen = withRows;
+      chosenNames = withRows.map(s => s.name);
       appendAll = true;
     } else {
-      const picked = choice.kind === "one" ? plans.find(p => p.info.name === choice.name) : undefined;
+      const picked = choice.kind === "one" ? names.find(n => n === choice.name) : undefined;
       if (!picked) throw new Error("The chosen sheet is not in this workbook.");
-      chosen = [picked];
+      chosenNames = [picked];
+      progress("parsing", null, XLSX_DETAIL.sheet(picked));
     }
+    if (appendAll) progress("parsing", null, XLSX_DETAIL.workbook);
   }
+
+  // Only the chosen sheets are parsed (`sheets`); date cells become calendar strings (xlsxDates.ts).
+  const workbook = readWorkbookWithCalendarDates(bytes, names.length > 1 ? chosenNames : undefined);
+  const chosen = chosenNames.map(name => planSheet(workbook, name));
 
   const totalRows = chosen.reduce((n, p) => n + p.info.rowCount, 0) || 1;
   const records: Record<string, unknown>[] = [];
   const sourceColumn = appendAll ? uniqueColumnName(SOURCE_SHEET_COLUMN, chosen[0].info.headers) : null;
   let rowsBefore = 0;
-  progress("parsing", 0);
+  progress("parsing", 0, XLSX_DETAIL.rows);
   for (const plan of chosen) {
-    sheetRecords(plan, options.xlsxBlockRows, records, done => progress("parsing", (rowsBefore + done) / totalRows),
+    sheetRecords(plan, options.xlsxBlockRows, records, done => progress("parsing", (rowsBefore + done) / totalRows, XLSX_DETAIL.rows),
       sourceColumn ? { [sourceColumn]: plan.info.name } : undefined);
     rowsBefore += plan.info.rowCount;
   }
-  progress("parsing", 1);
+  progress("parsing", 1, XLSX_DETAIL.rows);
   return records;
 }
 

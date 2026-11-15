@@ -76,13 +76,13 @@ describe("non-breaking spaces survive cleaning", () => {
 });
 
 describe("strict number parsing at ingest", () => {
-  it("keeps hex, Infinity and NaN as text; accepts exponents", () => {
+  it("keeps hex and Infinity as text, NaN is missing; accepts exponents", () => {
     const ds = processRawData(
       parseCsvText("v\n1\n2\n3\n4\n5\n6\n7\n8\n1e3\n0x1A\nInfinity\nNaN\n").rows,
       "strict.csv"
     );
     const v = ds.data.map(r => r.v);
     expect(v.slice(0, 9)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 1000]);
-    expect(v.slice(9)).toEqual(["0x1A", "Infinity", "NaN"]);
+    expect(v.slice(9)).toEqual(["0x1A", "Infinity", null]);
   });
 });

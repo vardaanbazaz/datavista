@@ -101,7 +101,8 @@ describe("Dexie v1 → v3 upgrade", () => {
     expect(useDashboardStore.getState().dashboards).toEqual(dashboards);
     expect(useFilterStore.getState().activeFilters).toEqual(filters[0].state);
     expect(await db.filters.toArray()).toEqual(filters);
-    expect(useUiStore.getState().theme).toBe("dark");
+    // An old "theme" row is ignored: the theme lives in localStorage only (read before the first paint).
+    expect(useUiStore.getState().themeSetting.mode).toBe("auto");
     expect(useUiStore.getState().activeView).toBe("charts");
     expect(await db.uiState.toArray()).toEqual(expect.arrayContaining(uiState));
 

@@ -13,19 +13,15 @@ import { applyDisplayPrefs } from './shared/theme/displayPrefs'
 // Bootstrap plugins
 pluginRegistry.registerPlugin(sampleGaugePlugin)
 
-// Theme and Reading comfort go on <html> before the first paint. The store has already read
-// localStorage synchronously (zustand persist), so this is the saved choice, not the default.
+// index.html's boot script already put the saved theme and Appearance on <html> before the
+// first paint; apply once more from the store (same functions, see shared/theme/boot.ts) before
+// React renders. ThemeProvider keeps it in step afterwards.
 const ui = useUiStore.getState()
-applyDisplayPrefs(ui.theme, ui.readingComfort)
-useUiStore.subscribe((state, prev) => {
-  if (state.theme !== prev.theme || state.readingComfort !== prev.readingComfort) {
-    applyDisplayPrefs(state.theme, state.readingComfort)
-  }
-})
+useUiStore.setState({ resolvedTheme: applyDisplayPrefs(ui.themeSetting, ui.appearance) })
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <ThemeProvider defaultTheme="dark" storageKey="datavista-theme">
+    <ThemeProvider>
       <App />
     </ThemeProvider>
   </StrictMode>,

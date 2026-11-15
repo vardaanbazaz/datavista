@@ -49,7 +49,7 @@ export function DatasetUpdateModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col glass border-border">
+      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
             <RefreshCw className="h-5 w-5 text-primary-ink" />
@@ -86,7 +86,7 @@ export function DatasetUpdateModal({
 
           {/* Schema Diff Grid */}
           <div className="p-4 rounded-lg border border-border/60 bg-muted/20 space-y-3 mt-4">
-            <h4 className="catalogue-label text-muted-foreground flex items-center gap-1.5">
+            <h4 className="text-caption font-semibold text-muted-foreground flex items-center gap-1.5">
               <Layers className="h-3.5 w-3.5" /> Schema Comparison Breakdown
             </h4>
 
@@ -150,7 +150,7 @@ export function DatasetUpdateModal({
           {/* Affected Charts Section */}
           {diffReport.affectedCharts.length > 0 && (
             <div className="space-y-2 pt-2">
-              <h4 className="catalogue-label text-destructive flex items-center gap-1.5">
+              <h4 className="text-caption font-semibold text-destructive flex items-center gap-1.5">
                 <AlertCircle className="h-4 w-4" /> Affected Dashboard Charts ({diffReport.affectedCharts.length})
               </h4>
               <div className="space-y-2">

@@ -180,7 +180,7 @@ export function GlobalFilterBar() {
   };
 
   return (
-    <div className="w-full glass border border-border/50 rounded-xl p-3 bg-card/20 shadow-sm flex flex-wrap items-center justify-between gap-4">
+    <div className="w-full surface-glass rounded-xl p-3 flex flex-wrap items-center justify-between gap-4" data-testid="global-filter-bar">
       <div className="flex items-center gap-3 flex-wrap flex-1 min-w-0">
         <div className="flex items-center gap-2 text-muted-foreground font-semibold shrink-0 text-sm">
           <Filter className="h-4 w-4 text-primary-ink" />
@@ -234,7 +234,7 @@ export function GlobalFilterBar() {
         {/* Bookmarks / Saved Views Dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5 glass">
+            <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5">
               <Bookmark className="h-3.5 w-3.5 text-primary-ink" />
               <span>Views</span>
               {savedViews.length > 0 && (
@@ -244,7 +244,7 @@ export function GlobalFilterBar() {
               )}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56 glass">
+          <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel className="text-xs">Saved Interactive Views</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => setIsSaveModalOpen(true)} className="text-xs gap-2">
@@ -306,12 +306,12 @@ export function GlobalFilterBar() {
 
         <Popover open={isOpen} onOpenChange={setIsOpen}>
           <PopoverTrigger asChild>
-            <Button size="sm" variant="premium" className="h-8 gap-1">
+            <Button size="sm" variant="default" className="h-8 gap-1">
               <Plus className="h-3.5 w-3.5" />
               Add Filter
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-80 p-4 border-border/80 glass shadow-xl" align="end">
+          <PopoverContent className="w-80 p-4" align="end">
             <div className="space-y-4">
               <h4 className="font-semibold text-sm flex items-center gap-1">
                 <Filter className="h-4 w-4 text-primary-ink" />

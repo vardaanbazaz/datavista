@@ -20,3 +20,16 @@ export type ViewType = (typeof VIEW_TYPES)[number];
 export function isViewType(value: unknown): value is ViewType {
   return typeof value === 'string' && (VIEW_TYPES as readonly string[]).includes(value);
 }
+
+/** Display names (sidebar, header breadcrumb). */
+export const VIEW_LABELS: Record<ViewType, string> = {
+  overview: 'Overview',
+  upload: 'Upload Data',
+  charts: 'Charts',
+  data: 'Data Explorer',
+  filters: 'Filters',
+  export: 'Export',
+  pivot: 'Pivot Table',
+  stats: 'Statistics',
+  'window-builder': 'Window Functions',
+};

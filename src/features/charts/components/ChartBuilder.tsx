@@ -206,7 +206,7 @@ export function ChartBuilder() {
       className="space-y-6"
     >
       {/* Chart Builder Form */}
-      <Card className="glass border-border">
+      <Card surface="glass" data-testid="chart-builder">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Plus className="w-5 h-5" />
@@ -236,7 +236,7 @@ export function ChartBuilder() {
                       whileTap={{ scale: 0.95 }}
                     >
                       <Button
-                        variant={chartType === type.value ? "premium" : "outline"}
+                        variant={chartType === type.value ? "default" : "outline"}
                         onClick={() => chooseChartType(type.value)}
                         className="transition-all duration-200"
                       >
@@ -525,9 +525,9 @@ export function ChartBuilder() {
               </Button>
 
               <Dialog open={isFormattingModalOpen} onOpenChange={setIsFormattingModalOpen}>
-                <DialogContent className="max-w-3xl glass border-border shadow-2xl p-6">
+                <DialogContent className="max-w-3xl p-6">
                   <DialogHeader>
-                    <DialogTitle className="text-xl font-bold flex items-center gap-2">
+                    <DialogTitle className="text-h2 flex items-center gap-2">
                       <Palette className="h-5 w-5 text-primary-ink" />
                       Chart Visual Threshold Formatting Rules
                     </DialogTitle>
@@ -557,7 +557,7 @@ export function ChartBuilder() {
                   </div>
                   <Button
                     type="button"
-                    variant={forecastEnabled ? "premium" : "outline"}
+                    variant={forecastEnabled ? "default" : "outline"}
                     size="sm"
                     className="h-8 text-xs"
                     onClick={() => setForecastEnabled(!forecastEnabled)}
@@ -608,7 +608,7 @@ export function ChartBuilder() {
             <Button 
               onClick={handleCreateChart}
               disabled={!isFormValid()}
-              variant="premium"
+              variant="default"
               className="transition-all duration-200"
             >
               Create Chart

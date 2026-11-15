@@ -39,10 +39,10 @@ export function DrillThroughModal() {
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && close()}>
-      <DialogContent className="max-w-6xl w-11/12 max-h-[90vh] flex flex-col p-6 overflow-hidden border-border bg-background shadow-2xl glass">
+      <DialogContent className="max-w-6xl w-11/12 max-h-[90vh] flex flex-col p-6 overflow-hidden">
         <DialogHeader className="flex-shrink-0">
-          <DialogTitle className="flex items-center gap-2 text-xl font-bold">
-            <Database className="h-5 w-5 text-primary-ink animate-pulse" />
+          <DialogTitle className="flex items-center gap-2 text-h2">
+            <Database className="h-5 w-5 text-primary-ink" />
             <span>{title}</span>
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
@@ -50,7 +50,7 @@ export function DrillThroughModal() {
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 min-h-0 overflow-y-auto mt-4">
+        <div className="surface-solid flex-1 min-h-0 overflow-y-auto mt-4 rounded-lg">
           <DataTable
             customDataset={customDataset}
             customData={drillThroughData}

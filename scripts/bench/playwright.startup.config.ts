@@ -15,9 +15,21 @@ export default defineConfig({
     baseURL: "http://localhost:4173/datavista/",
     trace: "off",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    {
+      name: "chromium",
+      use: {
+        ...devices["Desktop Chrome"],
+        // glass-perf.spec.ts: BENCH_HEADED=1 runs a visible window (real GPU compositing);
+        // BENCH_GPU=1 asks headless Chromium to use the GPU instead of software raster.
+        headless: !process.env.BENCH_HEADED,
+        launchOptions: process.env.BENCH_GPU ? { args: ["--enable-gpu", "--ignore-gpu-blocklist", "--enable-gpu-rasterization", "--use-angle=vulkan"] } : undefined,
+      },
+    },
+  ],
   webServer: {
-    command: "npx vite preview --port 4173 --strictPort",
+    // BENCH_DIST=<dir> serves another build (e.g. a baseline commit's dist) for comparison.
+    command: `npx vite preview --port 4173 --strictPort${process.env.BENCH_DIST ? ` --outDir "${process.env.BENCH_DIST}"` : ""}`,
     cwd: "../..",
     url: "http://localhost:4173/datavista/",
     reuseExistingServer: false,
