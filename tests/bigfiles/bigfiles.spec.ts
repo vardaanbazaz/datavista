@@ -225,7 +225,7 @@ test("big file import", async ({ page }) => {
 
   if (FILE === "googleplaystore.csv") {
     await page.getByTestId("sidebar-nav-data").click();
-    result.ratingStats = await page.getByTestId("column-stats-Rating").innerText();
+    result.ratingStats = await page.getByTestId("numeric-row-Rating").innerText();
   }
 
   if (FILE === "online_retail_II.csv") {

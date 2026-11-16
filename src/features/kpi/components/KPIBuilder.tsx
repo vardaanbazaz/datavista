@@ -192,6 +192,13 @@ export function KPIBuilder({ isOpen, onClose, onSave, editKpi = null, saveNote }
                 <Select
                   value={metricCol}
                   onValueChange={(col) => {
+                    // ignoreEmpty: inside a <form>, Radix Select keeps a hidden native <select> in
+                    // sync and relays its change events. When the value is set before the matching
+                    // option exists (the builder opening: "sum" → "avg" while the aggregation list
+                    // still holds the counts-only options of no column), the native select falls
+                    // back to "" and Radix reports onValueChange(""), which blanked the aggregation
+                    // and titled the card "Rating". No option has an empty value, so "" is never a pick.
+                    if (!col) return;
                     setMetricCol(col);
                     const allowed = aggregationsForColumn(dataset, col);
                     // Keep a picked aggregation only if it still fits the new column (no Sum of a text column).
@@ -221,7 +228,8 @@ export function KPIBuilder({ isOpen, onClose, onSave, editKpi = null, saveNote }
                 <Label htmlFor="aggregation" className="text-sm font-semibold">Aggregation</Label>
                 <Select
                   value={aggregation}
-                  onValueChange={(val: AggregationOperator) => {
+                  onValueChange={(val: AggregationOperator | "") => {
+                    if (!val) return; // see ignoreEmpty note on the measure select
                     setAggregation(val);
                     setAggregationTouched(true);
                     dispatchTitle({ type: "auto", aggregation: val, column: metricCol });

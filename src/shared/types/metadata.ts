@@ -46,8 +46,12 @@ export interface ColumnQuality {
   labelVariants?: ValueCount[][];
   /** Numeric columns: one value that looks like a "missing" code (-1, -99, 9999). */
   sentinel?: { value: number; count: number; reason: 'negative' | 'year' | 'nines' };
-  /** Text values like "10,000+", "19M": how many non-blank cells "Convert to number…" would read. */
-  suffixCandidate?: { convertible: number; total: number };
+  /**
+   * Text values like "10,000+", "19M": how many non-blank cells "Convert to number…" would read,
+   * and up to two of the column's own values that need it (absent on datasets imported before
+   * examples were kept).
+   */
+  suffixCandidate?: { convertible: number; total: number; examples?: string[] };
 }
 
 /**

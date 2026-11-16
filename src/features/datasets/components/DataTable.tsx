@@ -21,7 +21,8 @@ import { QueryPerformanceBadge } from "@/features/dashboard/components/QueryPerf
 import { ConditionalFormattingBuilder } from "@/features/dashboards/components/ConditionalFormattingBuilder";
 import { DatasetUpdateModal } from "./DatasetUpdateModal";
 import { getEffectiveColumnType, mightBeCategorical } from "@/shared/utils/columnType";
-import { constantText, profileNumericColumns, roleLabel } from "@/shared/services/stats/columnProfile";
+import { profileNumericColumns } from "@/shared/services/stats/columnProfile";
+import { NumericSummaryTable } from "@/features/dashboard/components/NumericSummary";
 import { DataPanel } from "@/shared/components/surface";
 import { useImportStore } from "@/store/importStore";
 import { ImportIssuesDialog } from "@/features/upload/components/ImportDialog";
@@ -230,7 +231,7 @@ export function DataTable({
   const summaryStats = useMemo(() => {
     if (!dataset) return [];
     // Computed from the shown rows with the shared numeric rule (via profileNumericColumns).
-    // ID/year columns get count/distinct/min/max (no mean); constant columns one line.
+    // Shown with the Overview's NumericSummaryTable (ID/year columns: no average or sum; constants one line).
     const numericColumns = dataset.columns.filter(col => getEffectiveColumnType(dataset, col) === 'numeric');
     return profileNumericColumns(filteredData, numericColumns, dataset).filter((p) => p.count > 0);
   }, [dataset, filteredData]);
@@ -458,31 +459,8 @@ export function DataTable({
 
       {/* Summary Statistics */}
       {summaryStats.length > 0 && (
-        <DataPanel title="Numeric columns" description="Summary statistics of the rows shown">
-          <ul className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,15rem),1fr))] gap-3">
-            {summaryStats.map((stats) => {
-              const tag = roleLabel(stats.role, stats.constantIn);
-              return (
-                <li key={stats.column} className="p-3 bg-muted/60 border border-border rounded-lg" data-testid={`column-stats-${stats.column}`}>
-                  <h3 className="font-semibold mb-1 truncate" title={stats.column}>
-                    {stats.column}
-                    {tag && <span className="ml-2 text-xs font-normal text-muted-foreground">{tag}</span>}
-                  </h3>
-                  {stats.role === 'constant' ? (
-                    <p className="text-dataTable">{constantText(stats, stats.min.toLocaleString())}</p>
-                  ) : (
-                    <div className="space-y-0.5 text-dataTable tabular-nums">
-                      <div>Count: {stats.count}</div>
-                      {stats.distinct !== null && <div>Distinct: {stats.distinct}</div>}
-                      <div>Min: {stats.min.toFixed(2)}</div>
-                      <div>Max: {stats.max.toFixed(2)}</div>
-                      {stats.role === 'measure' && <div>Mean: {stats.mean.toFixed(2)}</div>}
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+        <DataPanel title="Numeric columns" description="Summary of the rows shown. Select a header to sort." flush>
+          <NumericSummaryTable profiles={summaryStats} />
         </DataPanel>
       )}
 

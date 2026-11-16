@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import * as XLSX from "xlsx";
-import { loadSampleData, startFreshSessionWithoutTour } from "./helpers";
+import { loadSampleData, startFreshSessionWithoutTour, numericStat } from "./helpers";
 
 async function openUpload(page: Page) {
   if ((await page.getByTestId("file-upload-input").count()) === 0) {
@@ -97,7 +97,7 @@ test("parse problems are listed; exclude removes Play Store's shifted row", asyn
   await dialog.getByTestId("issues-exclude").click();
   await waitForImported(page, "playstore");
   await page.getByTestId("sidebar-nav-data").click();
-  await expect(page.getByTestId("column-stats-Rating")).toContainText("Max: 5.00");
+  await expect(numericStat(page, "Rating", "Max")).toHaveText("5");
   await expect(page.getByTestId("import-issues-notice")).toContainText("1 row had parse problems at import and was excluded");
 });
 
@@ -109,7 +109,7 @@ test("keeping problem rows is the default and the summary reopens from the Data 
   await page.getByTestId("issues-keep").click();
   await waitForImported(page, "playstore");
   await page.getByTestId("sidebar-nav-data").click();
-  await expect(page.getByTestId("column-stats-Rating")).toContainText("Max: 19.00");
+  await expect(numericStat(page, "Rating", "Max")).toHaveText("19");
   // The summary is stored with the dataset (IndexedDB), so it survives a reload.
   await page.reload();
   if ((await page.getByTestId("import-issues-notice").count()) === 0) await page.getByTestId("sidebar-nav-data").click();

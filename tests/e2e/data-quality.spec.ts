@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { existsSync } from "fs";
-import { startFreshSessionWithoutTour } from "./helpers";
+import { startFreshSessionWithoutTour, numericStat } from "./helpers";
 
 async function openUpload(page: Page) {
   if ((await page.getByTestId("file-upload-input").count()) === 0) {
@@ -32,13 +32,13 @@ test("sentinel prompt: Yes makes -1 missing in Founded (Glassdoor fixture)", asy
   await page.goto("/");
   await importFile(page, "tests/fixtures/messy/glassdoor.csv", "glassdoor");
   await openData(page);
-  await expect(page.getByTestId("column-stats-Founded")).toContainText("Mean: 1339.58");
+  await expect(numericStat(page, "Founded", "Average")).toHaveText("1,339.58");
   const prompt = page.getByTestId("sentinel-prompt-Founded");
   await expect(prompt).toHaveText(/-1 appears 10 times in Founded\. Treat -1 as missing\?/);
   await page.getByTestId("sentinel-yes-Founded").click();
   // pandas, -1 as NaN: mean 1977.952381 (messy.golden.json fixedStats)
-  await expect(page.getByTestId("column-stats-Founded")).toContainText("Mean: 1977.95");
-  await expect(page.getByTestId("column-stats-Founded")).toContainText("Count: 21");
+  await expect(numericStat(page, "Founded", "Average")).toHaveText("1,977.95");
+  await expect(numericStat(page, "Founded", "Count")).toHaveText("21");
   await expect(prompt).toHaveCount(0);
   await expect(page.getByTestId("fix-badge-Founded")).toHaveText("-1 → missing · undo");
   await expect(page.getByTestId("fix-badge-Founded")).toHaveAttribute("aria-label", /-1 treated as missing/);
@@ -47,11 +47,11 @@ test("sentinel prompt: Yes makes -1 missing in Founded (Glassdoor fixture)", asy
   await page.waitForTimeout(1500);
   await page.reload();
   await openData(page);
-  await expect(page.getByTestId("column-stats-Founded")).toContainText("Mean: 1977.95");
+  await expect(numericStat(page, "Founded", "Average")).toHaveText("1,977.95");
   // …and undo restores the original values exactly.
   await page.getByTestId("fix-badge-Founded").click();
   await page.getByTestId("undo-fix-sentinel:Founded:-1").click();
-  await expect(page.getByTestId("column-stats-Founded")).toContainText("Mean: 1339.58");
+  await expect(numericStat(page, "Founded", "Average")).toHaveText("1,339.58");
 });
 
 test("full Glassdoor file: Founded mean 1984.10 and Rating 3.88 after Yes (local file only)", async ({ page }) => {
@@ -64,8 +64,8 @@ test("full Glassdoor file: Founded mean 1984.10 and Rating 3.88 after Yes (local
   await expect(page.getByTestId("sentinel-prompt-Founded")).toHaveText(/-1 appears 118 times in Founded/);
   await page.getByTestId("sentinel-yes-Founded").click();
   await page.getByTestId("sentinel-yes-Rating").click();
-  await expect(page.getByTestId("column-stats-Founded")).toContainText("Mean: 1984.10");
-  await expect(page.getByTestId("column-stats-Rating")).toContainText("Mean: 3.88");
+  await expect(numericStat(page, "Founded", "Average")).toHaveText("1,984.1");
+  await expect(numericStat(page, "Rating", "Average")).toHaveText("3.88");
 });
 
 test("currency: Price converts from $ on import, with a badge and undo; duplicates remove and come back", async ({ page }) => {
@@ -75,9 +75,9 @@ test("currency: Price converts from $ on import, with a badge and undo; duplicat
   await openData(page);
 
   // Price: pandas with "$" stripped, the shifted row's "Everyone" excluded: 79 values, mean 20.896709, max 400.
-  await expect(page.getByTestId("column-stats-Price")).toContainText("Count: 79");
-  await expect(page.getByTestId("column-stats-Price")).toContainText("Mean: 20.90");
-  await expect(page.getByTestId("column-stats-Price")).toContainText("Max: 400.00");
+  await expect(numericStat(page, "Price", "Count")).toHaveText("79");
+  await expect(numericStat(page, "Price", "Average")).toHaveText("20.9");
+  await expect(numericStat(page, "Price", "Max")).toHaveText("400");
   const badge = page.getByTestId("fix-badge-Price");
   await expect(badge).toHaveText("$ · undo");
   await expect(badge).toHaveAttribute("aria-label", /converted from \$/);
@@ -88,7 +88,7 @@ test("currency: Price converts from $ on import, with a badge and undo; duplicat
   await badge.click();
   await page.getByTestId("undo-fix-currency:Price").click();
   await expect(page.getByTestId("fix-badge-Price")).toHaveCount(0);
-  await expect(page.getByTestId("column-stats-Price")).toHaveCount(0); // back to text
+  await expect(page.getByTestId("numeric-row-Price")).toHaveCount(0); // back to text
   await expect(page.getByTestId("data-table-container").getByRole("cell", { name: "$0", exact: true })).toHaveCount(0);
 
   // 8 exact duplicate rows in this subset (pandas duplicated()).
@@ -133,17 +133,17 @@ test("misaligned rows: the shifted Play Store row is found, previewed, excluded 
   await importFile(page, "tests/fixtures/messy/playstore.csv", "playstore");
   await openData(page);
   const notice = page.getByTestId("misaligned-notice");
-  await expect(notice).toContainText("1 misaligned row");
+  await expect(notice).toContainText("1 row with 2+ values that don't fit their column (often a row shifted by a column)");
   await expect(page.getByTestId("misaligned-preview")).toContainText("Life Made WI-Fi Touchscreen Photo Frame");
   await expect(page.getByTestId("misaligned-preview")).toContainText('Price: "Everyone"');
-  await expect(page.getByTestId("column-stats-Rating")).toContainText("Max: 19.00");
+  await expect(numericStat(page, "Rating", "Max")).toHaveText("19");
   await page.getByTestId("exclude-misaligned").click();
-  await expect(notice).toContainText("1 misaligned row excluded");
+  await expect(notice).toContainText("1 row with 2+ values that don't fit their column excluded.");
   await expect(page.getByText(/Showing \d+ of 79 rows/)).toBeVisible();
-  await expect(page.getByTestId("column-stats-Rating")).not.toContainText("Max: 19.00");
+  await expect(numericStat(page, "Rating", "Max")).not.toHaveText("19");
   await page.getByTestId("restore-misaligned").click();
   await expect(page.getByText(/Showing \d+ of 80 rows/)).toBeVisible();
-  await expect(notice).toContainText("1 misaligned row:");
+  await expect(notice).toContainText("It is kept and counted unless you exclude it.");
 });
 
 test("full Play Store file: 483 duplicate rows (local file only)", async ({ page }) => {
@@ -154,7 +154,7 @@ test("full Play Store file: 483 duplicate rows (local file only)", async ({ page
   await importFile(page, file, "googleplaystore");
   await openData(page);
   await expect(page.getByTestId("duplicates-notice")).toContainText("483 duplicate rows");
-  await expect(page.getByTestId("column-stats-Price")).toContainText("Max: 400.00");
+  await expect(numericStat(page, "Price", "Max")).toHaveText("400");
 });
 
 const LABS = ["Lab,Value", ...Array.from({ length: 12 }, (_, i) => `${i % 3 === 0 ? "lab a" : i % 3 === 1 ? "Lab A" : "Lab B"},${i}`), "Lab A,99"].join("\n");

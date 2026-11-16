@@ -2,6 +2,27 @@
 
 Newest first. Entries marked `Source: inferred` were reconstructed from existing code; their "Why" is a guess and should be corrected by the author.
 
+### 2026-11-16 — Data Explorer numeric stats use the Overview's NumericSummaryTable
+- **Decision:** `DataTable.tsx` "Numeric columns" renders `features/dashboard/components/NumericSummary.tsx:NumericSummaryTable` with the same `profileNumericColumns` profiles of the shown (filtered) rows it already computed, replacing the per-column Count/Min/Max/Mean boxes. E2E helper `tests/e2e/helpers.ts:numericStat(page, column, stat)` reads a cell by header; specs that read `column-stats-*` now read `numeric-row-*`.
+- **Why:** User request: the boxes printed raw `toFixed(2)` values ("78158306.00"); the table already sorts, groups thousands and trims decimals (max 2), and one component keeps both views consistent.
+- **Alternatives considered:** Restyling the boxes (rejected: duplicates formatting the table already has); moving the table to `shared/` (rejected for a small fix: one import across features is enough).
+- **Tradeoff accepted:** Data Explorer now imports from `features/dashboard`. Values show at most 2 decimals with trailing zeros dropped ("20.9", "400"), so e2e expectations changed. The ID/year "Distinct" line moves next to the column name, as on Overview.
+- **Source:** made-now
+
+### 2026-11-16 — Data-quality notice wording: real examples, misaligned rows described by what is flagged
+- **Decision:** `dataQuality.ts:columnQuality` keeps up to two of the column's own values that need the suffix reader in `suffixCandidate.examples` (file order; the second of a different suffix shape when there is one: Size "19M", "201k"; Installs "10,000+", "500,000+"); `suffixOfferText` words the offer, and falls back to "<column> holds numbers written as text" for datasets saved before examples existed. The misaligned notice (`misalignedNoticeText`) now reads "N row(s) with 2+ values that don't fit their column (often a row shifted by a column)"; button and preview unchanged.
+- **Why:** User request: the hard-coded "10,000+" or "19M" showed on every column, and the detector also flags rows with junk tokens (cafe "ERROR"/"UNKNOWN"), not only shifted rows.
+- **Alternatives considered:** Taking examples from `topValues` (rejected: only categorical columns have them, and they include plain numbers that need no reader); backfilling examples on old datasets (rejected: the fallback wording is accurate without them).
+- **Tradeoff accepted:** Older saved datasets show the generic wording until re-imported or a column fix recounts them.
+- **Source:** made-now
+
+### 2026-11-16 — KPI builder ignores empty values from Radix Select
+- **Decision:** `KPIBuilder.tsx`: the Measure and Aggregation Selects return early on `onValueChange("")`. E2E `tests/e2e/kpi-builder.spec.ts` opens the real dialog on `tests/fixtures/playstore-insights.csv`.
+- **Why:** Cause of "Aggregation empty, title 'Rating'" on the Play Store file. Not the once-per-opening init guard: logging showed it ran once with the dataset ready (measure Rating). Inside a `<form>`, Radix Select renders a hidden native `<select>` and relays its change events; when the builder opened, the value went "sum" → "avg" while the native select still held the counts-only options of no column, so it fell back to "" and Radix called `onValueChange("")`. That set the aggregation to "" ("Select agg") and the title to `kpiAutoTitle("", "Rating")` = "Rating". Unit tests of the helpers could not see it. The new spec fails without the guard ("Select agg") and passes with it.
+- **Alternatives considered:** Moving the Selects out of the `<form>` (rejected: changes submit/required behaviour); keying the Select on the column so it remounts (rejected: still racy, and resets focus); upgrading Radix (not checked as a fix; larger change).
+- **Tradeoff accepted:** An empty value can never be chosen in these two Selects (none of their options is empty).
+- **Source:** made-now
+
 ### 2026-11-16 — Big-file check (run 3): retail sheet on the production build
 - **Decision:** New local bench `scripts/bench/startup/bigfile-retail.spec.ts` (prod build via `vite preview`, fresh browser profile, 1 worker). Measured, after the fix below. XLSX `online_retail_II.xlsx`, sheet "Year 2009-2010", 525,461 rows: sheet picker 13.1 s after the file is chosen; import 36.2 s from the sheet pick (49.4 s from the file); peak main-thread JS heap 218 MB (the import worker's heap is not included), peak browser RSS 1,744 MB; longest main-thread block during import 0.96 s; Data Explorer first render 0.24 s; table scroll top to bottom (30 steps) 0.51 s, no long task; Filters 0.39 s; Pivot 0.28 s (longest block 0.15 s); KPI builder 0.06 s, save to card 0.93 s; reload (rows from IndexedDB) 3.1 s to the KPI card, longest block 1.19 s. The same rows as CSV (first 525,461 data rows of `online_retail_II.csv`): import 11.3 s, RSS 1,248 MB, longest block 0.94 s, the views within ±30 ms of the XLSX run, reload 3.2 s (block 1.24 s).
 - **Why:** User request: measure first, fix only regressions or freezes over 2 s. Earlier numbers come from different setups and are compared like for like where possible: Node `bookSheets` + preview 11.6 s vs the picker at 12.1-13.1 s in the browser; Node one-sheet read 33.3 s and browser whole-workbook 45-47 s vs 36.2-45.3 s here; transfer block 1.1-2.9 s on the XLSX (dev, headless) vs 0.96 s; 1M generated rows reload 2.4-2.5 s, block 0.9-1.0 s (different data) vs 3.1 s, 1.19 s.

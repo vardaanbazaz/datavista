@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { detectImportConversion, detectSentinel, findDuplicateRows, findMisalignedRows, columnQuality, labelKey } from "../dataQuality";
+import { detectImportConversion, detectSentinel, findDuplicateRows, findMisalignedRows, columnQuality, labelKey, misalignedNoticeText, suffixOfferText } from "../dataQuality";
 import { readFileSync } from "fs";
 import { resolve } from "path";
 import { parseCsvText } from "../csvParse";
@@ -100,8 +100,40 @@ describe("columnQuality", () => {
 
   it("offers Convert to number for suffix/plus text", () => {
     const q = columnQuality("categorical", new Map([["10,000+", 5], ["19M", 3], ["Varies with device", 2]]), new Map(), 10);
-    expect(q.suffixCandidate).toEqual({ convertible: 8, total: 10 });
+    expect(q.suffixCandidate).toEqual({ convertible: 8, total: 10, examples: ["10,000+", "19M"] });
     expect(columnQuality("categorical", new Map([["a", 5]]), new Map(), 5).suffixCandidate).toBeUndefined();
+  });
+
+  it("Convert to number examples: two of the column's own values, the second of another shape when there is one", () => {
+    const ex = (counts: [string, number][]) =>
+      columnQuality("categorical", new Map(counts), new Map(), counts.reduce((n, [, c]) => n + c, 0)).suffixCandidate?.examples;
+    // Plain numbers ("0") don't need the reader, so they are never an example.
+    expect(ex([["0", 4], ["19M", 3], ["14M", 2], ["201k", 1]])).toEqual(["19M", "201k"]);
+    expect(ex([["10,000+", 3], ["500,000+", 2], ["0", 1]])).toEqual(["10,000+", "500,000+"]);
+    expect(ex([["5M", 5], ["1", 5]])).toEqual(["5M"]);
+  });
+
+  it("Convert to number examples on the real Play Store columns", () => {
+    const file = resolve(__dirname, "../../../../tests/fixtures/playstore-insights.csv");
+    const ds = processRawData(parseCsvText(readFileSync(file, "utf8")).rows, "playstore-insights.csv");
+    const examples = (name: string) => ds.metadata!.columns.find((c) => c.name === name)!.quality!.suffixCandidate!.examples;
+    expect(examples("Size")).toEqual(["19M", "201k"]);
+    expect(examples("Installs")).toEqual(["10,000+", "500,000+"]);
+    expect(suffixOfferText("Size", examples("Size"))).toBe('Size is text like "19M" or "201k"');
+    expect(suffixOfferText("Installs", examples("Installs"))).toBe('Installs is text like "10,000+" or "500,000+"');
+  });
+
+  it("Convert to number text: one example, and none on datasets imported before examples were kept", () => {
+    expect(suffixOfferText("Size", ["19M"])).toBe('Size is text like "19M"');
+    expect(suffixOfferText("Size", undefined)).not.toMatch(/10,000\+|19M/);
+  });
+
+  it("misaligned notice wording covers shifted rows and junk tokens alike", () => {
+    expect(misalignedNoticeText(1, false)).toBe(
+      "1 row with 2+ values that don't fit their column (often a row shifted by a column). It is kept and counted unless you exclude it."
+    );
+    expect(misalignedNoticeText(3, false)).toMatch(/^3 rows with 2\+ values .* They are kept and counted unless you exclude them\.$/);
+    expect(misalignedNoticeText(2, true)).toBe("2 rows with 2+ values that don't fit their column excluded.");
   });
 });
 

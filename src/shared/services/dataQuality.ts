@@ -25,6 +25,11 @@ const SAMPLE_COUNT = 5;
 /** Share of non-blank cells that must need the suffix reader ("10,000+", "19M") before it is offered. */
 const SUFFIX_MIN_SHARE = 0.1;
 
+/** What a suffix number is written with, digits and separators dropped: "19M" → "m", "10,000+" → "+". */
+function suffixShape(value: string): string {
+  return value.replace(/[\d.,\s]/g, "").toLowerCase();
+}
+
 /** No digit, no number: skips the format regexes for plain text cells. */
 function hasDigit(s: string): boolean {
   for (let i = 0; i < s.length; i++) {
@@ -143,14 +148,25 @@ export function columnQuality(
   if (type !== "date" && nonBlank > 0) {
     let convertible = 0;
     let needsReader = 0;
+    // Two real values for the notice, in file order, the second of a different shape when the
+    // column has one: Size "19M", "201k"; Installs "10,000+", "500,000+".
+    let first: string | undefined;
+    let sameShape: string | undefined;
+    let otherShape: string | undefined;
     for (const [k, c] of valueCounts) {
       const parsed = parseSuffixNumber(k);
       if (!parsed) continue;
       convertible += c;
-      if (parseStrictNumber(k) === null) needsReader += c;
+      if (parseStrictNumber(k) !== null) continue;
+      needsReader += c;
+      if (first === undefined) first = k;
+      else if (otherShape === undefined && suffixShape(k) !== suffixShape(first)) otherShape = k;
+      else if (sameShape === undefined) sameShape = k;
     }
+    const second = otherShape ?? sameShape;
+    const examples = first === undefined ? [] : second === undefined ? [first] : [first, second];
     if (needsReader / nonBlank >= SUFFIX_MIN_SHARE && convertible / nonBlank >= 0.5) {
-      quality.suffixCandidate = { convertible, total: nonBlank };
+      quality.suffixCandidate = { convertible, total: nonBlank, examples };
     }
   }
   return quality;
@@ -324,6 +340,22 @@ export function variantMergeText(group: readonly ValueCount[], target: string): 
   const to = group.find((g) => g.value === target)!;
   const from = group.filter((g) => g.value !== target).map(fmt).join(", ");
   return `Merge ${from} into ${fmt(to)}?`;
+}
+
+/** Lead of the "Convert to number…" offer, quoting the column's own values: `Size is text like "19M" or "201k"`. */
+export function suffixOfferText(column: string, examples: readonly string[] | undefined): string {
+  if (!examples?.length) return `${column} holds numbers written as text`;
+  return `${column} is text like ${examples.map((e) => `"${e}"`).join(" or ")}`;
+}
+
+/**
+ * The misaligned-rows notice. misalignedRows flags any row with 2+ cells that fail their
+ * column's type: a row shifted by a column, but also error markers ("ERROR", "UNKNOWN").
+ */
+export function misalignedNoticeText(count: number, excluded: boolean): string {
+  const rows = `${countOf(count, "row")} with 2+ values that don't fit their column`;
+  if (excluded) return `${rows} excluded.`;
+  return `${rows} (often a row shifted by a column). ${plural(count, "It is", "They are")} kept and counted unless you exclude ${plural(count, "it", "them")}.`;
 }
 
 export function isHighCardinality(uniqueValueCount: number, nonBlank: number): boolean {

@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/components/ui/popover";
 import type { ColumnFix, ColumnMetadata, Dataset, ValueCount } from "@/shared/types";
 import { useDatasetStore } from "@/store/datasetStore";
-import { failsType, labelKey, suggestionKey, variantMergeText } from "@/shared/services/dataQuality";
+import { failsType, labelKey, misalignedNoticeText, suffixOfferText, suggestionKey, variantMergeText } from "@/shared/services/dataQuality";
 import { misalignedRowsOf, previewNumberConversion } from "@/shared/services/columnFixes";
 import { getEffectiveColumnType } from "@/shared/utils/columnType";
 import { countOf } from "@/shared/utils/plural";
@@ -287,17 +287,14 @@ export function DataQualityPanel({ dataset }: { dataset: Dataset }) {
 
       {misalignedRemoved > 0 ? (
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center" data-testid="misaligned-notice">
-          <p className="flex-1">{countOf(misalignedRemoved, "misaligned row")} excluded.</p>
+          <p className="flex-1">{misalignedNoticeText(misalignedRemoved, true)}</p>
           <Button size="sm" variant="outline" onClick={restoreMisaligned} data-testid="restore-misaligned">Undo</Button>
         </div>
       ) : (
         misaligned.length > 0 && (
           <div className="space-y-2" data-testid="misaligned-notice">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <p className="flex-1">
-                {countOf(misaligned.length, "misaligned row")}: two or more values don't fit their column's type, as if
-                the row were shifted by a column. They are kept and counted unless you exclude them.
-              </p>
+              <p className="flex-1">{misalignedNoticeText(misaligned.length, false)}</p>
               <Button size="sm" variant="outline" onClick={excludeMisaligned} data-testid="exclude-misaligned">Exclude rows</Button>
             </div>
             <MisalignedPreview dataset={dataset} rows={misaligned} />
@@ -346,7 +343,7 @@ export function DataQualityPanel({ dataset }: { dataset: Dataset }) {
       {converts.map((c) => (
         <div key={c.key} className="flex flex-col gap-2 sm:flex-row sm:items-center" data-testid={`convert-offer-${c.column}`}>
           <p className="flex-1">
-            {c.column} is text like "10,000+" or "19M": {c.convertible.toLocaleString()} of {c.total.toLocaleString()} values can be read as numbers.
+            {suffixOfferText(c.column, c.examples)}: {c.convertible.toLocaleString()} of {c.total.toLocaleString()} values can be read as numbers.
           </p>
           <div className="flex gap-2">
             <Button size="sm" variant="outline" onClick={() => setConverting(c.column)} data-testid={`convert-open-${c.column}`}>Convert to number…</Button>

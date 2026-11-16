@@ -22,3 +22,13 @@ export async function loadSampleData(page: Page) {
   await page.getByTestId("sample-data-button").click();
   await page.getByText("Sample Sales Data").first().waitFor({ state: "visible" });
 }
+
+const NUMERIC_STATS = ["Count", "Average", "Min", "Max", "Sum", "Missing", "Invalid"] as const;
+
+/**
+ * One cell of the numeric-columns table (NumericSummaryTable, on Overview and Data Explorer),
+ * e.g. numericStat(page, "Rating", "Max"). Values are formatted as shown: "1,339.58", "400".
+ */
+export function numericStat(page: Page, column: string, stat: (typeof NUMERIC_STATS)[number]) {
+  return page.getByTestId(`numeric-row-${column}`).locator("td").nth(NUMERIC_STATS.indexOf(stat));
+}

@@ -46,7 +46,7 @@ describe("column fixes", () => {
 
   it("Convert to number: preview, unreadable cells become missing, undo restores text", () => {
     const ds = load([{ i: "10,000+" }, { i: "19M" }, { i: "512k" }, { i: "Varies with device" }, { i: "0" }]);
-    expect(ds.metadata!.columns[0].quality!.suffixCandidate).toEqual({ convertible: 4, total: 5 });
+    expect(ds.metadata!.columns[0].quality!.suffixCandidate).toEqual({ convertible: 4, total: 5, examples: ["10,000+", "19M"] });
     const preview = previewNumberConversion(ds, "i");
     expect(preview.samples).toEqual([
       { before: "10,000+", after: 10000 },
