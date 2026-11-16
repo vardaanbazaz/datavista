@@ -1,13 +1,14 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { Dataset } from "@/shared/types";
-import { useUiStore } from "@/store/uiStore";
 
-vi.mock("../llmService", () => ({
-  callLLM: vi.fn(),
+vi.mock("../aiRequests", () => ({
+  runChat: vi.fn(),
+  buildSummaryMessages: vi.fn(async () => []),
 }));
 
 import { summaryEngine } from "../summaryEngine";
-import { callLLM } from "../llmService";
+import { runChat as callLLM } from "../aiRequests";
+import { useAiSettingsStore } from "../settings/aiSettingsStore";
 
 const makeDataset = (): Dataset => ({
   id: "ds1",
@@ -20,11 +21,11 @@ const makeDataset = (): Dataset => ({
 describe("summaryEngine.generateExecutiveSummary - result source tagging (item 5)", () => {
   afterEach(() => {
     vi.restoreAllMocks();
-    useUiStore.setState({ llmApiKey: "", llmProvider: "gemini" });
+    useAiSettingsStore.setState({ providerId: "gemini", keys: {} });
   });
 
   it("tags the result 'offline' when no API key is configured", async () => {
-    useUiStore.setState({ llmApiKey: "" });
+    useAiSettingsStore.setState({ keys: {} });
 
     const result = await summaryEngine.generateExecutiveSummary(makeDataset(), [], []);
 
@@ -33,7 +34,7 @@ describe("summaryEngine.generateExecutiveSummary - result source tagging (item 5
   });
 
   it("tags the result 'ai' when a key is configured and the LLM call succeeds", async () => {
-    useUiStore.setState({ llmApiKey: "test-key", llmProvider: "gemini" });
+    useAiSettingsStore.setState({ providerId: "gemini", keys: { gemini: "test-key" } });
     vi.mocked(callLLM).mockResolvedValue("Everything looks fine.");
 
     const result = await summaryEngine.generateExecutiveSummary(makeDataset(), [], []);
@@ -43,7 +44,7 @@ describe("summaryEngine.generateExecutiveSummary - result source tagging (item 5
   });
 
   it("falls back to 'offline' when a key is configured but the LLM call fails", async () => {
-    useUiStore.setState({ llmApiKey: "test-key", llmProvider: "gemini" });
+    useAiSettingsStore.setState({ providerId: "gemini", keys: { gemini: "test-key" } });
     vi.mocked(callLLM).mockRejectedValue(new Error("network error"));
 
     const result = await summaryEngine.generateExecutiveSummary(makeDataset(), [], []);
@@ -52,7 +53,7 @@ describe("summaryEngine.generateExecutiveSummary - result source tagging (item 5
   });
 
   it("tags 'offline' when there is no active dataset (no call attempted)", async () => {
-    useUiStore.setState({ llmApiKey: "test-key" });
+    useAiSettingsStore.setState({ keys: { gemini: "test-key" } });
 
     const result = await summaryEngine.generateExecutiveSummary(null, [], []);
 

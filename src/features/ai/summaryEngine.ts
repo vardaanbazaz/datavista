@@ -1,8 +1,7 @@
 import { Dataset, ChartConfig, GlobalFilter, FilterState, DataRow } from "@/shared/types";
 import { anomalyDetector, DetectedAnomaly } from "./anomalyDetector";
-import { callLLM } from "./llmService";
-import { useUiStore } from "@/store/uiStore";
-import { getEffectiveColumnType } from "@/shared/utils/columnType";
+import { buildSummaryMessages, runChat } from "./aiRequests";
+import { isAiConnected } from "./settings/aiSettingsStore";
 import { countOf } from "@/shared/utils/plural";
 
 export const summaryEngine = {
@@ -41,24 +40,8 @@ export const summaryEngine = {
           .map(([k, v]) => `${k}: [${v.join(", ")}]`)
           .join("; ");
 
-    const anomalySummaryText = anomalies
-      .slice(0, 5)
-      .map((a) => a.description)
-      .join(" ");
-
-    const promptContext = `
-Executive Dashboard Status Report:
-Dataset: "${datasetName}" (${rowCount} rows, ${chartCount} charts)
-Active Filters: ${filterText || "None"}
-Detected Outliers/Anomalies: ${anomalySummaryText || "No statistically significant outliers detected. Overall data trends appear consistent."}
-
-TASK: Generate a concise, professional 2 to 3 sentence executive summary describing the overall state of the data, key metric performance, and any notable spikes/drops or anomalies.
-`;
-
-    const { llmApiKey, llmProvider } = useUiStore.getState();
-
-    // 3. Invoke LLM or Fallback Heuristic Summary
-    if (!llmApiKey || llmApiKey.trim() === "") {
+    // 3. No provider connected: the offline summary, and no request is made.
+    if (!isAiConnected()) {
       return {
         summary: this.generateOfflineSummary(datasetName, rowCount, chartCount, anomalies, filterText),
         anomalies,
@@ -67,15 +50,9 @@ TASK: Generate a concise, professional 2 to 3 sentence executive summary describ
     }
 
     try {
-      const rawResponse = await callLLM(
-        llmApiKey,
-        llmProvider,
-        {
-          prompt: promptContext,
-          datasetName,
-          columns: (dataset.metadata?.columns || []).map((c) => ({ name: c.name, type: getEffectiveColumnType(dataset, c.name) }))
-        }
-      );
+      // Dataset content, filter values and unusual values all pass the privacy builder.
+      const messages = await buildSummaryMessages(dataset, charts, filters, anomalies, rows);
+      const rawResponse = await runChat("summary", messages);
 
       let clean = rawResponse.trim();
       // If JSON returned, attempt to extract summary field or text
@@ -101,7 +78,8 @@ TASK: Generate a concise, professional 2 to 3 sentence executive summary describ
         source: 'ai'
       };
     } catch (e) {
-      console.warn("LLM summary generation failed, falling back to heuristic summary:", e);
+      // Only the error kind is logged: provider messages can carry request details.
+      console.warn("AI summary failed, using the offline summary:", e instanceof Error ? e.name : "error", (e as { kind?: string })?.kind ?? "");
       return {
         summary: this.generateOfflineSummary(datasetName, rowCount, chartCount, anomalies, filterText),
         anomalies,

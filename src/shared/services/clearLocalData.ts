@@ -1,13 +1,14 @@
 import { db } from "@/shared/lib/db";
 import { persistenceService } from "./persistenceService";
 
-/** Every localStorage key DataVista writes starts with this (ui prefs + AI key, templates, saved views, snapshots, first-visit flag). */
+/** Every localStorage/sessionStorage key DataVista writes starts with this (ui prefs, AI settings and key, templates, saved views, snapshots, first-visit flag). */
 export const LOCAL_STORAGE_PREFIX = "datavista";
 
 /**
  * What "Clear all local data" deletes, for the confirm step. IndexedDB `DataVistaDatabase`:
  * datasets, their rows, charts, dashboards, filters and UI state. localStorage `datavista*`:
- * preferences, the AI provider and key, templates, saved views, snapshots.
+ * preferences, the AI provider and a remembered key, templates, saved views, snapshots.
+ * sessionStorage `datavista*`: the AI key kept for this session.
  */
 export const CLEARED_ITEMS = [
   "Every dataset and all its rows",
@@ -40,5 +41,16 @@ export async function clearAllLocalData(reload: () => void = () => window.locati
     if (key?.startsWith(LOCAL_STORAGE_PREFIX)) keys.push(key);
   }
   for (const key of keys) localStorage.removeItem(key);
+  // The AI key is kept in sessionStorage unless the user chose "Remember on this device".
+  try {
+    const sessionKeys: string[] = [];
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i);
+      if (key?.startsWith(LOCAL_STORAGE_PREFIX)) sessionKeys.push(key);
+    }
+    for (const key of sessionKeys) sessionStorage.removeItem(key);
+  } catch {
+    /* sessionStorage blocked: nothing stored there */
+  }
   reload();
 }

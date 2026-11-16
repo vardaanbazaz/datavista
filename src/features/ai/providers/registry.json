@@ -1,0 +1,199 @@
+{
+  "checkedOrigin": "https://vardaanbazaz.github.io",
+  "providers": [
+    {
+      "id": "openai",
+      "label": "OpenAI",
+      "baseUrl": "https://api.openai.com/v1",
+      "apiStyle": "openai-compatible",
+      "keyRequired": true,
+      "suggestedModels": [
+        "gpt-4o-mini",
+        "gpt-4.1-mini",
+        "gpt-4o"
+      ],
+      "modelsEndpoint": "/models",
+      "browserAccess": {
+        "status": "ok",
+        "checkedAt": "2026-11-16",
+        "detail": "preflight 200, POST 401 with Access-Control-Allow-Origin"
+      },
+      "setupNote": "Create a key at platform.openai.com → API keys. Usage is billed to your OpenAI account."
+    },
+    {
+      "id": "anthropic",
+      "label": "Anthropic (Claude)",
+      "baseUrl": "https://api.anthropic.com/v1",
+      "apiStyle": "anthropic",
+      "keyRequired": true,
+      "suggestedModels": [
+        "claude-haiku-5-5",
+        "claude-sonnet-5-5",
+        "claude-opus-5-5"
+      ],
+      "modelsEndpoint": "/models",
+      "browserAccess": {
+        "status": "ok",
+        "checkedAt": "2026-11-16",
+        "detail": "preflight 200, POST 401 with Access-Control-Allow-Origin"
+      },
+      "setupNote": "Create a key at console.anthropic.com → API keys. DataVista sends the header Anthropic requires for direct browser calls."
+    },
+    {
+      "id": "gemini",
+      "label": "Google Gemini",
+      "baseUrl": "https://generativelanguage.googleapis.com/v1beta",
+      "apiStyle": "gemini",
+      "keyRequired": true,
+      "suggestedModels": [
+        "gemini-flash-latest",
+        "gemini-2.5-flash",
+        "gemini-2.5-pro"
+      ],
+      "modelsEndpoint": "/models",
+      "browserAccess": {
+        "status": "ok",
+        "checkedAt": "2026-11-16",
+        "detail": "preflight 200, POST 403 with Access-Control-Allow-Origin"
+      },
+      "setupNote": "Create a key in Google AI Studio (aistudio.google.com → Get API key)."
+    },
+    {
+      "id": "openrouter",
+      "label": "OpenRouter",
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "apiStyle": "openai-compatible",
+      "keyRequired": true,
+      "suggestedModels": [
+        "openai/gpt-4o-mini",
+        "anthropic/claude-sonnet-5-5",
+        "google/gemini-2.5-flash"
+      ],
+      "modelsEndpoint": "/models",
+      "browserAccess": {
+        "status": "ok",
+        "checkedAt": "2026-11-16",
+        "detail": "preflight 204, POST 401 with Access-Control-Allow-Origin"
+      },
+      "setupNote": "One key for many models. Create it at openrouter.ai → Keys; model ids look like vendor/model."
+    },
+    {
+      "id": "groq",
+      "label": "Groq",
+      "baseUrl": "https://api.groq.com/openai/v1",
+      "apiStyle": "openai-compatible",
+      "keyRequired": true,
+      "suggestedModels": [
+        "llama-3.3-70b-versatile",
+        "llama-3.1-8b-instant"
+      ],
+      "modelsEndpoint": "/models",
+      "browserAccess": {
+        "status": "ok",
+        "checkedAt": "2026-11-16",
+        "detail": "preflight 204, POST 401 with Access-Control-Allow-Origin"
+      },
+      "setupNote": "Create a key at console.groq.com → API Keys."
+    },
+    {
+      "id": "mistral",
+      "label": "Mistral",
+      "baseUrl": "https://api.mistral.ai/v1",
+      "apiStyle": "openai-compatible",
+      "keyRequired": true,
+      "suggestedModels": [
+        "mistral-small-latest",
+        "mistral-large-latest"
+      ],
+      "modelsEndpoint": "/models",
+      "browserAccess": {
+        "status": "ok",
+        "checkedAt": "2026-11-16",
+        "detail": "preflight 200, POST 401 with Access-Control-Allow-Origin"
+      },
+      "setupNote": "Create a key at console.mistral.ai → API Keys."
+    },
+    {
+      "id": "deepseek",
+      "label": "DeepSeek",
+      "baseUrl": "https://api.deepseek.com/v1",
+      "apiStyle": "openai-compatible",
+      "keyRequired": true,
+      "suggestedModels": [
+        "deepseek-chat",
+        "deepseek-reasoner"
+      ],
+      "modelsEndpoint": "/models",
+      "browserAccess": {
+        "status": "ok",
+        "checkedAt": "2026-11-16",
+        "detail": "preflight 200, POST 401 with Access-Control-Allow-Origin"
+      },
+      "setupNote": "Create a key at platform.deepseek.com → API keys."
+    },
+    {
+      "id": "together",
+      "label": "Together AI",
+      "baseUrl": "https://api.together.xyz/v1",
+      "apiStyle": "openai-compatible",
+      "keyRequired": true,
+      "suggestedModels": [
+        "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+        "Qwen/Qwen2.5-72B-Instruct-Turbo"
+      ],
+      "modelsEndpoint": "/models",
+      "browserAccess": {
+        "status": "ok",
+        "checkedAt": "2026-11-16",
+        "detail": "preflight 200, POST 401 with Access-Control-Allow-Origin"
+      },
+      "setupNote": "Create a key at api.together.ai → Settings → API keys."
+    },
+    {
+      "id": "ollama",
+      "label": "Ollama (local)",
+      "baseUrl": "http://localhost:11434/v1",
+      "apiStyle": "openai-compatible",
+      "keyRequired": false,
+      "suggestedModels": [
+        "llama3.2",
+        "qwen2.5",
+        "mistral"
+      ],
+      "modelsEndpoint": "/models",
+      "browserAccess": {
+        "status": "local",
+        "checkedAt": null
+      },
+      "setupNote": "Runs on your computer; nothing leaves it. Allow this site first: start Ollama with OLLAMA_ORIGINS=https://vardaanbazaz.github.io (e.g. `OLLAMA_ORIGINS=https://vardaanbazaz.github.io ollama serve`, or set it with `launchctl setenv` / a systemd override), then pull a model with `ollama pull llama3.2`."
+    },
+    {
+      "id": "lmstudio",
+      "label": "LM Studio (local)",
+      "baseUrl": "http://localhost:1234/v1",
+      "apiStyle": "openai-compatible",
+      "keyRequired": false,
+      "suggestedModels": [],
+      "modelsEndpoint": "/models",
+      "browserAccess": {
+        "status": "local",
+        "checkedAt": null
+      },
+      "setupNote": "Runs on your computer; nothing leaves it. In LM Studio open Developer → start the server, and turn on \"Enable CORS\" in its settings so this site may call it. Load a model, then press Load models here."
+    },
+    {
+      "id": "custom",
+      "label": "Custom (OpenAI-compatible)",
+      "baseUrl": "",
+      "apiStyle": "openai-compatible",
+      "keyRequired": false,
+      "suggestedModels": [],
+      "modelsEndpoint": "/models",
+      "browserAccess": {
+        "status": "unchecked",
+        "checkedAt": null
+      },
+      "setupNote": "Any server that speaks the OpenAI chat-completions API (vLLM, llama.cpp server, LiteLLM, a company gateway). Enter its base URL ending in /v1. The server must allow this site's origin (CORS). Leave the key empty if it needs none."
+    }
+  ]
+}

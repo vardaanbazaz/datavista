@@ -1,5 +1,4 @@
 import { AIPromptContext } from "./types";
-import { LlmProvider } from "@/store/uiStore";
 import { functionsByCategory } from "@/shared/services/formula/library/registry";
 import { FunctionDefinition } from "@/shared/services/formula/library/types";
 
@@ -71,125 +70,11 @@ Strict Constraints:
 3. If the user prompt asks to query, filter, rank, group, or show top items (e.g. "top 5 regions by revenue", "show electronics sales"), set type="query" and populate query configuration.
 `;
 
-const LLM_REQUEST_TIMEOUT_MS = 30000;
-
 /**
- * fetch() with an AbortController-based timeout. Without this, a stalled network condition
- * (captive portal, dropped connection, provider hang) leaves the calling UI's "generating..."
- * state stuck true forever, with no cancel path.
+ * Offline heuristic for common analytical phrases, used when no AI provider is connected.
+ * Runs locally; nothing is sent anywhere.
  */
-export async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = LLM_REQUEST_TIMEOUT_MS): Promise<Response> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...init, signal: controller.signal });
-  } catch (e) {
-    if (e instanceof DOMException && e.name === 'AbortError') {
-      throw new Error(`AI request timed out after ${timeoutMs / 1000}s. The service may be slow or unreachable - please try again.`);
-    }
-    throw e;
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
-
-export async function callLLM(
-  apiKey: string,
-  provider: LlmProvider,
-  context: AIPromptContext,
-  mode?: 'query' | 'formula'
-): Promise<string> {
-  if (!apiKey || apiKey.trim() === '') {
-    // Provide a smart offline heuristic response if no API key is set
-    return generateOfflineFallback(context, mode);
-  }
-
-  const contextMessage = `
-Context Dataset: ${context.datasetName || 'Active Dataset'}
-Available Columns: ${JSON.stringify(context.columns)}
-Existing Calculated Fields: ${JSON.stringify(context.calculatedFields || [])}
-User Prompt: "${context.prompt}"
-Target Mode Preference: ${mode || 'auto'}
-  `;
-
-  if (provider === 'gemini') {
-    // Key goes in the x-goog-api-key header (Google's documented alternative to the
-    // ?key= query param) — a query-param key is more likely to leak into provider
-    // access logs, browser history, or a TLS-inspecting proxy log.
-    // "latest" alias tracks Google's current GA Flash model, so a dated model
-    // name (e.g. gemini-1.5-flash) can't silently go stale after deprecation.
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent`;
-    const response = await fetchWithTimeout(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': apiKey.trim(),
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              { text: SYSTEM_PROMPT },
-              { text: contextMessage }
-            ]
-          }
-        ],
-        generationConfig: {
-          temperature: 0.1,
-          responseMimeType: "application/json"
-        }
-      })
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Gemini API Error (${response.status}): ${errText}`);
-    }
-
-    const data = await response.json();
-    const candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!candidateText) {
-      throw new Error("No response text returned from Gemini API");
-    }
-    return candidateText;
-  } else {
-    // OpenAI Provider
-    const url = 'https://api.openai.com/v1/chat/completions';
-    const response = await fetchWithTimeout(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey.trim()}`
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: contextMessage }
-        ],
-        temperature: 0.1,
-        response_format: { type: "json_object" }
-      })
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`OpenAI API Error (${response.status}): ${errText}`);
-    }
-
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
-    if (!content) {
-      throw new Error("No response text returned from OpenAI API");
-    }
-    return content;
-  }
-}
-
-/**
- * Offline Heuristic Fallback for common analytical phrases when API key is missing
- */
-function generateOfflineFallback(context: AIPromptContext, mode?: 'query' | 'formula'): string {
+export function generateOfflineFallback(context: AIPromptContext, mode?: 'query' | 'formula'): string {
   const promptLower = context.prompt.toLowerCase();
   const columns = context.columns;
   const colNames = columns.map(c => c.name);

@@ -1,7 +1,8 @@
 import { Dataset, QueryResult } from "@/shared/types";
 import { AIPromptContext, AIPromptColumn, AIResponse } from "./types";
-import { callLLM } from "./llmService";
-import { useUiStore } from "@/store/uiStore";
+import { generateOfflineFallback } from "./llmService";
+import { buildQueryMessages, runChat } from "./aiRequests";
+import { isAiConnected } from "./settings/aiSettingsStore";
 import { queryEngine } from "@/shared/services/queryEngine";
 import { formulaEngine } from "@/shared/services/formulaEngine";
 import { useFilterStore } from "@/store/filterStore";
@@ -17,48 +18,12 @@ export class AiEngineError extends Error {
 
 export const aiEngine = {
   /**
-   * Constructs prompt context from active dataset
+   * Column names and types for the offline heuristic (runs locally; nothing is sent).
+   * Requests to a provider build their context in privacy/contextBuilder.ts instead.
    */
-  buildContext(dataset: Dataset, prompt: string): AIPromptContext {
-    const columns: AIPromptColumn[] = (dataset.metadata?.columns || []).map((c) => {
-      const sampleVals = dataset.data
-        .slice(0, 5)
-        .map((r) => String(r[c.name]))
-        .filter((v) => v !== "null" && v !== "undefined");
-
-      return {
-        name: c.name,
-        type: getEffectiveColumnType(dataset, c.name),
-        sampleValues: sampleVals,
-        minimumValue: c.minimumValue,
-        maximumValue: c.maximumValue,
-        uniqueValueCount: c.uniqueValueCount,
-      };
-    });
-
-    // Fallback if metadata is not populated
-    const resolvedColumns =
-      columns.length > 0
-        ? columns
-        : dataset.columns.map((col) => {
-            const sampleVals = dataset.data
-              .slice(0, 5)
-              .map((r) => String(r[col]))
-              .filter((v) => v !== "null" && v !== "undefined");
-            return {
-              name: col,
-              type: getEffectiveColumnType(dataset, col),
-              sampleValues: sampleVals,
-            };
-          });
-
-    return {
-      prompt,
-      datasetName: dataset.name,
-      columns: resolvedColumns,
-      metadata: dataset.metadata,
-      calculatedFields: dataset.calculatedFields || [],
-    };
+  offlineContext(dataset: Dataset, prompt: string): AIPromptContext {
+    const columns: AIPromptColumn[] = dataset.columns.map((name) => ({ name, type: getEffectiveColumnType(dataset, name) }));
+    return { prompt, datasetName: dataset.name, columns };
   },
 
   /**
@@ -70,6 +35,12 @@ export const aiEngine = {
       clean = clean.replace(/^```json/, "").replace(/```$/, "").trim();
     } else if (clean.startsWith("```")) {
       clean = clean.replace(/^```/, "").replace(/```$/, "").trim();
+    }
+    // Providers without a JSON mode sometimes wrap the object in prose: keep the outermost {...}.
+    if (!clean.startsWith("{")) {
+      const first = clean.indexOf("{");
+      const last = clean.lastIndexOf("}");
+      if (first !== -1 && last > first) clean = clean.slice(first, last + 1);
     }
     return clean;
   },
@@ -86,10 +57,10 @@ export const aiEngine = {
       throw new AiEngineError("No active dataset selected. Please upload or select a dataset first.");
     }
 
-    const { llmApiKey, llmProvider } = useUiStore.getState();
-    const context = this.buildContext(dataset, prompt);
-
-    const rawResponse = await callLLM(llmApiKey, llmProvider, context, mode);
+    // No provider connected: the local heuristic answers and no request is made.
+    const rawResponse = isAiConnected()
+      ? await runChat(mode ?? "query", await buildQueryMessages(prompt, dataset, mode))
+      : generateOfflineFallback(this.offlineContext(dataset, prompt), mode);
 
     let parsed: AIResponse;
     try {

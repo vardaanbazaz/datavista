@@ -192,6 +192,9 @@ test("clear all local data: nothing of the workspace is left after a reload", as
   await page.goto("/");
   await importFile(page, { name: "labs.csv", mimeType: "text/csv", buffer: Buffer.from(LABS) }, "labs");
   await page.evaluate(() => {
+    // A remembered key, a session key, and an old-style key (from before AI settings moved out of ui storage).
+    localStorage.setItem("datavista-ai-keys", JSON.stringify({ openai: "sk-test-key" }));
+    sessionStorage.setItem("datavista-ai-keys", JSON.stringify({ gemini: "AIza-test-key" }));
     const raw = JSON.parse(localStorage.getItem("datavista-ui-storage")!);
     raw.state.llmApiKey = "sk-test-key";
     localStorage.setItem("datavista-ui-storage", JSON.stringify(raw));
@@ -208,7 +211,7 @@ test("clear all local data: nothing of the workspace is left after a reload", as
   const left = await page.evaluate(
     () =>
       new Promise<{ datasets: number; rows: number; charts: number; dashboards: number; filters: number; keys: string[]; apiKey: unknown }>((resolve, reject) => {
-        const keys = Object.keys(localStorage).filter((k) => k.startsWith("datavista"));
+        const keys = [...Object.keys(localStorage), ...Object.keys(sessionStorage)].filter((k) => k.startsWith("datavista"));
         const ui = JSON.parse(localStorage.getItem("datavista-ui-storage") ?? "{}");
         const open = indexedDB.open("DataVistaDatabase");
         open.onerror = () => reject(open.error);
@@ -234,7 +237,7 @@ test("clear all local data: nothing of the workspace is left after a reload", as
         };
       })
   );
-  expect({ ...left, keys: undefined }).toEqual({ datasets: 0, rows: 0, charts: 0, dashboards: 0, filters: 0, keys: undefined, apiKey: "" });
+  expect({ ...left, keys: undefined }).toEqual({ datasets: 0, rows: 0, charts: 0, dashboards: 0, filters: 0, keys: undefined, apiKey: undefined });
   // Only what the app writes on a fresh start (default UI state) may exist.
   expect(left.keys.every((k) => k === "datavista-ui-storage")).toBe(true);
   await expect(page.getByTestId("sidebar").getByText("labs", { exact: true })).toHaveCount(0);

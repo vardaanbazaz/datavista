@@ -5,8 +5,6 @@ import type { ViewType } from "./viewTypes";
 
 export type { ViewType };
 
-export type LlmProvider = 'gemini' | 'openai';
-
 import {
   DEFAULT_APPEARANCE,
   DEFAULT_THEME_SETTING,
@@ -15,6 +13,7 @@ import {
   type ThemeSetting,
 } from "@/shared/theme/boot";
 import { THEME_IDS, type ThemeId } from "@/shared/theme/themes";
+import { migrateLegacyKey } from "@/features/ai/settings/keyStorage";
 
 /** Appearance (theme, transparency, animation, text size, contrast, motion). Stored per browser with the rest of the UI prefs. */
 export type { Appearance, ThemeSetting, TextSize, MotionPreference } from "@/shared/theme/boot";
@@ -48,8 +47,8 @@ interface UiState {
   isDataHydrated: boolean;
   /** What startup is doing right now, for the loading screen (persistenceService.hydrate). Not persisted. */
   startupStatus: StartupStatus | null;
-  llmApiKey: string;
-  llmProvider: LlmProvider;
+  /** AI settings dialog (provider, key, model, privacy). Not persisted. Keys live in features/ai/settings. */
+  isAiSettingsOpen: boolean;
   hasSeenTour: boolean;
   runTour: boolean;
   /** First-run setup finished or skipped (SetupFlow). */
@@ -77,8 +76,7 @@ interface UiState {
   setIsAppearanceOpen: (open: boolean) => void;
   setIsHydrated: (hydrated: boolean) => void;
   setIsDataHydrated: (hydrated: boolean) => void;
-  setLlmApiKey: (key: string) => void;
-  setLlmProvider: (provider: LlmProvider) => void;
+  setIsAiSettingsOpen: (open: boolean) => void;
   setHasSeenTour: (seen: boolean) => void;
   setIsSetupOpen: (open: boolean) => void;
   completeSetup: () => void;
@@ -102,8 +100,7 @@ export const useUiStore = create<UiState>()(
       isHydrated: false,
       isDataHydrated: false,
       startupStatus: null,
-      llmApiKey: '',
-      llmProvider: 'gemini',
+      isAiSettingsOpen: false,
       hasSeenTour: false,
       runTour: false,
       hasCompletedSetup: false,
@@ -120,8 +117,7 @@ export const useUiStore = create<UiState>()(
       setIsAppearanceOpen: (open) => set({ isAppearanceOpen: open }),
       setIsHydrated: (hydrated) => set({ isHydrated: hydrated }),
       setIsDataHydrated: (hydrated) => set({ isDataHydrated: hydrated }),
-      setLlmApiKey: (key) => set({ llmApiKey: key }),
-      setLlmProvider: (provider) => set({ llmProvider: provider }),
+      setIsAiSettingsOpen: (open) => set({ isAiSettingsOpen: open }),
       setHasSeenTour: (seen) => set({ hasSeenTour: seen }),
       setIsSetupOpen: (open) => set({ isSetupOpen: open }),
       completeSetup: () => {
@@ -159,7 +155,10 @@ export const useUiStore = create<UiState>()(
       // A saved state may lack a field added later, or carry an unknown theme id: normalise
       // through readStoredPrefs instead of letting the shallow merge keep a bad value.
       merge: (persisted, current) => {
-        const saved = (persisted ?? {}) as Partial<UiState>;
+        // Older versions kept the AI key and provider here: move them to the AI settings
+        // (key "remembered on this device") before this store rewrites its storage.
+        migrateLegacyKey();
+        const { llmApiKey: _key, llmProvider: _provider, ...saved } = (persisted ?? {}) as Partial<UiState> & { llmApiKey?: unknown; llmProvider?: unknown };
         // After `migrate`, the saved state is in the current version's shape.
         const { setting, appearance } = readStoredPrefs(JSON.stringify({ state: saved, version: 4 }), [...THEME_IDS]);
         return { ...current, ...saved, themeSetting: setting, appearance };
@@ -169,8 +168,6 @@ export const useUiStore = create<UiState>()(
         hasCompletedSetup: state.hasCompletedSetup,
         themeSetting: state.themeSetting,
         appearance: state.appearance,
-        llmApiKey: state.llmApiKey,
-        llmProvider: state.llmProvider,
         activeView: state.activeView,
         hasAcknowledgedAiInsights: state.hasAcknowledgedAiInsights,
       }),

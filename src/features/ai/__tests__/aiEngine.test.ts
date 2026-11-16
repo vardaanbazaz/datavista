@@ -4,7 +4,7 @@ import { Dataset } from "@/shared/types";
 import { Query } from "@/shared/types/query";
 import { useFilterStore } from "@/store/filterStore";
 import { useChartStore } from "@/store/chartStore";
-import { useUiStore } from "@/store/uiStore";
+import { useAiSettingsStore } from "../settings/aiSettingsStore";
 
 function makeDataset(): Dataset {
   return {
@@ -63,11 +63,11 @@ describe("aiEngine.validateQueryColumns", () => {
 // filterStore and auto-create a chart in one unreviewable step (audit #22b). It's now
 // split into a preview step (generateAIQueryPreview, read-only) and a commit step
 // (applyAIQueryResult, called only once the user reviews and accepts the preview).
-// No API key is configured in these tests, so callLLM deterministically falls back to
+// No provider is connected in these tests, so the engine deterministically uses
 // the offline heuristic — no network mocking needed.
 describe("aiEngine query preview/apply split (item #8)", () => {
   beforeEach(() => {
-    useUiStore.setState({ llmApiKey: "", llmProvider: "gemini" });
+    useAiSettingsStore.setState({ providerId: "gemini", keys: {} });
     useFilterStore.setState({ filteredData: [] });
     useChartStore.setState({ charts: [] });
   });

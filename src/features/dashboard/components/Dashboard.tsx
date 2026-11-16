@@ -6,6 +6,7 @@ import { MainContent } from "@/app/layout/MainContent";
 import { FileUpload } from "@/features/upload/components/FileUpload";
 import { ImportDialog } from "@/features/upload/components/ImportDialog";
 import { DataPrivacyDialog } from "@/features/privacy/components/DataPrivacyDialog";
+import { AiSettingsHost } from "@/features/ai/components/AiSettingsHost";
 import { AppearancePanel } from "@/features/settings/components/AppearancePanel";
 import { SetupFlow, shouldOfferSetup } from "@/features/settings/components/SetupFlow";
 import { loadSampleDataset } from "@/features/datasets/sampleData";
@@ -413,6 +414,7 @@ export function Dashboard() {
       />
       <ImportDialog />
       <DataPrivacyDialog />
+      <AiSettingsHost />
       <AppearancePanel />
     </div>
   );

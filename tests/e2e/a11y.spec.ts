@@ -178,6 +178,17 @@ test("axe: dialogs (Light, Dark, high contrast)", async ({ page }) => {
     await page.keyboard.type("chart");
     await settle(page);
     await scan(page, `command palette ${t.name}`, found, "[role='dialog']");
+
+    // AI settings (opened from the palette's Connect a provider card), with the request preview shown.
+    await page.getByTestId("connect-provider-open").click();
+    const aiSettings = page.getByTestId("ai-settings-dialog");
+    await aiSettings.waitFor();
+    await page.getByTestId("ai-preview-button").click();
+    await page.getByTestId("ai-preview").waitFor();
+    await settle(page);
+    await scan(page, `AI settings ${t.name}`, found, "[data-testid='ai-settings-dialog']");
+    await page.keyboard.press("Escape");
+    await aiSettings.waitFor({ state: "hidden" });
     await page.keyboard.press("Escape");
     await palette.waitFor({ state: "hidden" });
 

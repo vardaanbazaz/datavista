@@ -41,8 +41,9 @@ import { useUiStore } from "@/store/uiStore";
 import { useDatasetStore } from "@/store/datasetStore";
 import { useDashboardStore } from "@/features/dashboards/store/dashboardStore";
 import { aiEngine } from "@/features/ai/aiEngine";
-import { AiSettingsModal } from "@/features/ai/components/AiSettingsModal";
-import { providerDisplayName } from "@/features/ai/providerDisplayName";
+import { ConnectProviderCard } from "@/features/ai/components/ConnectProviderCard";
+import { useAiConnected, useAiSettingsStore, useProviderLabel } from "@/features/ai/settings/aiSettingsStore";
+import { PRIVACY_LEVELS } from "@/features/ai/privacy/levels";
 import { AIResponse } from "@/features/ai/types";
 import { QueryResult } from "@/shared/types";
 import { toast } from "@/shared/hooks/use-toast";
@@ -72,7 +73,7 @@ export function CommandPalette({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isAiExecuting, setIsAiExecuting] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const setIsSettingsOpen = useUiStore((state) => state.setIsAiSettingsOpen);
   // Generated-but-unreviewed AI query result, awaiting an explicit Apply/Discard before
   // it's allowed to touch filterStore/chartStore.
   const [aiPreview, setAiPreview] = useState<{
@@ -86,8 +87,9 @@ export function CommandPalette({
   const commandMap = useCommandRegistry((state) => state.commands);
   const commands = useMemo(() => Object.values(commandMap), [commandMap]);
   const setActiveView = useUiStore((state) => state.setActiveView);
-  const llmApiKey = useUiStore((state) => state.llmApiKey);
-  const llmProvider = useUiStore((state) => state.llmProvider);
+  const aiConnected = useAiConnected();
+  const providerLabel = useProviderLabel();
+  const privacyLabel = useAiSettingsStore((state) => PRIVACY_LEVELS.find((l) => l.id === state.privacy.level)?.label ?? "");
   const activeDataset = useDatasetStore((state) => state.activeDataset);
   const datasets = useDatasetStore((state) => state.datasets);
   const selectDataset = useDatasetStore((state) => state.selectDataset);
@@ -436,6 +438,12 @@ export function CommandPalette({
             </div>
           )}
 
+          {!isAiExecuting && !aiPreview && !aiConnected && query.trim().length > 0 && (
+            <div className="px-3 pt-3">
+              <ConnectProviderCard feature="questions about your data" />
+            </div>
+          )}
+
           {!isAiExecuting && !aiPreview && (
             <ScrollArea className="max-h-[300px] overflow-y-auto overflow-x-hidden p-3">
               {flatUnifiedItems.length === 0 ? (
@@ -454,9 +462,9 @@ export function CommandPalette({
                       <div id="command-group-1" className="px-2 py-1 text-caption font-semibold text-primary-ink flex items-center gap-1.5">
                         <Sparkles className="h-3.5 w-3.5 text-primary-ink" /> AI Natural Language Query
                       </div>
-                      {llmApiKey && llmApiKey.trim() !== "" && (
+                      {aiConnected && (
                         <p className="px-2 pb-1 text-xs text-muted-foreground">
-                          Sends this dataset's column names and sample values to {providerDisplayName(llmProvider)}.
+                          Sends your question and this dataset&apos;s {privacyLabel.toLowerCase()} (privacy level in AI settings) to {providerLabel}.
                         </p>
                       )}
                       {(() => {
@@ -762,10 +770,6 @@ export function CommandPalette({
         </DialogContent>
       </Dialog>
 
-      <AiSettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-      />
     </>
   );
 }

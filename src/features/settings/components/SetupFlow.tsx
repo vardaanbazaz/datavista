@@ -5,9 +5,10 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { cn } from "@/shared/lib/utils";
-import { useUiStore, DEFAULT_APPEARANCE, DEFAULT_THEME_SETTING, type LlmProvider, type TextSize } from "@/store/uiStore";
+import { useUiStore, DEFAULT_APPEARANCE, DEFAULT_THEME_SETTING, type TextSize } from "@/store/uiStore";
 import { motionIsReduced, prefersReducedMotion, transparencyBlockedReason } from "@/shared/theme/displayPrefs";
-import { providerDisplayName } from "@/features/ai/providerDisplayName";
+import { PROVIDERS, getProvider } from "@/features/ai/providers/registry";
+import { useAiSettingsStore } from "@/features/ai/settings/aiSettingsStore";
 import { loadSampleDataset } from "@/features/datasets/sampleData";
 import { AutomaticOptions, Choice, ModeCards, ThemeGroups, Toggle, type Option } from "./appearanceControls";
 
@@ -82,10 +83,14 @@ export function SetupFlow() {
   const appearance = useUiStore((s) => s.appearance);
   const setAppearance = useUiStore((s) => s.setAppearance);
   const setSetting = useUiStore((s) => s.setThemeSetting);
-  const llmApiKey = useUiStore((s) => s.llmApiKey);
-  const llmProvider = useUiStore((s) => s.llmProvider);
-  const setLlmApiKey = useUiStore((s) => s.setLlmApiKey);
-  const setLlmProvider = useUiStore((s) => s.setLlmProvider);
+  const providerId = useAiSettingsStore((s) => s.providerId);
+  const savedKeys = useAiSettingsStore((s) => s.keys);
+  const remembered = useAiSettingsStore((s) => s.remembered);
+  const setProvider = useAiSettingsStore((s) => s.setProvider);
+  const setAiKey = useAiSettingsStore((s) => s.setKey);
+  const provider = getProvider(providerId);
+  const savedKey = savedKeys[providerId] ?? "";
+  const providerSelectId = useId();
   const [step, setStep] = useState<Step>("look");
   const [key, setKey] = useState("");
   const keyId = useId();
@@ -94,7 +99,7 @@ export function SetupFlow() {
   useEffect(() => {
     if (open) {
       setStep("look");
-      setKey(llmApiKey);
+      setKey(savedKey);
     }
     // Only when the dialog opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -105,12 +110,13 @@ export function SetupFlow() {
     setOpen(false);
   };
   const saveKey = () => {
-    if (key.trim() !== llmApiKey) setLlmApiKey(key.trim());
+    // Kept for this session unless already remembered; "Remember on this device" is in AI settings.
+    if (key.trim() !== savedKey) setAiKey(providerId, key, !!remembered[providerId]);
   };
   const recommended = () => {
     if (index <= 0) setSetting(DEFAULT_THEME_SETTING);
     if (index <= 1) setAppearance(DEFAULT_APPEARANCE);
-    if (index === 2) setKey(llmApiKey);
+    if (index === 2) setKey(savedKey);
     setStep("done");
   };
   const next = () => {
@@ -188,38 +194,51 @@ export function SetupFlow() {
 
         {step === "ai" && (
           <div className="space-y-4" data-testid="setup-step-ai">
-            <Choice<LlmProvider>
-              legend="Provider"
-              name="setup-provider"
-              columns={2}
-              options={[
-                { value: "gemini", label: providerDisplayName("gemini") },
-                { value: "openai", label: providerDisplayName("openai") },
-              ]}
-              value={llmProvider}
-              onChange={setLlmProvider}
-            />
             <div className="space-y-1.5">
-              <label htmlFor={keyId} className="flex items-center gap-1.5 text-sm font-semibold">
-                <KeyRound className="h-4 w-4 text-primary-ink" aria-hidden />
-                API key
+              <label htmlFor={providerSelectId} className="text-sm font-semibold">
+                Provider
               </label>
-              <Input
-                id={keyId}
-                type="password"
-                autoComplete="off"
-                value={key}
-                onChange={(e) => setKey(e.target.value)}
-                placeholder={llmProvider === "gemini" ? "AIzaSy..." : "sk-..."}
-                data-testid="setup-api-key"
-              />
+              <select
+                id={providerSelectId}
+                value={providerId}
+                onChange={(e) => {
+                  setProvider(e.target.value);
+                  setKey(savedKeys[e.target.value] ?? "");
+                }}
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                data-testid="setup-provider"
+              >
+                {PROVIDERS.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-frame-muted">{provider.setupNote}</p>
             </div>
+            {provider.keyRequired && (
+              <div className="space-y-1.5">
+                <label htmlFor={keyId} className="flex items-center gap-1.5 text-sm font-semibold">
+                  <KeyRound className="h-4 w-4 text-primary-ink" aria-hidden />
+                  API key
+                </label>
+                <Input
+                  id={keyId}
+                  type="password"
+                  autoComplete="off"
+                  value={key}
+                  onChange={(e) => setKey(e.target.value)}
+                  placeholder="Paste your key"
+                  data-testid="setup-api-key"
+                />
+              </div>
+            )}
             <div className="flex items-start gap-3 rounded-xl border border-border p-3 text-sm" data-testid="setup-privacy-note">
               <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary-ink" aria-hidden />
               <p className="text-frame-muted">
                 <span className="font-medium text-foreground">Your data stays in this browser.</span> Files are read and stored here, not
-                uploaded. The key is saved in this browser's local storage (not encrypted) until you remove it in AI settings or with Data &amp; privacy → Clear all local data. When you use an AI feature, your question and
-                the dataset's column names, types and first few values are sent to {providerDisplayName(llmProvider)}.
+                uploaded. The key is kept for this browser session only (choose &quot;Remember on this device&quot; in AI settings to keep it). When you use an AI feature, your question and
+                the dataset&apos;s column names, types, numeric stats and top values (the default privacy level, changeable in AI settings; personal-data columns masked) are sent to {provider.label}.
               </p>
             </div>
           </div>

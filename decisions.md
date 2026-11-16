@@ -2,6 +2,41 @@
 
 Newest first. Entries marked `Source: inferred` were reconstructed from existing code; their "Why" is a guess and should be corrected by the author.
 
+### 2026-11-16 — AI provider registry and one fetch client for three API styles
+- **Decision:** `src/features/ai/providers/registry.json` (data) + `registry.ts` (types): OpenAI, Anthropic, Gemini, OpenRouter, Groq, Mistral, DeepSeek, Together, Ollama, LM Studio, Custom (any OpenAI-compatible base URL). One client, `src/features/ai/client/` (plain `fetch`, no SDKs): `chat(messages, { model, stream, tools, json, onText })` with request/response/SSE handling per style (openai-compatible, anthropic, gemini) and typed errors (`blocked`, `bad-key`, `model-not-found`, `rate-limited`, `other`). Tools are accepted and put in each style's request shape; no feature uses them yet. `response_format: json_object` only for providers known to accept it (OpenAI, Groq, Mistral, DeepSeek, Together, OpenRouter); local and custom servers get the JSON instruction in the prompt only, and `aiEngine.cleanJsonString` keeps the outermost `{...}`. Timeouts: 60 s whole request, or 30 s idle between stream chunks (the old 30 s whole-request limit would cut long streams). Request options come from one function, `aiRequests.ts:requestOptions(kind, model, style)`, used by the features and by "Test connection", so a passing test means the features work; openai-compatible requests carry no `temperature` or `max_tokens` (newer OpenAI reasoning models reject both), anthropic/gemini keep 0.1/1500 (query, formula) and 0.3/400 (summary). The previous `llmService.ts:callLLM` / `fetchWithTimeout` were removed; `llmService.ts` keeps the system prompt and offline heuristic. Default models stay `gemini-flash-latest` / `gpt-4o-mini`, so migrated users get the same model.
+- **Why:** User request (Run A): many providers, one client, streaming, typed errors, no vendor SDKs, lazy-loaded.
+- **Alternatives considered:** Vendor SDKs or the Vercel AI SDK (rejected: user asked for plain fetch; SDK weight in the bundle); registry as a TS literal (rejected: the browser-access script must write results back, JSON is safe to rewrite).
+- **Tradeoff accepted:** Gemini invalid-key detection relies on the 400 body text (`API_KEY_INVALID` / "API key not valid"), checked against the documented error format, not against a live bad key. Anthropic `max_tokens` defaults to 1024. Suggested model lists will age; "Load models" and free text cover it.
+- **Source:** `made-now`
+
+### 2026-11-16 — Browser access checked by a local script, written into the registry
+- **Decision:** `scripts/ai/check-browser-access.mjs` (not in the app, no keys) sends each hosted provider a CORS preflight with Origin `https://vardaanbazaz.github.io` and the headers the app sends, then an unauthenticated POST to the same chat endpoint. "ok" only when the preflight allows the origin, POST and every header (a `*` does not count for Authorization) and the POST response (401/403) also carries `Access-Control-Allow-Origin`; otherwise "needs-proxy" (still selectable, with a warning in settings). Run 2026-11-16: all eight hosted providers "ok" (OpenAI, Anthropic, Gemini 403 without a key, OpenRouter, Groq, Mistral, DeepSeek, Together). Ollama / LM Studio are "local" with notes on `OLLAMA_ORIGINS` and LM Studio's CORS switch; Custom is "unchecked".
+- **Why:** User request; a provider that blocks browsers would fail with a CORS error users can't diagnose.
+- **Alternatives considered:** Checking from the app at runtime (rejected: would send requests before the user connects); trusting docs (rejected: CORS policies change).
+- **Tradeoff accepted:** Results are a dated snapshot; rerun the script to refresh.
+- **Source:** `made-now`
+
+### 2026-11-16 — AI key kept for the session by default, outside every persisted store
+- **Decision:** Keys live only in `src/features/ai/settings/keyStorage.ts`: sessionStorage `datavista-ai-keys` by default, localStorage `datavista-ai-keys` with the opt-in "Remember on this device" (one-line warning: unencrypted, readable by anyone using this browser profile); "Forget key" removes both. `aiSettingsStore` (persisted `datavista-ai-settings`) holds provider, model, base URL and privacy settings, and keeps keys in memory only (`partialize` leaves them out). `uiStore` no longer has `llmApiKey`/`llmProvider`. An old key (`datavista-ui-storage`.state.llmApiKey) is moved to "remembered" (same device-wide storage it already had) by `migrateLegacyKey`, run from `uiStore`'s `merge` and at `aiSettingsStore` load (idempotent, so module order doesn't matter), and a toast says so once (`datavista-ai-key-migrated`). "Clear all local data" also clears `datavista*` sessionStorage keys. AI settings is one dialog (`AiSettingsHost` in `Dashboard`, lazy `AiSettingsModal`), opened via `uiStore.setIsAiSettingsOpen`.
+- **Why:** User request: session-only by default, opt-in remember, never in IndexedDB, exports, PDFs, logs or errors; don't silently drop an existing key.
+- **Alternatives considered:** Keeping the key in `uiStore` (rejected: any future serialization of the store would leak it); encrypting at rest (rejected: the decryption key would sit beside it in the same origin).
+- **Tradeoff accepted:** Users who don't tick "Remember" re-enter the key per tab/session. First-run setup saves the key for the session only (remember is in AI settings).
+- **Source:** `made-now`
+
+### 2026-11-16 — AI privacy levels with one context builder and a personal-data guard
+- **Decision:** `src/features/ai/privacy/contextBuilder.ts:buildAiContext(dataset, settings, {rows})` is the only source of dataset content in AI requests (query, formula, executive summary, settings preview). Levels (per app, default Summaries): Schema (column names + types + calculated-field formulas), Summaries (+ numeric min/max/mean/missing/distinct and top 5 values of text columns), Sample rows (+ first N rows, 20–200). `privacy/pii.ts:detectPii` flags emails, phones and person names by column name and by value (≥50% emails, ≥60% phones, ≥60% "Firstname Lastname" with ≥80% distinct); numeric and date columns are never flagged by value. Flagged columns are masked (`[masked email]`…) in top values and sample rows at every level unless the user ticks "Send unmasked". The executive summary's filter values and unusual-value labels pass through `valueForAi` (masked, or left out at Schema). "Preview what will be sent" builds the real request (`aiRequests.ts:previewNextRequest` → the same message builder and `client/styles.ts:buildRequest`), key shown as •••. Disclosure text in AI settings, setup, command palette, formula builder and summary consent now describes the level instead of "first 5 rows".
+- **Why:** User request; DPDP: notice at the collection point and data minimisation.
+- **Alternatives considered:** Masking by name only (rejected: misses `Contact` columns full of emails); dropping masked columns entirely (rejected: the model needs their names to write queries).
+- **Tradeoff accepted:** The default Summaries level sends more than the old executive summary (stats and top values) but less than the old query context (no rows). Value-based name detection can mask product-like columns of two capitalised words; the user can unmask. Unmask choices are per column name, app-wide.
+- **Source:** `made-now`
+
+### 2026-11-16 — No provider connected: Connect card, offline heuristics kept, no request
+- **Decision:** `isAiConnected` (key present, or keyless Ollama / LM Studio; base URL and model set) gates every AI request. When not connected, the command palette and formula builder show `ConnectProviderCard` (opens AI settings) and still run the local offline heuristic (`llmService.ts:generateOfflineFallback`); the executive summary's offline insights are unchanged. A keyless local provider counts as connected, so the summary's one-time consent applies to it too.
+- **Why:** User request: no key → no request; AI features point to settings; offline insights unchanged.
+- **Alternatives considered:** Hiding the offline query heuristic behind the card (rejected: removes a working offline feature and breaks existing tests for no privacy gain, it sends nothing).
+- **Tradeoff accepted:** The palette shows both the card and the offline "Ask AI" option.
+- **Source:** `made-now`
+
 ### 2026-11-16 — Data Explorer numeric stats use the Overview's NumericSummaryTable
 - **Decision:** `DataTable.tsx` "Numeric columns" renders `features/dashboard/components/NumericSummary.tsx:NumericSummaryTable` with the same `profileNumericColumns` profiles of the shown (filtered) rows it already computed, replacing the per-column Count/Min/Max/Mean boxes. E2E helper `tests/e2e/helpers.ts:numericStat(page, column, stat)` reads a cell by header; specs that read `column-stats-*` now read `numeric-row-*`.
 - **Why:** User request: the boxes printed raw `toFixed(2)` values ("78158306.00"); the table already sorts, groups thousands and trims decimals (max 2), and one component keeps both views consistent.
@@ -488,6 +523,7 @@ Newest first. Entries marked `Source: inferred` were reconstructed from existing
 - **Source:** `made-now`
 
 ### 2026-10-29 — Privacy notice on upload; AI disclosure lists what is sent
+- **Superseded (AI part) by:** "AI privacy levels with one context builder and a personal-data guard" (2026-11-16).
 - **Decision:** Upload panel: data is read and stored in this browser, kept until deleted (dataset menu, or Clear all local data), and AI features with your own key send some of it to the provider. AI settings list, from `llmService.ts` contextMessage and `summaryEngine.ts`: query/formula → prompt, dataset name, each column's name, type, first-5-row sample values, min/max, distinct count, calculated fields' names and formulas; executive summary → dataset name, row/chart counts, column names and types, active filters with their values, anomaly descriptions. `metadata` sits in the context object but is not serialized. The key is stored in this browser's localStorage, unencrypted, and sent only to that provider (Gemini: `x-goog-api-key` header).
 - **Why:** DPDP checklist: notice at the collection point, retention and deletion, and what leaves the device.
 - **Tradeoff accepted:** None.
@@ -907,6 +943,7 @@ Newest first. Entries marked `Source: inferred` were reconstructed from existing
 - **Source:** `inferred`
 
 ### Zustand stores, some persisted to localStorage
+- **Superseded (API key part) by:** "AI key kept for the session by default, outside every persisted store" (2026-11-16).
 - **Decision:** App state in Zustand stores (`src/store/`, `src/features/dashboards/store/`); `uiStore` uses `persist` (`datavista-ui-storage`) for preferences including the LLM API key.
 - **Why:** Likely: minimal boilerplate compared with Redux, selector-based subscriptions.
 - **Alternatives considered:** Unknown.
@@ -935,6 +972,7 @@ Newest first. Entries marked `Source: inferred` were reconstructed from existing
 - **Source:** `inferred`
 
 ### Optional direct browser calls to LLM providers (Gemini default)
+- **Superseded by:** "AI provider registry and one fetch client for three API styles" (2026-11-16).
 - **Decision:** `src/features/ai/llmService.ts:callLLM` calls the provider API directly from the browser using a user-supplied key.
 - **Why:** Likely: no backend to proxy requests; users bring their own key.
 - **Alternatives considered:** Server-side proxy.

@@ -17,10 +17,13 @@ Normally, when you upload a spreadsheet to a data tool, your private data is sen
 Simply drag and drop a CSV or Excel file, and you instantly get access to interactive pivot tables, statistical analysis, complex formula parsing, and an AI Co-Pilot—all running at lightning speed directly on your device.
 
 > **Privacy note:** everything above runs fully offline — except the AI
-> Co-Pilot. If you add a Gemini/OpenAI API key and use natural-language
-> queries or AI formula generation, sample values from your dataset's
-> columns are sent to that provider to generate a response. Skip AI
-> features and nothing ever leaves your device.
+> Co-Pilot. If you connect an AI provider and use natural-language queries,
+> AI formulas or AI summaries, what your privacy level allows (column names
+> and types; by default also numeric stats and top values; optionally sample
+> rows) is sent to that provider. Columns that look like emails, phone numbers
+> or names are masked by default, and AI settings shows a preview of the exact
+> request. Your key is kept for the session unless you choose to remember it.
+> Skip AI features and nothing ever leaves your device.
 
 ---
 
@@ -29,7 +32,7 @@ Simply drag and drop a CSV or Excel file, and you instantly get access to intera
 * **Offline-First Storage**: Utilizes IndexedDB (via Dexie) to locally store, version, and manage massive datasets without requiring a backend database.
 * **Custom AST Formula Parser**: A recursive-descent parser that evaluates Excel-style calculated fields and window functions on the fly.
 * **Unified Query & Pivot Engine**: A multidimensional framework-agnostic engine allowing users to group data by Rows, Columns, and Values with complex aggregations.
-* **AI Co-Pilot Integration**: Connects directly to LLM APIs (Google Gemini, OpenAI GPT-4o) for natural language data querying and automated anomaly detection.
+* **AI Co-Pilot Integration**: Bring your own provider (OpenAI, Anthropic, Gemini, OpenRouter, Groq, Mistral, DeepSeek, Together, a local Ollama or LM Studio, or any OpenAI-compatible server), called directly from the browser, for natural language data querying, formulas and summaries.
 * **Enterprise UX**: Features a robust 14-step guided product tour (`react-joyride`), global command palette (`⌘K`), and strict Tailwind dark-mode constraints.
 
 ---
@@ -74,8 +77,8 @@ graph TD
     end
 
     subgraph External AI APIs
-        K[Google Gemini API]
-        L[OpenAI GPT-4o API]
+        K[Hosted LLM APIs: OpenAI / Anthropic / Gemini / OpenRouter / ...]
+        L[Local LLM: Ollama / LM Studio]
     end
 
     %% Flow connections
@@ -126,7 +129,7 @@ Follow these simple steps to explore and analyze your datasets with DataVista:
 8. **Window Functions & Rankings**:
    - Use **Window Functions** to run rolling calculations, moving averages, cumulative sums, and row rankings (`ROW_NUMBER`, `RANK`, `DENSE_RANK`).
 9. **AI Co-Pilot Assistance**:
-   - Click the **AI Co-Pilot (Sparkles icon)** in the top header to configure your Gemini or GPT-4o API key — a status banner always shows whether AI is Active or running in Offline heuristic mode.
+   - Open **AI settings** (the gear in the command palette, or any "Connect a provider" card) to pick a provider, paste a key, choose a model ("Load models"), and "Test connection". Choose what requests may include (Schema, Summaries or Sample rows) and preview the exact request. A status banner shows whether AI is connected or running offline.
    - Natural-language queries are staged as a **preview** first; review the proposed filter/result before applying it or discarding it.
 10. **Exporting Data & Reports**:
     - Visit **Export** to download processed datasets as CSVs, export individual charts as PNG or SVG images, or generate a full PDF report.

@@ -10,11 +10,11 @@ import { Settings, Plus, Trash2, HelpCircle, AlertTriangle, Code, Sparkles, Load
 import { Hint } from "@/shared/components/Hint";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/components/ui/tooltip";
 import { useDatasetStore } from "@/store/datasetStore";
-import { useUiStore } from "@/store/uiStore";
 import { formulaEngine } from "@/shared/services/formulaEngine";
 import { allFunctions } from "@/shared/services/formula/library";
 import { aiEngine } from "@/features/ai/aiEngine";
-import { providerDisplayName } from "@/features/ai/providerDisplayName";
+import { ConnectProviderCard } from "@/features/ai/components/ConnectProviderCard";
+import { useAiConnected, useProviderLabel } from "@/features/ai/settings/aiSettingsStore";
 import { toast } from "@/shared/hooks/use-toast";
 
 interface CalculatedFieldsManagerProps {
@@ -25,8 +25,8 @@ export function CalculatedFieldsManager({ trigger }: CalculatedFieldsManagerProp
   const activeDataset = useDatasetStore((state) => state.activeDataset);
   const addCalculatedField = useDatasetStore((state) => state.addCalculatedField);
   const deleteCalculatedField = useDatasetStore((state) => state.deleteCalculatedField);
-  const llmApiKey = useUiStore((state) => state.llmApiKey);
-  const llmProvider = useUiStore((state) => state.llmProvider);
+  const aiConnected = useAiConnected();
+  const providerLabel = useProviderLabel();
 
   const [isOpen, setIsOpen] = useState(false);
   const [fieldName, setFieldName] = useState("");
@@ -179,10 +179,12 @@ export function CalculatedFieldsManager({ trigger }: CalculatedFieldsManagerProp
                   </TooltipContent>
                 </Tooltip>
               </div>
-              {llmApiKey && llmApiKey.trim() !== "" && (
+              {aiConnected ? (
                 <p className="text-xs text-muted-foreground">
-                  Sends column names and sample data to {providerDisplayName(llmProvider)}.
+                  Sends your request and what the privacy level in AI settings allows to {providerLabel}.
                 </p>
+              ) : (
+                <ConnectProviderCard feature="formulas" />
               )}
               {aiError && (
                 <p className="text-xs text-destructive font-medium">{aiError}</p>
