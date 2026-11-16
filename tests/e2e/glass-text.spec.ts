@@ -7,7 +7,7 @@ import { test, expect, type Page } from "@playwright/test";
  * glass (nearest painted surface is .surface-glass / .surface-float) in any other colour, e.g.
  * data-only muted text, or text faded with an opacity modifier, which the audit cannot vouch for.
  * Light, a mid-tone (Clay) and a dark mid-tone (Dusk), with the HR fixture. Also fails on any
- * endless animation running at idle (default settings: Background animation off).
+ * endless animation running at idle.
  */
 
 const VIEWS = ["overview", "upload", "filters", "charts", "data", "pivot", "stats", "window-builder", "export"] as const;
@@ -26,7 +26,7 @@ async function open(page: Page, theme: string) {
           hasSeenTour: true,
           hasCompletedSetup: true,
           themeSetting: { mode: "fixed", theme: t, day: "light", night: "dark", trigger: "device", dayStart: "07:00", nightStart: "19:00" },
-          appearance: { textSize: "default", highContrast: false, motion: "reduce", transparency: true, backgroundAnimation: false },
+          appearance: { textSize: "default", highContrast: false, motion: "reduce", transparency: true },
         },
         version: 3,
       })

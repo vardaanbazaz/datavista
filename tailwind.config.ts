@@ -129,6 +129,11 @@ export default {
 					from: { opacity: '0', transform: 'translateY(10px)' },
 					to: { opacity: '1', transform: 'translateY(0)' }
 				},
+				// View enter: opacity only and short, so switching views (and the tour) never waits on it.
+				'view-in': {
+					from: { opacity: '0' },
+					to: { opacity: '1' }
+				},
 				'slide-in-right': {
 					from: { transform: 'translateX(100%)' },
 					to: { transform: 'translateX(0)' }
@@ -146,6 +151,7 @@ export default {
 				'accordion-down': 'accordion-down 0.2s ease-out',
 				'accordion-up': 'accordion-up 0.2s ease-out',
 				'fade-in': 'fade-in 0.3s ease-out',
+				'view-in': 'view-in 0.15s ease-out',
 				'slide-in-right': 'slide-in-right 0.3s ease-out',
 				'chart-animate': 'chart-animate 0.4s ease-out',
 				'pulse-glow': 'pulse-glow 2s ease-in-out infinite'

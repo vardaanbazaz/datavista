@@ -1,4 +1,5 @@
 import { Dataset, DatasetMetadata, ChartConfig } from "@/shared/types";
+import { plural } from "@/shared/utils/plural";
 
 export interface ColumnTypeChange {
   columnName: string;
@@ -73,7 +74,7 @@ export function generateSchemaDiff(
       affectedCharts.push({
         chartId: chart.id,
         chartTitle: chart.title,
-        reason: `Uses removed column(s): ${missingUsed.join(", ")}`,
+        reason: `Uses removed ${plural(missingUsed.length, "column")}: ${missingUsed.join(", ")}`,
       });
     } else if (changedTypeUsed.length > 0) {
       const tcDetails = changedTypeUsed
@@ -86,7 +87,7 @@ export function generateSchemaDiff(
       affectedCharts.push({
         chartId: chart.id,
         chartTitle: chart.title,
-        reason: `Uses modified data type column(s): ${tcDetails}`,
+        reason: `Uses ${plural(changedTypeUsed.length, "a column whose data type changed", "columns whose data type changed")}: ${tcDetails}`,
       });
     }
   });

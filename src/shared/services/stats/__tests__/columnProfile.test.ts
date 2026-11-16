@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { profileNumericColumns, numericStatRole } from "../columnProfile";
+import { profileNumericColumns, numericStatRole, roleLabel, constantText } from "../columnProfile";
 import type { Dataset } from "@/shared/types";
 
 const rows = [
@@ -47,5 +47,28 @@ describe("profileNumericColumns", () => {
     expect(profiles.EmployeeCount.role).toBe("constant");
     expect(profiles.Score.role).toBe("constant");
     expect(numericStatRole(null, "CustomerID", 7, 7, 3)).toBe("constant");
+  });
+});
+
+describe("constant: whole dataset vs filtered rows", () => {
+  const ds = datasetWith(["Age", "EmployeeCount"]);
+  it("unfiltered: a one-value column is constant for the dataset", () => {
+    const p = profileNumericColumns(rows, ["EmployeeCount"], ds)[0];
+    expect(p.constantIn).toBe("dataset");
+    expect(roleLabel(p.role, p.constantIn)).toBe("constant");
+    expect(constantText(p, "1")).toBe("constant: 1");
+  });
+  it("filtered to one Age value: 'same value in the N rows shown', no constant tag", () => {
+    const shown = [rows[0]];
+    const p = profileNumericColumns(shown, ["Age"], ds)[0];
+    expect(p.role).toBe("constant");
+    expect(p.constantIn).toBe("shown");
+    expect(roleLabel(p.role, p.constantIn)).toBeNull();
+    expect(constantText(p, "30")).toBe("same value in the 1 row shown: 30");
+    expect(constantText({ ...p, count: 4 }, "4.1")).toBe("same value in the 4 rows shown: 4.1");
+  });
+  it("filtered, but the column has one value in every row: still constant", () => {
+    const p = profileNumericColumns([rows[0], rows[1]], ["EmployeeCount"], ds)[0];
+    expect(p.constantIn).toBe("dataset");
   });
 });

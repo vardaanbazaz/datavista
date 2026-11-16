@@ -23,8 +23,21 @@ import { KPICardConfig } from "../types";
 import { AggregationOperator, ConditionalFormatRule } from "@/shared/types";
 import { ConditionalFormattingBuilder } from "@/features/dashboards/components/ConditionalFormattingBuilder";
 import { getEffectiveColumnTypes } from "@/shared/utils/columnType";
-import { aggregationFlag, aggregationNote } from "@/shared/utils/columnRoles";
+import { aggregationFlag, aggregationNote, aggregationsForColumn, defaultAggregationForColumn, defaultMeasureColumn } from "@/shared/utils/columnRoles";
 import { Palette } from "lucide-react";
+import { countOf } from "@/shared/utils/plural";
+
+const AGGREGATION_LABELS: Partial<Record<AggregationOperator, string>> = {
+  sum: "Sum",
+  avg: "Average",
+  count: "Count",
+  count_rows: "Count of rows",
+  count_distinct: "Distinct count",
+  min: "Minimum",
+  max: "Maximum",
+  median: "Median",
+  stddev: "Std. deviation (sample)",
+};
 
 interface KPIBuilderProps {
   isOpen: boolean;
@@ -71,7 +84,13 @@ export function KPIBuilder({ isOpen, onClose, onSave, editKpi = null, saveNote }
     if (editKpi) {
       setTitle(editKpi.title);
       setMetricCol(editKpi.primaryMetric.column);
-      setAggregation(editKpi.primaryMetric.aggregation);
+      // A card saved before counts-only for categorical columns (e.g. Sum of "Invoice") opens with a valid choice.
+      const saved = editKpi.primaryMetric.aggregation;
+      setAggregation(
+        aggregationsForColumn(dataset, editKpi.primaryMetric.column).includes(saved)
+          ? saved
+          : defaultAggregationForColumn(dataset, editKpi.primaryMetric.column)
+      );
       setAggregationTouched(true);
       setPolarity(editKpi.polarity);
       setEnableTrend(!!editKpi.trendConfiguration);
@@ -87,8 +106,9 @@ export function KPIBuilder({ isOpen, onClose, onSave, editKpi = null, saveNote }
     } else {
       // Defaults for new KPI card
       setTitle("");
-      setMetricCol(allColumns[0] || "");
-      setAggregation("sum");
+      const measure = defaultMeasureColumn(dataset) ?? "";
+      setMetricCol(measure);
+      setAggregation(defaultAggregationForColumn(dataset, measure));
       setAggregationTouched(false);
       setPolarity("positive");
       setEnableTrend(false);
@@ -97,7 +117,7 @@ export function KPIBuilder({ isOpen, onClose, onSave, editKpi = null, saveNote }
       setEnableSparkline(true);
       setFormattingRules([]);
     }
-  }, [editKpi, isOpen, allColumns, dateColumns]);
+  }, [editKpi, isOpen, dataset, dateColumns]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -161,7 +181,12 @@ export function KPIBuilder({ isOpen, onClose, onSave, editKpi = null, saveNote }
                   value={metricCol}
                   onValueChange={(col) => {
                     setMetricCol(col);
-                    if (!aggregationTouched) setAggregation(aggregationFlag(dataset, col) ? "count" : "sum");
+                    const allowed = aggregationsForColumn(dataset, col);
+                    // Keep a picked aggregation only if it still fits the new column (no Sum of a text column).
+                    if (!aggregationTouched || !allowed.includes(aggregation)) {
+                      setAggregation(defaultAggregationForColumn(dataset, col));
+                      setAggregationTouched(false);
+                    }
                   }}
                 >
                   <SelectTrigger id="metric-col">
@@ -190,14 +215,11 @@ export function KPIBuilder({ isOpen, onClose, onSave, editKpi = null, saveNote }
                     <SelectValue placeholder="Select agg" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="sum">Sum</SelectItem>
-                    <SelectItem value="avg">Average</SelectItem>
-                    <SelectItem value="count">Count</SelectItem>
-                    <SelectItem value="count_rows">Count of rows</SelectItem>
-                    <SelectItem value="min">Minimum</SelectItem>
-                    <SelectItem value="max">Maximum</SelectItem>
-                    <SelectItem value="median">Median</SelectItem>
-                    <SelectItem value="stddev">Std. deviation (sample)</SelectItem>
+                    {aggregationsForColumn(dataset, metricCol).map((op) => (
+                      <SelectItem key={op} value={op}>
+                        {AGGREGATION_LABELS[op]}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 {aggregationNote(aggregationFlag(dataset, metricCol), aggregation) && (
@@ -297,7 +319,7 @@ export function KPIBuilder({ isOpen, onClose, onSave, editKpi = null, saveNote }
                 <Label className="text-sm font-semibold">Conditional Formatting</Label>
                 {formattingRules.length > 0 && (
                   <span className="text-xs text-success font-medium">
-                    {formattingRules.length} rule(s) configured
+                    {countOf(formattingRules.length, "rule")} configured
                   </span>
                 )}
               </div>

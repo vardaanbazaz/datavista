@@ -27,9 +27,9 @@ test.describe("first-run setup", () => {
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
     await page.getByTestId("setup-next").click();
 
-    // 2. Effects: animation is off by default; turn transparency off and text size up.
+    // 2. Effects: no background-animation option (removed); turn transparency off and text size up.
     await expect(page.getByTestId("setup-step-effects")).toBeVisible();
-    await expect(page.getByTestId("setup-background-animation")).not.toBeChecked();
+    await expect(page.getByTestId("setup-background-animation")).toHaveCount(0);
     await expect(page.getByTestId("setup-preview")).toBeVisible();
     await page.getByTestId("setup-transparency").uncheck();
     await expect(page.locator("html")).toHaveAttribute("data-transparency", "off");
@@ -60,7 +60,7 @@ test.describe("first-run setup", () => {
     await expect(page.getByTestId("setup-flow")).toBeVisible();
     await page.getByTestId("setup-recommended").click();
     await expect(page.getByTestId("setup-step-done")).toBeVisible();
-    await expect(page.locator("html")).toHaveAttribute("data-animation", "off");
+    await expect(page.locator("html")).not.toHaveAttribute("data-animation", /.*/);
     await page.getByTestId("setup-close").click();
     await expect(page.getByTestId("setup-flow")).toBeHidden();
     await page.reload();

@@ -3,7 +3,7 @@ import { logoShapes } from "@/shared/brand/logoGeometry";
 import { saveAs } from 'file-saver';
 import jsPDF from 'jspdf';
 import { ChartConfig, DataRow, Dataset } from '@/shared/types';
-import { profileNumericColumns } from '@/shared/services/stats/columnProfile';
+import { constantText, profileNumericColumns } from '@/shared/services/stats/columnProfile';
 import { columnsOfType } from "@/shared/utils/columnType";
 
 /**
@@ -239,7 +239,7 @@ export const buildPDFReport = async (
       }
       const line =
         p.role === 'constant'
-          ? `${p.column}: constant: ${p.min}`
+          ? `${p.column}: ${constantText(p, String(p.min))}`
           : p.role === 'id' || p.role === 'year'
             ? `${p.column} (${p.role === 'id' ? 'ID' : 'year'}): Count=${p.count}, Distinct=${p.distinct}, Min=${p.min}, Max=${p.max}`
             : `${p.column}: Min=${p.min.toFixed(2)}, Max=${p.max.toFixed(2)}, Avg=${p.mean.toFixed(2)}`;

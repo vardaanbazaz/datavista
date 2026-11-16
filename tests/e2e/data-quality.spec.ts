@@ -40,7 +40,8 @@ test("sentinel prompt: Yes makes -1 missing in Founded (Glassdoor fixture)", asy
   await expect(page.getByTestId("column-stats-Founded")).toContainText("Mean: 1977.95");
   await expect(page.getByTestId("column-stats-Founded")).toContainText("Count: 21");
   await expect(prompt).toHaveCount(0);
-  await expect(page.getByTestId("fix-badge-Founded")).toContainText("-1 treated as missing");
+  await expect(page.getByTestId("fix-badge-Founded")).toHaveText("-1 → missing · undo");
+  await expect(page.getByTestId("fix-badge-Founded")).toHaveAttribute("aria-label", /-1 treated as missing/);
 
   // Survives a reload (rows rewritten with the fix, originals kept)…
   await page.waitForTimeout(1500);
@@ -78,7 +79,10 @@ test("currency: Price converts from $ on import, with a badge and undo; duplicat
   await expect(page.getByTestId("column-stats-Price")).toContainText("Mean: 20.90");
   await expect(page.getByTestId("column-stats-Price")).toContainText("Max: 400.00");
   const badge = page.getByTestId("fix-badge-Price");
-  await expect(badge).toContainText("converted from $");
+  await expect(badge).toHaveText("$ · undo");
+  await expect(badge).toHaveAttribute("aria-label", /converted from \$/);
+  // One line: the badge is no taller than a single line of badge text.
+  expect((await badge.boundingBox())!.height).toBeLessThan(28);
   // Converted values are shown with the symbol from the file (first rows are free apps: "0").
   await expect(page.getByTestId("data-table-container").getByRole("cell", { name: "$0", exact: true }).first()).toBeVisible();
   await badge.click();
@@ -126,7 +130,7 @@ test("label variants: merge 'lab a' into 'Lab A', then undo; categorical summary
   await expect(suggestion).toContainText("Merge 'lab a' (4) into 'Lab A' (5)?");
   await page.getByTestId("merge-Lab").click();
   await expect(suggestion).toHaveCount(0);
-  await expect(page.getByTestId("fix-badge-Lab")).toContainText("merged 'lab a' into 'Lab A'");
+  await expect(page.getByTestId("fix-badge-Lab")).toHaveAttribute("aria-label", /merged 'lab a' into 'Lab A'/);
 
   await page.getByTestId("sidebar-nav-overview").click();
   await expect(page.getByTestId("category-row-Lab").getByRole("cell").nth(0)).toHaveText("2");
@@ -134,7 +138,7 @@ test("label variants: merge 'lab a' into 'Lab A', then undo; categorical summary
 
   await openData(page);
   await page.getByTestId("fix-badge-Lab").click();
-  await page.getByRole("button", { name: "Undo" }).click();
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect(page.getByTestId("variant-suggestion-Lab")).toBeVisible();
 });
 

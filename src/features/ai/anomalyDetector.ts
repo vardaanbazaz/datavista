@@ -44,9 +44,39 @@ export function anomalyChipText(a: LabelParts & Pick<DetectedAnomaly, "value">):
   return `${anomalyLabel(a)}: ${a.value.toLocaleString()}`;
 }
 
-/** "Reviews: 78,158,306 (App: Facebook), 17497% above average." / "MonthlyIncome for Attrition = No: 19,999, 207% above average." */
-function describeAnomaly(parts: LabelParts, value: number, diffPct: number, isSpike: boolean): string {
-  const tail = `${Math.round(diffPct)}% ${isSpike ? "above" : "below"} average.`;
+/** Up to 2 decimals for small numbers, none from 100 up: "4.69", "53,594". */
+function formatAmount(n: number): string {
+  return Math.abs(n).toLocaleString(undefined, { maximumFractionDigits: Math.abs(n) >= 100 ? 0 : 2 });
+}
+
+/** "×175", "×2.4": one decimal under 10, none from 10 up. */
+function formatRatio(r: number): string {
+  return `×${r.toLocaleString(undefined, { maximumFractionDigits: r < 10 ? 1 : 0 })}`;
+}
+
+/**
+ * How far a value is from the average, in words a reader can use. A percentage only where it
+ * means something (a positive average, at most 100% below, under 2× above):
+ * - "×175 the average" from twice the average up (never "17497% above average");
+ * - "54% above average" / "38% below average" otherwise;
+ * - "−53,594 vs average 4.69" (the plain difference) when the value is below zero with a
+ *   positive average (never "1143121% below average"), and for a zero or negative average,
+ *   where a percentage of the average has no meaning.
+ */
+export function compareToAverage(value: number, mean: number): string {
+  const diff = value - mean;
+  if (!(mean > 0) || !Number.isFinite(value) || !Number.isFinite(mean) || value < 0) {
+    const sign = diff < 0 ? "\u2212" : "+";
+    return `${sign}${formatAmount(diff)} vs average ${mean < 0 ? "\u2212" : ""}${formatAmount(mean)}`;
+  }
+  if (value >= 2 * mean) return `${formatRatio(value / mean)} the average`;
+  const pct = Math.round((Math.abs(diff) / mean) * 100);
+  return `${pct}% ${diff >= 0 ? "above" : "below"} average`;
+}
+
+/** "Reviews: 78,158,306 (App: Facebook), ×175 the average." / "MonthlyIncome for Attrition = No: 19,999, ×3.1 the average." */
+function describeAnomaly(parts: LabelParts, value: number, mean: number): string {
+  const tail = `${compareToAverage(value, mean)}.`;
   if (parts.dimensionColumn && parts.rowLevel) {
     return `${parts.columnName}: ${value.toLocaleString()} (${parts.dimensionColumn}: ${parts.dimensionKey}), ${tail}`;
   }
@@ -152,7 +182,7 @@ export const anomalyDetector = {
         severity,
         description: describeAnomaly(
           { columnName: valueCol, dimensionColumn: hasDim ? dimCol : undefined, dimensionKey, rowLevel: hasDim && rowLevel },
-          outlier.value, diffPct, isSpike
+          outlier.value, mean
         ),
       };
     }));
@@ -219,7 +249,7 @@ export const anomalyDetector = {
           severity,
           description: describeAnomaly(
             { columnName: col, dimensionColumn: hasDim ? categoryCol : undefined, dimensionKey: dimVal, rowLevel: hasDim && rowLevel },
-            outlier.value, diffPct, isSpike
+            outlier.value, mean
           ),
         });
       });

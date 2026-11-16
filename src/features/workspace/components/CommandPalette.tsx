@@ -48,6 +48,7 @@ import { QueryResult } from "@/shared/types";
 import { toast } from "@/shared/hooks/use-toast";
 import { Hint } from "@/shared/components/Hint";
 import { formatShortcut, modKey } from "@/shared/lib/platform";
+import { countOf } from "@/shared/utils/plural";
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -205,7 +206,7 @@ export function CommandPalette({
 
     toast({
       title: aiPreview.response.title || "AI Query Applied",
-      description: `${aiPreview.response.explanation || "Query applied successfully."} (${aiPreview.queryResult.rows.length} rows returned)`,
+      description: `${aiPreview.response.explanation || "Query applied successfully."} (${countOf(aiPreview.queryResult.rows.length, "row")} returned)`,
     });
 
     setAiPreview(null);

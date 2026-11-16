@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { nameWords, columnAggregationFlag, aggregationNote } from "../columnRoles";
-import type { ColumnMetadata } from "@/shared/types";
+import { nameWords, columnAggregationFlag, aggregationNote, defaultMeasureColumn, aggregationsForColumn, defaultAggregationForColumn } from "../columnRoles";
+import type { ColumnMetadata, Dataset } from "@/shared/types";
 
 function col(name: string, over: Partial<ColumnMetadata> = {}): ColumnMetadata {
   return {
@@ -72,5 +72,50 @@ describe("aggregationNote", () => {
     expect(aggregationNote("year", "count")).toBe(null);
     expect(aggregationNote("id", "count_distinct")).toBe(null);
     expect(aggregationNote(null, "sum")).toBe(null);
+  });
+});
+
+function dataset(columns: ColumnMetadata[]): Dataset {
+  const columnTypes: Record<string, "numeric" | "categorical" | "date"> = {};
+  columns.forEach((c) => (columnTypes[c.name] = c.inferredDataType));
+  return {
+    id: "ds", name: "ds", data: [], columns: columns.map((c) => c.name), columnTypes,
+    metadata: {
+      datasetId: "ds", name: "ds", createdAt: 0, updatedAt: 0, rowCount: 10, columnCount: columns.length,
+      originalFileName: "f.csv", originalFileType: "csv", parsingStatistics: { processingTimeMs: 0 }, version: 1, columns,
+    },
+  };
+}
+
+describe("KPI measure defaults", () => {
+  const retail = dataset([
+    col("Invoice", { inferredDataType: "categorical", minimumValue: undefined, maximumValue: undefined }),
+    col("CustomerID"),
+    col("order_year", { minimumValue: 2010, maximumValue: 2011 }),
+    col("Currency", { minimumValue: 1, maximumValue: 1 }),
+    col("Quantity", { minimumValue: -80, maximumValue: 900 }),
+    col("Price", { allIntegerValues: false }),
+  ]);
+
+  it("skips categorical, ID, year and constant columns: first plain numeric measure, with Sum", () => {
+    expect(defaultMeasureColumn(retail)).toBe("Quantity");
+    expect(defaultAggregationForColumn(retail, "Quantity")).toBe("sum");
+  });
+  it("falls back to the first numeric column (counted) when there is no plain measure", () => {
+    const ds = dataset([col("Invoice", { inferredDataType: "categorical" }), col("CustomerID")]);
+    expect(defaultMeasureColumn(ds)).toBe("CustomerID");
+    expect(defaultAggregationForColumn(ds, "CustomerID")).toBe("count");
+  });
+  it("falls back to the first column when nothing is numeric; null without a dataset", () => {
+    expect(defaultMeasureColumn(dataset([col("Country", { inferredDataType: "categorical" })]))).toBe("Country");
+    expect(defaultMeasureColumn(null)).toBeNull();
+  });
+  it("never offers Sum or Average for a categorical column", () => {
+    const ops = aggregationsForColumn(retail, "Invoice");
+    expect(ops).not.toContain("sum");
+    expect(ops).not.toContain("avg");
+    expect(ops).toEqual(["count", "count_rows", "count_distinct"]);
+    expect(defaultAggregationForColumn(retail, "Invoice")).toBe("count");
+    expect(aggregationsForColumn(retail, "Quantity")).toEqual(expect.arrayContaining(["sum", "avg", "median"]));
   });
 });

@@ -6,7 +6,7 @@ import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { cn } from "@/shared/lib/utils";
 import { useUiStore, DEFAULT_APPEARANCE, DEFAULT_THEME_SETTING, type LlmProvider, type TextSize } from "@/store/uiStore";
-import { animationBlockedReason, motionIsReduced, prefersReducedMotion, transparencyBlockedReason } from "@/shared/theme/displayPrefs";
+import { motionIsReduced, prefersReducedMotion, transparencyBlockedReason } from "@/shared/theme/displayPrefs";
 import { providerDisplayName } from "@/features/ai/providerDisplayName";
 import { loadSampleDataset } from "@/features/datasets/sampleData";
 import { AutomaticOptions, Choice, ModeCards, ThemeGroups, Toggle, type Option } from "./appearanceControls";
@@ -14,8 +14,8 @@ import { AutomaticOptions, Choice, ModeCards, ThemeGroups, Toggle, type Option }
 /*
  * First-run setup (batch 7 phase B): three short screens, then a choice of next step.
  *   1. Look: Light / Dark / Automatic (+ day/night themes, device or schedule) and every theme.
- *   2. Effects & comfort: transparency, background animation, reduce motion, text size, high
- *      contrast, with a live preview.
+ *   2. Effects & comfort: transparency, reduce motion, text size, high contrast, with a live
+ *      preview.
  *   3. AI key (optional) and where data lives.
  *   End: "Take the tour" or "Start with sample data".
  * Each choice applies at once (same store as Appearance). "Use recommended settings" on any
@@ -162,14 +162,6 @@ export function SetupFlow() {
                 checked={appearance.transparency}
                 onChange={(transparency) => setAppearance({ transparency })}
                 blockedReason={transparencyBlockedReason(appearance)}
-              />
-              <Toggle
-                id="setup-background-animation"
-                label="Background animation"
-                description="The coloured ribbon drifts slowly. Off by default; uses more battery."
-                checked={appearance.backgroundAnimation}
-                onChange={(backgroundAnimation) => setAppearance({ backgroundAnimation })}
-                blockedReason={animationBlockedReason(appearance)}
               />
               <Toggle
                 id="setup-reduce-motion"

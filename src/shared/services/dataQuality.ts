@@ -6,6 +6,7 @@
 import type { ColumnQuality, ValueCount, DataRow } from "@/shared/types";
 import { parseStrictNumber, toNumberOrNull } from "@/shared/utils/numeric";
 import { isCommaDecimal, parseCurrency, parseGroupedNumber, parseSuffixNumber } from "@/shared/utils/numberFormats";
+import { countOf, plural } from "@/shared/utils/plural";
 
 type Cell = DataRow[string];
 type ColumnType = "numeric" | "categorical" | "date";
@@ -230,7 +231,7 @@ export function detectImportConversion(values: readonly Cell[]): ImportDetection
   const grouped = western + indian + groupedBoth;
   if (grouped === 0 || (plain + grouped) / nonBlank < AUTO_CONVERT_SHARE) return {};
   if (commaDecimal > 0) {
-    return { groupingWarning: `${commaDecimal} value(s) use a comma as the decimal mark (e.g. 1.234,56) next to comma-grouped numbers` };
+    return { groupingWarning: `${countOf(commaDecimal, "value")} ${plural(commaDecimal, "uses", "use")} a comma as the decimal mark (e.g. 1.234,56) next to comma-grouped numbers` };
   }
   if (western > 0 && indian > 0) {
     return { groupingWarning: "mixes western (1,234,567) and Indian (12,34,567) digit grouping" };

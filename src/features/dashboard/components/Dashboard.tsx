@@ -1,4 +1,4 @@
-import { useEffect, useState, lazy, Suspense } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { Sidebar } from "./Sidebar";
 import { GlobalSearchModal } from "./GlobalSearchModal";
 import { InstantiateTemplateModal } from "@/features/dashboards/components/InstantiateTemplateModal";
@@ -19,15 +19,13 @@ import { ExportPanel } from "@/features/export/components/ExportPanel";
 import { ChartGrid } from "@/features/charts/components/ChartGrid";
 import { DashboardSummary } from "./DashboardSummary";
 import { OnboardingTour } from "@/features/ui/components/OnboardingTour";
-import { LoadingProgress, LoadingState } from "@/shared/components/LoadingSpinner";
+import { LoadingProgress } from "@/shared/components/LoadingSpinner";
+import { ViewSkeleton } from "@/shared/components/ViewSkeleton";
 import { perfMark, perfMeasure } from "@/shared/lib/perfMarks";
 import { ErrorBoundary, FullPageError } from "@/shared/components/ErrorBoundary";
 
-const PivotExplorer = lazy(() => import("@/features/pivot/components/PivotExplorer").then(m => ({ default: m.PivotExplorer })));
-const StatsExplorer = lazy(() => import("@/features/stats/components/StatsExplorer").then(m => ({ default: m.StatsExplorer })));
-const WindowExplorer = lazy(() => import("@/features/window/components/WindowExplorer").then(m => ({ default: m.WindowExplorer })));
+import { PivotExplorer, StatsExplorer, WindowExplorer } from "../lazyViews";
 import { Button } from "@/shared/components/ui/button";
-import { motion } from "framer-motion";
 import { BarChart3, Upload, Filter, Table, Grid, Sigma, Columns, Download } from "lucide-react";
 
 import { useUiStore } from "@/store/uiStore";
@@ -159,18 +157,11 @@ export function Dashboard() {
         }}
       >
         {isLoading && (
-          <LoadingState 
-            title="Processing your data..." 
-            description="Analyzing structure and preparing visualizations"
-          />
+          <ViewSkeleton label="Processing your data…" />
         )}
         
         {!isLoading && activeView === 'overview' && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-          >
+          <div className="animate-view-in">
             {activeDataset ? (
               <DashboardSummary />
             ) : (
@@ -208,16 +199,11 @@ export function Dashboard() {
                 </ul>
               </div>
             )}
-          </motion.div>
+          </div>
         )}
         
         {!isLoading && activeView === 'upload' && (
-          <motion.div 
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="max-w-2xl mx-auto"
-          >
+          <div className="max-w-2xl mx-auto animate-view-in">
             <PageHeader
               className="mb-6 pt-4"
               tourId="upload"
@@ -231,22 +217,12 @@ export function Dashboard() {
               }
             />
             <FileUpload />
-          </motion.div>
+          </div>
         )}
 
         {!isLoading && activeView === 'filters' && (
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
-            className="space-y-6"
-          >
-            <motion.div 
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.1, duration: 0.4 }}
-              className="flex flex-wrap items-end justify-between gap-3"
-            >
+          <div className="space-y-6 animate-view-in">
+            <div className="flex flex-wrap items-end justify-between gap-3">
               <PageHeader
                 className="w-full"
                 tourId="filters"
@@ -263,25 +239,15 @@ export function Dashboard() {
                   </>
                 }
               />
-            </motion.div>
+            </div>
             
             <FilterPanel />
-          </motion.div>
+          </div>
         )}
 
         {!isLoading && activeView === 'charts' && (
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
-            className="space-y-6"
-          >
-            <motion.div 
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.1, duration: 0.4 }}
-              className="flex flex-wrap items-end justify-between gap-3"
-            >
+          <div className="space-y-6 animate-view-in">
+            <div className="flex flex-wrap items-end justify-between gap-3">
               <PageHeader
                 className="w-full"
                 tourId="charts"
@@ -300,7 +266,7 @@ export function Dashboard() {
                   )
                 }
               />
-            </motion.div>
+            </div>
             
             {activeDataset ? (
               <>
@@ -332,11 +298,11 @@ export function Dashboard() {
                 Upload or pick a dataset to build charts.
               </NoDatasetPlate>
             )}
-          </motion.div>
+          </div>
         )}
 
         {!isLoading && activeView === 'data' && (
-          <div className="space-y-6 animate-fade-in">
+          <div className="space-y-6 animate-view-in">
             <PageHeader
               tourId="data"
               icon={<Table />}
@@ -354,7 +320,7 @@ export function Dashboard() {
         )}
 
         {!isLoading && activeView === 'pivot' && (
-          <div className="space-y-6 animate-fade-in w-full">
+          <div className="space-y-6 animate-view-in w-full">
             <PageHeader
               tourId="pivot"
               icon={<Grid />}
@@ -368,7 +334,7 @@ export function Dashboard() {
               }
             />
             <ErrorBoundary fallback={(props) => <FullPageError {...props} />}>
-              <Suspense fallback={<LoadingState title="Loading Pivot Analyzer..." description="Preparing pivot engine and view..." />}>
+              <Suspense fallback={<ViewSkeleton label="Loading the pivot table…" />}>
                 <PivotExplorer />
               </Suspense>
             </ErrorBoundary>
@@ -376,7 +342,7 @@ export function Dashboard() {
         )}
 
         {!isLoading && activeView === 'stats' && (
-          <div className="space-y-6 animate-fade-in w-full">
+          <div className="space-y-6 animate-view-in w-full">
             <PageHeader
               tourId="stats"
               icon={<Sigma />}
@@ -390,7 +356,7 @@ export function Dashboard() {
               }
             />
             <ErrorBoundary fallback={(props) => <FullPageError {...props} />}>
-              <Suspense fallback={<LoadingState title="Loading Statistical Engine..." description="Calculating summary statistics..." />}>
+              <Suspense fallback={<ViewSkeleton label="Loading statistics…" />}>
                 <StatsExplorer />
               </Suspense>
             </ErrorBoundary>
@@ -398,7 +364,7 @@ export function Dashboard() {
         )}
 
         {!isLoading && activeView === 'window-builder' && (
-          <div className="space-y-6 animate-fade-in w-full">
+          <div className="space-y-6 animate-view-in w-full">
             <PageHeader
               tourId="window-builder"
               icon={<Columns />}
@@ -412,7 +378,7 @@ export function Dashboard() {
               }
             />
             <ErrorBoundary fallback={(props) => <FullPageError {...props} />}>
-              <Suspense fallback={<LoadingState title="Loading Window Builder..." description="Initializing window calculation module..." />}>
+              <Suspense fallback={<ViewSkeleton label="Loading window functions…" />}>
                 <WindowExplorer />
               </Suspense>
             </ErrorBoundary>
@@ -420,7 +386,7 @@ export function Dashboard() {
         )}
 
         {!isLoading && activeView === 'export' && (
-          <div className="space-y-6 animate-fade-in">
+          <div className="space-y-6 animate-view-in">
             <PageHeader
               tourId="export"
               icon={<Download />}

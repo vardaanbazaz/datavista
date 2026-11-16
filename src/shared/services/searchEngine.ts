@@ -5,6 +5,7 @@ import { useTemplateStore } from "@/features/dashboards/store/templateStore";
 import { useViewStore } from "@/features/dashboards/store/viewStore";
 import { SavedView } from "@/shared/types";
 import { getEffectiveColumnType } from "@/shared/utils/columnType";
+import { countOf } from "@/shared/utils/plural";
 
 export interface SearchResultItem {
   id: string;
@@ -60,7 +61,7 @@ export const searchEngine = {
           id: `ds-${dataset.id}`,
           type: "dataset",
           title: dataset.name,
-          subtitle: `${datasetRowCount(dataset)} rows, ${dataset.columns?.length || 0} columns`,
+          subtitle: `${countOf(datasetRowCount(dataset), "row")}, ${countOf(dataset.columns?.length || 0, "column")}`,
           datasetId: dataset.id,
         });
       }
@@ -88,7 +89,7 @@ export const searchEngine = {
       );
 
       if (nameMatches || matchedKpis.length > 0) {
-        let subtitle = `${dash.chartIds?.length || 0} charts, ${(dash.kpis || []).length} KPIs`;
+        let subtitle = `${countOf(dash.chartIds?.length || 0, "chart")}, ${countOf((dash.kpis || []).length, "KPI")}`;
         if (!nameMatches && matchedKpis.length > 0) {
           subtitle = `Matched KPI: ${matchedKpis.map((k) => k.title).join(", ")}`;
         }

@@ -2,7 +2,7 @@ import { Compass, RotateCcw, Sparkles } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/shared/components/ui/dialog";
 import { Button } from "@/shared/components/ui/button";
 import { useUiStore, DEFAULT_APPEARANCE, DEFAULT_THEME_SETTING, type MotionPreference, type TextSize } from "@/store/uiStore";
-import { animationBlockedReason, prefersReducedMotion, transparencyBlockedReason } from "@/shared/theme/displayPrefs";
+import { prefersReducedMotion, transparencyBlockedReason } from "@/shared/theme/displayPrefs";
 import { AutomaticOptions, Choice, ModeCards, ThemeGroups, Toggle, type Option } from "./appearanceControls";
 
 const TEXT_SIZES: Option<TextSize>[] = [
@@ -12,7 +12,7 @@ const TEXT_SIZES: Option<TextSize>[] = [
 ];
 
 /**
- * Appearance: theme (or Automatic day/night), transparency, background animation, text size,
+ * Appearance: theme (or Automatic day/night), transparency, text size,
  * high contrast, motion. Every change applies at once (ThemeProvider → displayPrefs.ts puts it
  * on <html>) and is kept in this browser (uiStore, localStorage).
  */
@@ -56,14 +56,6 @@ export function AppearancePanel() {
             checked={appearance.transparency}
             onChange={(transparency) => setAppearance({ transparency })}
             blockedReason={transparencyBlockedReason(appearance)}
-          />
-          <Toggle
-            id="background-animation"
-            label="Background animation"
-            description="The coloured ribbon at the top of each page drifts slowly. Off by default: it keeps the graphics chip busy re-blurring the glass, so leave it off if things feel slow or on battery."
-            checked={appearance.backgroundAnimation}
-            onChange={(backgroundAnimation) => setAppearance({ backgroundAnimation })}
-            blockedReason={animationBlockedReason(appearance)}
           />
         </fieldset>
 

@@ -5,6 +5,7 @@ import { Progress } from "@/shared/components/ui/progress";
 import type { ImportIssuesSummary } from "@/shared/types";
 import type { ImportStage, SheetChoice } from "@/features/upload/lib/importCore";
 import { useImportStore } from "@/store/importStore";
+import { countOf, plural } from "@/shared/utils/plural";
 
 const STAGES: { id: ImportStage; label: string }[] = [
   { id: "reading", label: "Reading file" },
@@ -161,7 +162,7 @@ function SheetPicker() {
             <span className="min-w-0">
               <span className="font-medium">{s.name}</span>{" "}
               <span className="text-sm text-muted-foreground" data-testid="sheet-row-count">
-                {s.rowCount.toLocaleString()}{s.rowCountUnknown ? "+" : ""} rows
+                {s.rowCount.toLocaleString()}{s.rowCountUnknown ? "+ rows" : ` ${plural(s.rowCount, "row")}`}
               </span>
               <span className="block text-xs text-muted-foreground truncate" title={s.headers.join(", ")}>
                 {s.headers.length > 0 ? s.headers.join(", ") : "Empty sheet"}
@@ -210,7 +211,7 @@ function IssueReview() {
         <DialogTitle>Import summary</DialogTitle>
         <FocusOnMount target={keepRef} />
         <DialogDescription data-testid="import-summary-counts">
-          {review.rowCount.toLocaleString()} rows and {review.columnCount} columns read from {review.fileName}.{" "}
+          {countOf(review.rowCount, "row")} and {countOf(review.columnCount, "column")} read from {review.fileName}.{" "}
           {issues.rowCount.toLocaleString()} {issues.rowCount === 1 ? "row has" : "rows have"} parse problems.
           {review.duplicateRowCount > 0 &&
             ` ${review.duplicateRowCount.toLocaleString()} duplicate ${review.duplicateRowCount === 1 ? "row" : "rows"} (every column equal to an earlier row; you can remove them in the Data view).`}
@@ -274,8 +275,8 @@ export function ImportIssuesDialog({ issues, duplicateRowCount = 0, open, onOpen
         <DialogHeader>
           <DialogTitle>Import summary</DialogTitle>
           <DialogDescription>
-            {issues.rowCount.toLocaleString()} of {issues.sourceRowCount.toLocaleString()} rows had parse problems and{" "}
-            {issues.excluded ? "were excluded at import" : "were kept"}.
+            {issues.rowCount.toLocaleString()} of {countOf(issues.sourceRowCount, "row")} had parse problems and{" "}
+            {plural(issues.rowCount, "was", "were")} {issues.excluded ? "excluded at import" : "kept"}.
             {issues.excluded ? "" : " To exclude them, import the file again and choose Exclude."}
             {duplicateRowCount > 0 && ` ${duplicateRowCount.toLocaleString()} duplicate ${duplicateRowCount === 1 ? "row" : "rows"}.`}
           </DialogDescription>

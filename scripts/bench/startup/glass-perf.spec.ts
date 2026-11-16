@@ -2,9 +2,9 @@ import { test, expect, type Page, type Browser } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";
 
 /**
- * Batch 7: cost of the glass surfaces and the aurora ribbon, on the production build (see
- * ../playwright.startup.config.ts). Each scenario runs with Transparency + Background animation
- * on, then both off:
+ * Batch 7: cost of the glass surfaces over the (still) aurora ribbon, on the production build
+ * (see ../playwright.startup.config.ts). Each scenario runs with Transparency on, then off
+ * (the ribbon's drift animation was removed on 2026-11-16):
  * - "glass table": a generated 1M-row retail dataset, Data Explorer, wheel-scrolling the grid;
  * - "glass charts": four charts on the Charts view, wheel-scrolling the page;
  * - "glass idle": Overview with the ribbon in view, 10 s idle, CPU time of every Chromium
@@ -38,24 +38,24 @@ function out(name: string, data: unknown) {
 }
 
 const MODES = [
-  { name: "glass+animation on", transparency: true, backgroundAnimation: true },
-  { name: "glass+animation off", transparency: false, backgroundAnimation: false },
+  { name: "glass on", transparency: true },
+  { name: "glass off", transparency: false },
 ] as const;
 
-function seedPrefs(transparency: boolean, backgroundAnimation: boolean) {
+function seedPrefs(transparency: boolean) {
   return JSON.stringify({
     state: {
       hasSeenTour: true,
       hasCompletedSetup: true,
       themeSetting: { mode: "fixed", theme: "light", day: "light", night: "dark", trigger: "device", dayStart: "07:00", nightStart: "19:00" },
-      appearance: { textSize: "default", highContrast: false, motion: "full", transparency, backgroundAnimation },
+      appearance: { textSize: "default", highContrast: false, motion: "full", transparency },
     },
-    version: 3,
+    version: 4,
   });
 }
 
-async function setPrefs(page: Page, transparency: boolean, backgroundAnimation: boolean) {
-  await page.evaluate((v) => localStorage.setItem("datavista-ui-storage", v), seedPrefs(transparency, backgroundAnimation));
+async function setPrefs(page: Page, transparency: boolean) {
+  await page.evaluate((v) => localStorage.setItem("datavista-ui-storage", v), seedPrefs(transparency));
   await page.reload();
   await page.getByTestId("sidebar").waitFor();
   await expect(page.locator("html")).toHaveAttribute("data-transparency", transparency ? "on" : "off");
@@ -192,7 +192,7 @@ test("glass table: wheel-scroll a 1M-row Data Explorer grid", async ({ page, bro
   await seedBig(page, 1_000_000);
   const results: Record<string, unknown> = { gpu: await gpuStatus(browser) };
   for (const m of MODES) {
-    await setPrefs(page, m.transparency, m.backgroundAnimation);
+    await setPrefs(page, m.transparency);
     await page.getByText("retail 1M").first().waitFor({ timeout: 5 * 60_000 });
     await page.getByTestId("sidebar-nav-data").click();
     await page.getByText(/1,000,000/).first().waitFor({ timeout: 5 * 60_000 });
@@ -237,7 +237,7 @@ test("glass charts: wheel-scroll a page with four charts", async ({ page, browse
   }
   const results: Record<string, unknown> = { gpu: await gpuStatus(browser) };
   for (const m of MODES) {
-    await setPrefs(page, m.transparency, m.backgroundAnimation);
+    await setPrefs(page, m.transparency);
     await page.getByTestId("sidebar-nav-charts").click();
     await page.getByTestId("chart-card").nth(3).waitFor();
     await page.waitForTimeout(1500);
@@ -258,12 +258,8 @@ test("glass idle: CPU with the ribbon in view", async ({ page, browser }) => {
     return byType;
   };
   const results: Record<string, unknown> = { gpu: await gpuStatus(browser) };
-  for (const m of [
-    ...MODES,
-    { name: "glass on, animation off (default)", transparency: true, backgroundAnimation: false },
-    { name: "animation on, glass off", transparency: false, backgroundAnimation: true },
-  ]) {
-    await setPrefs(page, m.transparency, m.backgroundAnimation);
+  for (const m of MODES) {
+    await setPrefs(page, m.transparency);
     await expect(page.getByTestId("aurora-ribbon")).toBeVisible();
     await page.mouse.move(5, 5);
     await page.waitForTimeout(3000);

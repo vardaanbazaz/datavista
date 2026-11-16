@@ -24,7 +24,7 @@ describe("anomalies on Play Store (near-unique label column)", () => {
       if (a.dimensionColumn === "App") expect(a.rowLevel).toBe(true);
     }
     const reviews = found.filter((a) => a.columnName === "Reviews");
-    expect(reviews[0].description).toMatch(/^Reviews: 78,158,306 \(App: Facebook\), \d+% above average\.$/);
+    expect(reviews[0].description).toMatch(/^Reviews: 78,158,306 \(App: Facebook\), ×[\d.,]+ the average\.$/);
     expect(anomalyLabel(reviews[0])).toBe("Reviews (App: Facebook)");
     expect(anomalyChipText(reviews[0])).toBe("Reviews: 78,158,306 (App: Facebook)");
   });
@@ -50,6 +50,6 @@ describe("anomalies with a low-cardinality label column", () => {
     const small = processRawData(rows, "small.csv");
     const [a] = anomalyDetector.detectDatasetAnomalies(small);
     expect(a.rowLevel).toBeUndefined();
-    expect(a.description).toMatch(/^Pay for Dept = Sales: 99,000, \d+% above average\.$/);
+    expect(a.description).toMatch(/^Pay for Dept = Sales: 99,000, ×[\d.,]+ the average\.$/);
   });
 });

@@ -20,6 +20,7 @@ import { ConditionalFormattingBuilder } from "@/features/dashboards/components/C
 import { motion } from "framer-motion";
 import { NoDatasetPlate } from "@/shared/components/NoDatasetPlate";
 import { Hint } from "@/shared/components/Hint";
+import { countOf } from "@/shared/utils/plural";
 
 export function ChartBuilder() {
   const activeDataset = useDatasetStore((state) => state.activeDataset);
@@ -510,7 +511,7 @@ export function ChartBuilder() {
                 <Label className="text-sm font-semibold">Chart Conditional Formatting</Label>
                 {formattingRules.length > 0 && (
                   <span className="text-xs text-success font-medium">
-                    {formattingRules.length} rule(s) configured
+                    {countOf(formattingRules.length, "rule")} configured
                   </span>
                 )}
               </div>

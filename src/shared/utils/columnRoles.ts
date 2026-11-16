@@ -90,3 +90,45 @@ export function aggregationNote(flag: AggregationFlag | null, op: AggregationOpe
     ? "Adding up years is rarely meaningful — try Count, or use it as a date"
     : "Adding up ID numbers is rarely meaningful — try Count or Distinct count";
 }
+
+/** Numeric (effective type) column whose every valid value is the same, over the whole dataset (import metadata). */
+export function isConstantNumericColumn(dataset: Dataset | null | undefined, column: string): boolean {
+  const meta = dataset?.metadata?.columns.find((c) => c.name === column);
+  return !!meta && meta.minimumValue !== undefined && meta.maximumValue !== undefined && meta.minimumValue === meta.maximumValue;
+}
+
+function columnNames(dataset: Dataset): string[] {
+  return dataset.metadata ? dataset.metadata.columns.map((c) => c.name) : dataset.columns;
+}
+
+/**
+ * The column a new KPI measures by default: the first numeric column that is not an ID, not a
+ * year and not constant (Sum of "Invoice" or of a year is a number nobody can use). Falls back
+ * to the first numeric column of any kind, then the first column (counted), then null.
+ */
+export function defaultMeasureColumn(dataset: Dataset | null | undefined): string | null {
+  if (!dataset) return null;
+  const cols = columnNames(dataset);
+  const numeric = cols.filter((c) => getEffectiveColumnType(dataset, c) === "numeric");
+  return (
+    numeric.find((c) => !aggregationFlag(dataset, c) && !isConstantNumericColumn(dataset, c)) ??
+    numeric[0] ??
+    cols[0] ??
+    null
+  );
+}
+
+/** Aggregations that make sense for a column: every one for numbers; counts only for anything else. */
+export function aggregationsForColumn(dataset: Dataset | null | undefined, column: string): AggregationOperator[] {
+  if (dataset && column && getEffectiveColumnType(dataset, column) === "numeric") {
+    return ["sum", "avg", "count", "count_rows", "count_distinct", "min", "max", "median", "stddev"];
+  }
+  return ["count", "count_rows", "count_distinct"];
+}
+
+/** Default aggregation for a column: Sum for a plain measure, Count for IDs, years, constants and non-numbers. */
+export function defaultAggregationForColumn(dataset: Dataset | null | undefined, column: string): AggregationOperator {
+  if (!dataset || !column) return "count";
+  if (getEffectiveColumnType(dataset, column) !== "numeric") return "count";
+  return aggregationFlag(dataset, column) || isConstantNumericColumn(dataset, column) ? "count" : "sum";
+}

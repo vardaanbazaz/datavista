@@ -13,6 +13,7 @@ import { addColumnFix, mergeColumnMeta, removeColumnFix, removeDuplicateRows, re
 import { computeColumnMetadata } from "@/shared/services/columnMeta/client";
 import { perfMark, perfMeasure } from "@/shared/lib/perfMarks";
 import { loadPendingRows } from "@/shared/services/datasetRows";
+import { countOf } from "@/shared/utils/plural";
 
 /** A dataset whose rows are being read from disk (datasetStore.loadRows). */
 export interface RowsLoading {
@@ -256,7 +257,7 @@ export const useDatasetStore = create<DatasetState>((set, get) => {
     ].filter(Boolean);
     toast({
       title: "Dataset uploaded successfully",
-      description: `${dataset.name} with ${dataset.data.length.toLocaleString()} rows${notes.length ? ` · ${notes.join(" · ")} (see Data view)` : ""}`,
+      description: `${dataset.name} with ${countOf(dataset.data.length, "row")}${notes.length ? ` · ${notes.join(" · ")} (see Data view)` : ""}`,
     });
   },
 
@@ -327,7 +328,7 @@ export const useDatasetStore = create<DatasetState>((set, get) => {
 
     toast({
       title: "Dataset Updated",
-      description: `"${updatedDataset.name}" updated to v${nextVersion} (${newRawData.length} rows).`,
+      description: `"${updatedDataset.name}" updated to v${nextVersion} (${countOf(newRawData.length, "row")}).`,
     });
   },
   

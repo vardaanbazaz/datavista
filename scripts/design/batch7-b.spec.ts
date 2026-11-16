@@ -29,7 +29,7 @@ async function openApp(browser: Browser, v: Variant): Promise<Page> {
       hasSeenTour: !v.firstVisit,
       hasCompletedSetup: !v.firstVisit,
       themeSetting: { mode: "fixed", theme: v.theme, day: "light", night: "dark", trigger: "device", dayStart: "07:00", nightStart: "19:00" },
-      appearance: { textSize: "default", highContrast: false, motion: "system", transparency: true, backgroundAnimation: false },
+      appearance: { textSize: "default", highContrast: false, motion: "system", transparency: true },
     },
     version: 3,
   };

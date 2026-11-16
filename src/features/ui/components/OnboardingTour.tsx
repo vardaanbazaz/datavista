@@ -5,11 +5,13 @@ import { Joyride, ACTIONS, EVENTS, STATUS, type EventData, type FloatingOptions,
 type Middleware = NonNullable<FloatingOptions["middleware"]>[number];
 import { useShallow } from "zustand/react/shallow";
 import { useUiStore, type ViewType } from "@/store/uiStore";
+import { preloadView } from "@/features/dashboard/lazyViews";
 
 /*
  * The product tour (batch 7 phase B): one short step per section, in the sidebar's order, then
- * Appearance. Each step's `before` hook switches to its view and waits until the view's page
- * header (data-tour="view-<id>") is on screen, laid out and fully faded in. Steps never show a
+ * Appearance. Each step's `before` hook switches to its view, starts fetching the next step's
+ * view code (lazyViews.ts:preloadView), and waits until the view's page header
+ * (data-tour="view-<id>") is on screen and laid out (views fade in over 150 ms, opacity only). Steps never show a
  * beacon; closing, Esc or Skip ends the tour (Joyride unmounts, so nothing is left on the page).
  * Restart from the "?" button or Appearance (uiStore.resetTour).
  *
@@ -45,7 +47,7 @@ export const TOUR_STOPS: TourStop[] = [
 ];
 
 const APPEARANCE_TEXT =
-  "Themes (or Automatic day and night), transparency, background animation, text size and high contrast. Turn the effects off if things feel slow. On a phone it is in the menu.";
+  "Themes (or Automatic day and night), transparency, text size and high contrast. Turn transparency off if things feel slow. On a phone it is in the menu.";
 
 const visible = (selector: string) =>
   Array.from(document.querySelectorAll<HTMLElement>(selector)).find((el) => el.getClientRects().length > 0) ?? null;
@@ -55,7 +57,11 @@ function appearanceTarget(): HTMLElement | null {
   return visible('[data-tour="appearance"]') ?? visible('[data-testid="mobile-menu-toggle"]');
 }
 
-/** Resolves once `find()` returns an element that is laid out, fully opaque and has not moved for 3 frames (or after `timeout`). */
+/**
+ * Resolves once `find()` returns an element that is laid out, painted (not fully transparent)
+ * and has not moved for 2 frames (or after `timeout`). Views fade in with opacity only
+ * (`animate-view-in`), so the header is already in its final place while it fades.
+ */
 export function waitForSteady(find: () => HTMLElement | null, timeout = 8000): Promise<void> {
   return new Promise((resolve) => {
     const start = performance.now();
@@ -70,7 +76,7 @@ export function waitForSteady(find: () => HTMLElement | null, timeout = 8000): P
         const key = `${r.top.toFixed(1)}|${r.left.toFixed(1)}|${r.width.toFixed(1)}|${r.height.toFixed(1)}`;
         same = key === last ? same + 1 : 0;
         last = key;
-        if (r.width > 0 && r.height > 0 && opacity >= 0.999 && same >= 3) return resolve();
+        if (r.width > 0 && r.height > 0 && opacity > 0 && same >= 2) return resolve();
       }
       if (performance.now() - start > timeout) return resolve();
       requestAnimationFrame(tick);
@@ -132,16 +138,19 @@ export function OnboardingTour() {
   );
 
   const steps = useMemo<Step[]>(() => {
-    const go = (view: ViewType, find: () => HTMLElement | null) => async () => {
+    const go = (view: ViewType, next: ViewType | undefined, find: () => HTMLElement | null) => async () => {
       const ui = useUiStore.getState();
+      preloadView(view);
       if (ui.activeView !== view) ui.setActiveView(view);
+      // Fetch the next step's code now, while this step is read, so "Next" never waits on a chunk.
+      preloadView(next);
       // The header, not the sidebar item: the item never moves, so it would resolve before the view is in.
       await waitForSteady(find);
     };
-    const viewSteps: Step[] = TOUR_STOPS.map((s) => {
+    const viewSteps: Step[] = TOUR_STOPS.map((s, i) => {
       const header = `[data-tour="view-${s.view}"]`;
       const find = () => document.querySelector<HTMLElement>(header);
-      const common = { id: s.view, title: s.title, content: s.content, before: go(s.view, find), data: { view: s.view } };
+      const common = { id: s.view, title: s.title, content: s.content, before: go(s.view, TOUR_STOPS[i + 1]?.view, find), data: { view: s.view } };
       return withSidebar
         ? { ...common, ...besideSidebar(header), target: `[data-testid="sidebar-nav-${s.view}"]` }
         : { ...common, ...SHEET, target: header, placement: "bottom" };

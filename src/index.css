@@ -257,10 +257,8 @@
 /*
  * Aurora ribbon (src/shared/components/surface/AuroraRibbon.tsx): flowing gradient strands
  * at the top of each view, behind the page header and the tiles. Each strand is an SVG whose
- * blur is part of its own paint (rasterised once into the strand's layer). Still by default;
- * with Background animation on, `aurora-sway` moves each layer with `transform` only, at the
- * display's rate, and only while AuroraRibbon marks it visible (data-paused="false").
- * Hidden in high contrast.
+ * blur is part of its own paint (rasterised once into the strand's layer). Always still: the
+ * drift animation was removed (decisions.md, 2026-11-16). Hidden in high contrast.
  */
 @layer components {
   .aurora {
@@ -275,10 +273,6 @@
   .aurora-strand {
     position: absolute;
     inset: -10% -15%;
-  }
-  .aurora[data-paused="false"] .aurora-strand {
-    will-change: transform;
-    animation: aurora-sway var(--sway-duration, 17s) ease-in-out var(--sway-delay, 0s) infinite alternate;
   }
   .aurora-strand > svg {
     width: 100%;
@@ -306,15 +300,6 @@
   }
   html[data-contrast="high"] .setup-preview-ribbon {
     display: none;
-  }
-}
-
-@keyframes aurora-sway {
-  from {
-    transform: translate3d(calc(var(--sway-x, 4%) * -1), calc(var(--sway-y, 2.5%) * -1), 0);
-  }
-  to {
-    transform: translate3d(var(--sway-x, 4%), var(--sway-y, 2.5%), 0);
   }
 }
 

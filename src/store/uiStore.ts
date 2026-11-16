@@ -145,10 +145,11 @@ export const useUiStore = create<UiState>()(
       // v2 (batch 7): `theme` ("light" | "dark" | "system") became `themeSetting` and
       // `readingComfort` became `appearance` (simpleFrames dropped; transparency and background
       // animation added). v3 (batch 7 phase B): Background animation off by default, so a v1/v2
-      // `true` is dropped; `hasCompletedSetup` added. Every version is read by
+      // `true` is dropped; `hasCompletedSetup` added. v4: Background animation removed;
+      // readStoredPrefs rebuilds `appearance` without it, so the old key is dropped. Every version is read by
       // boot.ts:readStoredPrefs, the same function the pre-paint script uses, so the first paint
       // and the store always agree.
-      version: 3,
+      version: 4,
       migrate: (persistedState, fromVersion) => {
         const old = (persistedState ?? {}) as Record<string, unknown>;
         const { setting, appearance } = readStoredPrefs(JSON.stringify({ state: old, version: fromVersion }), [...THEME_IDS]);
@@ -160,7 +161,7 @@ export const useUiStore = create<UiState>()(
       merge: (persisted, current) => {
         const saved = (persisted ?? {}) as Partial<UiState>;
         // After `migrate`, the saved state is in the current version's shape.
-        const { setting, appearance } = readStoredPrefs(JSON.stringify({ state: saved, version: 3 }), [...THEME_IDS]);
+        const { setting, appearance } = readStoredPrefs(JSON.stringify({ state: saved, version: 4 }), [...THEME_IDS]);
         return { ...current, ...saved, themeSetting: setting, appearance };
       },
       partialize: (state) => ({

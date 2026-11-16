@@ -15,7 +15,7 @@ describe("offline insight wording", () => {
     const found = anomalyDetector.detectDatasetAnomalies(ds);
     expect(found.map((a) => a.columnName)).toEqual(["MonthlyIncome"]);
     expect(anomalyLabel(found[0])).toBe("MonthlyIncome for Attrition = No");
-    expect(found[0].description).toMatch(/^MonthlyIncome for Attrition = No: 19,999, \d+% above average\.$/);
+    expect(found[0].description).toMatch(/^MonthlyIncome for Attrition = No: 19,999, ×[\d.,]+ the average\.$/);
   });
 
   it("says nothing about widgets or steady performance", () => {

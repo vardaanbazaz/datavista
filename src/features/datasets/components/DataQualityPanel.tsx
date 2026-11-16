@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/shared/components/ui/button";
-import { Badge } from "@/shared/components/ui/badge";
+import { Badge, badgeVariants } from "@/shared/components/ui/badge";
+import { Hint } from "@/shared/components/Hint";
+import { cn } from "@/shared/lib/utils";
+import { AlertTriangle, Undo2 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/shared/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/components/ui/popover";
@@ -8,12 +11,16 @@ import type { ColumnFix, ColumnMetadata, Dataset, ValueCount } from "@/shared/ty
 import { useDatasetStore } from "@/store/datasetStore";
 import { labelKey, suggestionKey, variantMergeText } from "@/shared/services/dataQuality";
 import { previewNumberConversion } from "@/shared/services/columnFixes";
-import { fixLabel } from "../lib/fixLabel";
+import { fixLabel, fixShortLabel } from "../lib/fixLabel";
 
 /** Suggestions answered "No" this session (not stored: they come back after a reload). */
 const answeredNo = new Set<string>();
 
-/** Header badges for one column: applied fixes (with undo) and invalid values (with samples). */
+/**
+ * Header badges for one column: applied fixes (with undo) and invalid values (with samples).
+ * One line and compact ("$ · undo", "1 invalid") so the header never grows taller; the full
+ * text is the tooltip and the accessible name. Below the sm breakpoint only the icon shows.
+ */
 export function ColumnQualityBadges({ dataset, column, meta, effectiveType }: {
   dataset: Dataset;
   column: string;
@@ -24,15 +31,23 @@ export function ColumnQualityBadges({ dataset, column, meta, effectiveType }: {
   const fixes = (dataset.metadata?.columnFixes ?? []).filter((f) => f.column === column);
   const quality = meta?.quality;
   const invalid = (effectiveType === "numeric" || effectiveType === "date") && quality ? quality.invalidCount : 0;
+  // Accessible names start with the visible text (label in name), then the full explanation.
+  const fixShort = `${fixes.length === 1 ? fixShortLabel(fixes[0]) : `${fixes.length} fixes`} · undo`;
+  const fixFull = `${fixShort}: ${fixes.map((f) => fixLabel(f)).join("; ")}`;
+  const invalidFull = `${invalid.toLocaleString()} invalid: ${invalid.toLocaleString()} ${invalid === 1 ? "value isn't a valid" : "values aren't valid"} ${effectiveType === "date" ? "date" : "number"}; click for examples`;
+  const pill = "ml-1 shrink-0 gap-1 whitespace-nowrap text-xs normal-case font-normal cursor-pointer";
   return (
     <>
       {fixes.length > 0 && (
         <Popover>
-          <PopoverTrigger asChild>
-            <Badge variant="outline" className="ml-1 text-xs normal-case font-normal cursor-pointer border-primary text-primary-ink" data-testid={`fix-badge-${column}`}>
-              {fixes.length === 1 ? fixLabel(fixes[0]).split(" (")[0] : `${fixes.length} fixes`} — undo
-            </Badge>
-          </PopoverTrigger>
+          <Hint label={fixFull}>
+            <PopoverTrigger asChild>
+              <button type="button" className={cn(badgeVariants({ variant: "outline" }), pill, "border-primary text-primary-ink")} data-testid={`fix-badge-${column}`}>
+                <Undo2 className="h-3 w-3 sm:hidden" aria-hidden />
+                <span className="hidden sm:inline">{fixShort}</span>
+              </button>
+            </PopoverTrigger>
+          </Hint>
           <PopoverContent className="w-80 text-xs normal-case tracking-normal space-y-2">
             {fixes.map((f) => (
               <div key={f.id} className="flex items-start justify-between gap-2">
@@ -50,11 +65,14 @@ export function ColumnQualityBadges({ dataset, column, meta, effectiveType }: {
       )}
       {invalid > 0 && (
         <Popover>
-          <PopoverTrigger asChild>
-            <Badge variant="outline" className="ml-1 text-xs normal-case font-normal cursor-pointer border-tertiary text-tertiary" data-testid={`invalid-badge-${column}`}>
-              {invalid.toLocaleString()} invalid
-            </Badge>
-          </PopoverTrigger>
+          <Hint label={invalidFull}>
+            <PopoverTrigger asChild>
+              <button type="button" className={cn(badgeVariants({ variant: "outline" }), pill, "border-tertiary text-tertiary")} data-testid={`invalid-badge-${column}`}>
+                <AlertTriangle className="h-3 w-3 sm:hidden" aria-hidden />
+                <span className="hidden sm:inline">{invalid.toLocaleString()} invalid</span>
+              </button>
+            </PopoverTrigger>
+          </Hint>
           <PopoverContent className="w-72 text-xs normal-case tracking-normal" data-testid={`invalid-popover-${column}`}>
             <p className="font-semibold mb-1">
               {invalid.toLocaleString()} {invalid === 1 ? "value isn't a valid" : "values aren't valid"} {effectiveType === "date" ? "date" : "number"}

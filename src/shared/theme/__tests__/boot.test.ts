@@ -85,21 +85,19 @@ describe("readStoredPrefs migrates version 1", () => {
     expect(readStoredPrefs(JSON.stringify({ state: { theme: "system" }, version: 1 }), ids).setting).toMatchObject({ mode: "auto", trigger: "device", day: "light", night: "dark" });
     expect(readStoredPrefs(null, ids).setting.mode).toBe("auto");
   });
-  it("readingComfort → appearance (simpleFrames dropped, transparency on, animation off)", () => {
+  it("readingComfort → appearance (simpleFrames dropped, transparency on)", () => {
     const { appearance } = readStoredPrefs(
       JSON.stringify({ state: { readingComfort: { textSize: "xlarge", highContrast: true, motion: "reduce", simpleFrames: true } } }),
       ids
     );
-    expect(appearance).toEqual({ textSize: "xlarge", highContrast: true, motion: "reduce", transparency: true, backgroundAnimation: false });
+    expect(appearance).toEqual({ textSize: "xlarge", highContrast: true, motion: "reduce", transparency: true });
   });
-  it("Background animation: off by default; a v2 `true` (the old default) is dropped, a v3 `true` is kept", () => {
-    const read = (version: number, backgroundAnimation?: boolean) =>
-      readStoredPrefs(JSON.stringify({ state: { appearance: { backgroundAnimation } }, version }), ids).appearance.backgroundAnimation;
-    expect(readStoredPrefs(null, ids).appearance.backgroundAnimation).toBe(false);
-    expect(read(2, true)).toBe(false);
-    expect(read(3, true)).toBe(true);
-    expect(read(3, false)).toBe(false);
-    expect(read(3)).toBe(false);
+  it("Background animation (removed in v4): a stored v2/v3 key is dropped, the rest kept", () => {
+    for (const version of [2, 3]) {
+      const { appearance } = readStoredPrefs(JSON.stringify({ state: { appearance: { backgroundAnimation: true, transparency: false } }, version }), ids);
+      expect(appearance).not.toHaveProperty("backgroundAnimation");
+      expect(appearance.transparency).toBe(false);
+    }
   });
   it("unknown theme ids and junk fall back to defaults", () => {
     expect(readStoredPrefs(JSON.stringify({ state: { themeSetting: { mode: "fixed", theme: "parchment" } } }), ids).setting.theme).toBe("light");
@@ -115,8 +113,8 @@ describe("inline boot script matches the app", () => {
     ["fixed Dusk", { state: { themeSetting: { mode: "fixed", theme: "dusk" } }, version: 2 }, false, at(12)],
     ["schedule night", { state: { themeSetting: { mode: "auto", day: "clay", night: "carbon", trigger: "schedule", dayStart: "07:00", nightStart: "19:00" } }, version: 2 }, false, at(23, 30)],
     ["schedule over midnight, day", { state: { themeSetting: { mode: "auto", day: "mint", night: "graphite", trigger: "schedule", dayStart: "22:00", nightStart: "03:00" } }, version: 2 }, true, at(1)],
-    ["transparency and animation off", { state: { appearance: { transparency: false, backgroundAnimation: false, motion: "full" } }, version: 2 }, false, at(9)],
-    ["v3 animation on", { state: { appearance: { backgroundAnimation: true } }, version: 3 }, false, at(9)],
+    ["transparency off", { state: { appearance: { transparency: false, motion: "full" } }, version: 2 }, false, at(9)],
+    ["v3 with the removed animation key", { state: { appearance: { backgroundAnimation: true } }, version: 3 }, false, at(9)],
   ];
   it.each(cases)("%s", (_name, stored, prefersDark, now) => {
     const boot = runBoot(stored, prefersDark, now);
@@ -127,7 +125,7 @@ describe("inline boot script matches the app", () => {
     expect(boot.dataset.textSize).toBe(appearance.textSize);
     expect(boot.dataset.contrast).toBe(appearance.highContrast ? "high" : undefined);
     expect(boot.dataset.transparency).toBe(appearance.transparency && !appearance.highContrast ? "on" : "off");
-    expect(boot.dataset.animation).toBe(appearance.backgroundAnimation ? "on" : "off");
+    expect(boot.dataset.animation).toBeUndefined();
   });
   it("never throws, even when storage access throws", () => {
     const win = { localStorage: { getItem: () => { throw new Error("blocked"); } }, matchMedia: undefined, document: { documentElement: { dataset: {}, classList: { add() {}, remove() {} } } } };

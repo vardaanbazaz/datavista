@@ -49,7 +49,7 @@ for (const theme of THEMES) {
                 hasSeenTour: true,
                 hasCompletedSetup: true,
                 themeSetting: { mode: "fixed", theme: t, day: "light", night: "dark", trigger: "device", dayStart: "07:00", nightStart: "19:00" },
-                appearance: { textSize: "default", highContrast: hc, motion: "reduce", transparency: true, backgroundAnimation: false },
+                appearance: { textSize: "default", highContrast: hc, motion: "reduce", transparency: true },
               },
               version: 3,
             })

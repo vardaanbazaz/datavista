@@ -12,6 +12,7 @@ import { exportChartAsPNG, exportChartAsSVG, exportDataAsCSV, generatePDFReport 
 import { useToast } from "@/shared/hooks/use-toast";
 import { NoDatasetPlate } from "@/shared/components/NoDatasetPlate";
 import { ChartVisualization } from "@/features/charts/components/ChartVisualization";
+import { countOf } from "@/shared/utils/plural";
 
 export function ExportPanel() {
   const dataset = useDatasetStore((state) => state.activeDataset);
@@ -130,7 +131,7 @@ export function ExportPanel() {
             Data Export
           </CardTitle>
           <CardDescription>
-            Export your filtered dataset ({filteredData.length} rows) as CSV
+            Export your filtered dataset ({countOf(filteredData.length, "row")}) as CSV
           </CardDescription>
         </CardHeader>
         <CardContent>

@@ -1,4 +1,5 @@
 import type { ColumnFix } from "@/shared/types";
+import { countOf } from "@/shared/utils/plural";
 
 const quote = (v: string) => `'${v}'`;
 
@@ -12,7 +13,7 @@ export function fixLabel(fix: ColumnFix): string {
     case "thousands":
       return `commas removed (${fix.grouping === "indian" ? "Indian 12,34,567" : "1,234,567"} grouping)`;
     case "sentinel":
-      return `${fix.sentinel} treated as missing (${fix.changedCount.toLocaleString()} cells)`;
+      return `${fix.sentinel} treated as missing (${countOf(fix.changedCount, "cell")})`;
     case "numberSuffix":
       return [
         "converted to number",
@@ -21,5 +22,21 @@ export function fixLabel(fix: ColumnFix): string {
       ].filter(Boolean).join("; ");
     case "mergeLabels":
       return `merged ${fix.merge!.from.map(quote).join(", ")} into ${quote(fix.merge!.to)}`;
+  }
+}
+
+/** The compact header-badge text of a fix, e.g. "$" or "-1 → missing"; fixLabel is the full text (tooltip). */
+export function fixShortLabel(fix: ColumnFix): string {
+  switch (fix.kind) {
+    case "currency":
+      return fix.currency!.symbol;
+    case "thousands":
+      return "commas";
+    case "sentinel":
+      return `${fix.sentinel} → missing`;
+    case "numberSuffix":
+      return "→ number";
+    case "mergeLabels":
+      return "merged";
   }
 }

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import type { NumericProfile } from "@/shared/services/stats/columnProfile";
-import { roleLabel } from "@/shared/services/stats/columnProfile";
+import { constantText, roleLabel } from "@/shared/services/stats/columnProfile";
 import { cn } from "@/shared/lib/utils";
 
 type SortKey = "column" | "count" | "mean" | "min" | "max" | "sum" | "missing" | "invalid";
@@ -97,7 +97,7 @@ export function NumericSummaryTable({ profiles }: { profiles: NumericProfile[] }
         </thead>
         <tbody>
           {sorted.map((p) => {
-            const tag = roleLabel(p.role);
+            const tag = roleLabel(p.role, p.constantIn);
             const labelsOnly = p.role === "id" || p.role === "year";
             return (
               <tr key={p.column} className="border-b border-border last:border-b-0 hover:bg-accent/50" data-testid={`numeric-row-${p.column}`}>
@@ -114,7 +114,7 @@ export function NumericSummaryTable({ profiles }: { profiles: NumericProfile[] }
                   <>
                     <td className="px-3 py-1.5 text-right tabular-nums">{p.count.toLocaleString()}</td>
                     <td colSpan={4} className="px-3 py-1.5 text-left text-muted-foreground">
-                      constant: <span className="tabular-nums text-foreground">{fmt(p.min)}</span>
+                      {constantText(p, "")}<span className="tabular-nums text-foreground">{fmt(p.min)}</span>
                     </td>
                   </>
                 ) : (

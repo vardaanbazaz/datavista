@@ -21,7 +21,7 @@ import { QueryPerformanceBadge } from "@/features/dashboard/components/QueryPerf
 import { ConditionalFormattingBuilder } from "@/features/dashboards/components/ConditionalFormattingBuilder";
 import { DatasetUpdateModal } from "./DatasetUpdateModal";
 import { getEffectiveColumnType, mightBeCategorical } from "@/shared/utils/columnType";
-import { profileNumericColumns, roleLabel } from "@/shared/services/stats/columnProfile";
+import { constantText, profileNumericColumns, roleLabel } from "@/shared/services/stats/columnProfile";
 import { DataPanel } from "@/shared/components/surface";
 import { useImportStore } from "@/store/importStore";
 import { ImportIssuesDialog } from "@/features/upload/components/ImportDialog";
@@ -29,6 +29,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/shared/components/ui/
 import { ColumnQualityBadges, DataQualityPanel } from "./DataQualityPanel";
 import { NoDatasetPlate } from "@/shared/components/NoDatasetPlate";
 import { formatCurrency } from "@/shared/utils/numberFormats";
+import { countOf, plural } from "@/shared/utils/plural";
 
 interface DataTableProps {
   customDataset?: Dataset | null;
@@ -401,7 +402,7 @@ export function DataTable({
 
           <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground select-none">
             <div>
-              Showing {paginatedData.length} of {filteredData.length} rows 
+              Showing {paginatedData.length} of {countOf(filteredData.length, "row")} 
               {filteredData.length !== dataset.data.length && 
                 ` (filtered from ${dataset.data.length} total)`
               }
@@ -442,9 +443,9 @@ export function DataTable({
       {activeDataset && customDataset === undefined && (activeDataset.metadata?.importIssues?.rowCount ?? 0) > 0 && (
         <div role="status" data-testid="import-issues-notice" className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-lg border border-border text-body">
           <p className="flex-1">
-            {activeDataset.metadata!.importIssues!.rowCount.toLocaleString()}{" "}
-            {activeDataset.metadata!.importIssues!.rowCount === 1 ? "row" : "rows"} had parse problems at import and{" "}
-            {activeDataset.metadata!.importIssues!.excluded ? "were excluded" : "were kept"}.
+            {countOf(activeDataset.metadata!.importIssues!.rowCount, "row")} had parse problems at import and{" "}
+            {plural(activeDataset.metadata!.importIssues!.rowCount, "was", "were")}{" "}
+            {activeDataset.metadata!.importIssues!.excluded ? "excluded" : "kept"}.
           </p>
           <Button size="sm" variant="outline" onClick={() => setIsIssuesOpen(true)} data-testid="import-issues-open">
             View import summary
@@ -460,7 +461,7 @@ export function DataTable({
         <DataPanel title="Numeric columns" description="Summary statistics of the rows shown">
           <ul className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,15rem),1fr))] gap-3">
             {summaryStats.map((stats) => {
-              const tag = roleLabel(stats.role);
+              const tag = roleLabel(stats.role, stats.constantIn);
               return (
                 <li key={stats.column} className="p-3 bg-muted/60 border border-border rounded-lg" data-testid={`column-stats-${stats.column}`}>
                   <h3 className="font-semibold mb-1 truncate" title={stats.column}>
@@ -468,7 +469,7 @@ export function DataTable({
                     {tag && <span className="ml-2 text-xs font-normal text-muted-foreground">{tag}</span>}
                   </h3>
                   {stats.role === 'constant' ? (
-                    <p className="text-dataTable">constant: {stats.min.toLocaleString()}</p>
+                    <p className="text-dataTable">{constantText(stats, stats.min.toLocaleString())}</p>
                   ) : (
                     <div className="space-y-0.5 text-dataTable tabular-nums">
                       <div>Count: {stats.count}</div>
@@ -534,7 +535,7 @@ export function DataTable({
                         className="bg-card py-2"
                         aria-sort={sortColumn === column ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
                       >
-                        <div className={"flex items-center" + (effectiveType === 'numeric' ? " justify-end" : "")}>
+                        <div className={"flex flex-nowrap items-center whitespace-nowrap" + (effectiveType === 'numeric' ? " justify-end" : "")}>
                           <Button
                             variant="ghost"
                             className="h-auto p-2 justify-start text-sm font-semibold text-muted-foreground hover:text-foreground"
@@ -565,7 +566,7 @@ export function DataTable({
                                       <p className="text-muted-foreground">Range: {colMeta.earliestDate} to {colMeta.latestDate}</p>
                                     )}
                                     <p className="text-muted-foreground mb-2">
-                                      {colMeta.invalidDateCount ?? 0} value(s) aren't valid dates (e.g. month 13, Feb 30, text). They're kept as text and left out of date grouping, filters and charts.
+                                      {countOf(colMeta.invalidDateCount ?? 0, "value")} {plural(colMeta.invalidDateCount ?? 0, "isn't a valid date", "aren't valid dates")} (e.g. month 13, Feb 30, text). {plural(colMeta.invalidDateCount ?? 0, "It's", "They're")} kept as text and left out of date grouping, filters and charts.
                                     </p>
                                     {colMeta.dayFirst !== undefined && (
                                       <>

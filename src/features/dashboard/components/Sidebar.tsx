@@ -42,6 +42,7 @@ import { Logo } from "@/shared/brand/Logo";
 import { Hint } from "@/shared/components/Hint";
 import { Sparkles, ShieldCheck, Palette } from "lucide-react";
 import { datasetRowCount } from "@/shared/services/datasetRows";
+import { countOf } from "@/shared/utils/plural";
 
 export function Sidebar({
   onOpenSearch,
@@ -341,7 +342,7 @@ export function Sidebar({
         <div className="flex items-center gap-2 mb-2">
           <Database className="w-4 h-4 text-frame-muted" aria-hidden />
           <h2 className="text-xs font-semibold text-frame-muted">Datasets</h2>
-          <CountBadge className="ml-auto" label={`${datasets.length} datasets`}>
+          <CountBadge className="ml-auto" label={countOf(datasets.length, "dataset")}>
             {datasets.length}
           </CountBadge>
         </div>
@@ -370,7 +371,7 @@ export function Sidebar({
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium truncate">{dataset.name}</div>
                       <div className="text-xs text-frame-muted tabular-nums">
-                        {datasetRowCount(dataset).toLocaleString()} rows, {dataset.columns.length} columns
+                        {countOf(datasetRowCount(dataset), "row")}, {countOf(dataset.columns.length, "column")}
                       </div>
                     </div>
                   </Button>
@@ -476,7 +477,7 @@ export function Sidebar({
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium truncate">{dash.name}</div>
                       <div className="text-xs text-frame-muted tabular-nums">
-                        {dash.chartIds.length} charts
+                        {countOf(dash.chartIds.length, "chart")}
                       </div>
                     </div>
                   </Button>

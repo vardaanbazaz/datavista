@@ -20,8 +20,6 @@ export interface Appearance {
   motion: MotionPreference;
   /** Glass (translucency + blur) on the frame. Off falls back to solid surfaces. */
   transparency: boolean;
-  /** The aurora ribbon's slow drift. Off (the default since store v3) leaves it still. */
-  backgroundAnimation: boolean;
 }
 
 export interface ThemeSetting {
@@ -41,7 +39,6 @@ export const DEFAULT_APPEARANCE: Appearance = {
   highContrast: false,
   motion: "system",
   transparency: true,
-  backgroundAnimation: false,
 };
 
 export const DEFAULT_THEME_SETTING: ThemeSetting = {
@@ -81,10 +78,10 @@ export function resolveThemeId(setting: ThemeSetting, prefersDark: boolean, minu
 }
 
 /**
- * Reads the persisted UI state (zustand persist, `datavista-ui-storage`), version 1 to 3.
+ * Reads the persisted UI state (zustand persist, `datavista-ui-storage`), version 1 to 4.
  * Version 1 had `theme: "light" | "dark" | "system"` and `readingComfort`; unknown theme ids
- * fall back to the defaults. Before version 3 Background animation was on by default, so a
- * stored `true` from version 1 or 2 is not a choice: it is read as off (the new default).
+ * fall back to the defaults. Versions 2 and 3 also stored `backgroundAnimation` (the ribbon's
+ * drift, removed in version 4); `appearance` is rebuilt field by field, so that key is dropped.
  */
 export function readStoredPrefs(raw: string | null, knownIds: string[]): { setting: ThemeSetting; appearance: Appearance } {
   const defaultsSetting: ThemeSetting = {
@@ -97,11 +94,9 @@ export function readStoredPrefs(raw: string | null, knownIds: string[]): { setti
     nightStart: "19:00",
   };
   let state: Record<string, unknown> = {};
-  let version = 0;
   try {
     const parsed = raw ? JSON.parse(raw) : null;
     if (parsed && typeof parsed === "object" && parsed.state && typeof parsed.state === "object") state = parsed.state;
-    if (parsed && typeof parsed === "object" && typeof parsed.version === "number") version = parsed.version;
   } catch {
     state = {};
   }
@@ -129,7 +124,6 @@ export function readStoredPrefs(raw: string | null, knownIds: string[]): { setti
     highContrast: a.highContrast === true,
     motion: a.motion === "reduce" || a.motion === "full" ? a.motion : "system",
     transparency: a.transparency !== false,
-    backgroundAnimation: version >= 3 && a.backgroundAnimation === true,
   };
   return { setting, appearance };
 }
@@ -142,7 +136,6 @@ export function applyAttributes(root: HTMLElement, themeId: string, dark: boolea
   root.dataset.textSize = appearance.textSize;
   root.dataset.motion = appearance.motion;
   root.dataset.transparency = appearance.transparency && !appearance.highContrast ? "on" : "off";
-  root.dataset.animation = appearance.backgroundAnimation ? "on" : "off";
   if (appearance.highContrast) root.dataset.contrast = "high";
   else delete root.dataset.contrast;
 }

@@ -27,7 +27,7 @@ async function open(page: Page) {
       hasSeenTour: true,
       hasCompletedSetup: true,
       themeSetting: { mode: "fixed", theme: "light", day: "light", night: "dark", trigger: "device", dayStart: "07:00", nightStart: "19:00" },
-      appearance: { textSize: "default", highContrast: false, motion: "reduce", transparency: true, backgroundAnimation: false },
+      appearance: { textSize: "default", highContrast: false, motion: "reduce", transparency: true },
     },
     version: 3,
   };

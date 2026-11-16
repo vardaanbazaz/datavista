@@ -98,7 +98,7 @@ test("parse problems are listed; exclude removes Play Store's shifted row", asyn
   await waitForImported(page, "playstore");
   await page.getByTestId("sidebar-nav-data").click();
   await expect(page.getByTestId("column-stats-Rating")).toContainText("Max: 5.00");
-  await expect(page.getByTestId("import-issues-notice")).toContainText("1 row had parse problems at import and were excluded");
+  await expect(page.getByTestId("import-issues-notice")).toContainText("1 row had parse problems at import and was excluded");
 });
 
 test("keeping problem rows is the default and the summary reopens from the Data view", async ({ page }) => {
@@ -113,10 +113,10 @@ test("keeping problem rows is the default and the summary reopens from the Data 
   // The summary is stored with the dataset (IndexedDB), so it survives a reload.
   await page.reload();
   if ((await page.getByTestId("import-issues-notice").count()) === 0) await page.getByTestId("sidebar-nav-data").click();
-  await expect(page.getByTestId("import-issues-notice")).toContainText("1 row had parse problems at import and were kept");
+  await expect(page.getByTestId("import-issues-notice")).toContainText("1 row had parse problems at import and was kept");
   await page.getByTestId("import-issues-open").click();
   const reopened = page.getByTestId("import-issues-dialog");
-  await expect(reopened).toContainText("1 of 80 rows had parse problems and were kept");
+  await expect(reopened).toContainText("1 of 80 rows had parse problems and was kept");
   await expect(reopened.getByTestId("import-issue-row").locator("td").nth(0)).toHaveText("80");
   await expect(reopened.getByTestId("import-issue-row").locator("td").nth(2)).toContainText("Life Made WI-Fi Touchscreen Photo Frame");
 });
@@ -148,7 +148,7 @@ test.describe("multi-sheet XLSX", () => {
     const picker = page.getByTestId("sheet-picker");
     await expect(picker).toContainText("Year 2009-2010");
     await expect(picker).toContainText("Year 2010-2011");
-    await expect(picker.getByTestId("sheet-row-count")).toHaveText(["2 rows", "1 rows"]);
+    await expect(picker.getByTestId("sheet-row-count")).toHaveText(["2 rows", "1 row"]);
     await expect(picker).toContainText("Invoice, Country, Quantity");
     await page.getByRole("radio", { name: "Year 2010-2011" }).check();
     await page.getByTestId("sheet-import").click();

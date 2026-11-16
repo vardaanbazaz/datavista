@@ -14,13 +14,12 @@ test("appearance settings apply immediately and persist after reload", async ({ 
   const panel = page.getByTestId("appearance-panel");
   await panel.getByTestId("text-size-xlarge").check();
   await panel.getByTestId("motion-reduce").check();
-  await panel.getByTestId("background-animation").uncheck();
   await panel.locator("label", { has: page.getByTestId("theme-clay") }).click();
 
   await expect(html).toHaveAttribute("data-theme", "clay");
   await expect(html).toHaveClass(/light/);
   await expect(html).toHaveAttribute("data-text-size", "xlarge");
-  await expect(html).toHaveAttribute("data-animation", "off");
+  await expect(panel.getByTestId("background-animation")).toHaveCount(0);
 
   // High contrast forces glass off and says why.
   await panel.getByTestId("high-contrast").check();

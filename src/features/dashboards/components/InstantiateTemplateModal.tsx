@@ -18,6 +18,7 @@ import { useDatasetStore } from "@/store/datasetStore";
 import { useChartStore } from "@/store/chartStore";
 import { useDashboardStore } from "../store/dashboardStore";
 import { templateEngine } from "../services/templateEngine";
+import { countOf } from "@/shared/utils/plural";
 
 interface InstantiateTemplateModalProps {
   isOpen: boolean;
@@ -142,7 +143,7 @@ export function InstantiateTemplateModal({ isOpen, onClose }: InstantiateTemplat
               <SelectContent>
                 {datasets.map((ds) => (
                   <SelectItem key={ds.id} value={ds.id}>
-                    {ds.name} ({ds.columns.length} columns)
+                    {ds.name} ({countOf(ds.columns.length, "column")})
                   </SelectItem>
                 ))}
               </SelectContent>

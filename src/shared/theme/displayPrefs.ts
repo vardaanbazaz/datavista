@@ -25,13 +25,6 @@ export function transparencyBlockedReason(appearance: Appearance): string | null
   return null;
 }
 
-/** Why the ribbon stays still although Background animation is on, or null when it moves. */
-export function animationBlockedReason(appearance: Appearance): string | null {
-  if (appearance.highContrast) return "Off while High contrast is on (the ribbon is hidden).";
-  if (motionIsReduced(appearance)) return "Still while motion is reduced.";
-  return null;
-}
-
 export function resolveTheme(setting: ThemeSetting, now: Date = new Date()): ThemeId {
   const id = resolveThemeId(setting, systemPrefersDark(), now.getHours() * 60 + now.getMinutes());
   return isThemeId(id) ? id : "light";

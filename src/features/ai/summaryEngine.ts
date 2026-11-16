@@ -3,6 +3,7 @@ import { anomalyDetector, DetectedAnomaly } from "./anomalyDetector";
 import { callLLM } from "./llmService";
 import { useUiStore } from "@/store/uiStore";
 import { getEffectiveColumnType } from "@/shared/utils/columnType";
+import { countOf } from "@/shared/utils/plural";
 
 export const summaryEngine = {
   /**
@@ -127,7 +128,7 @@ TASK: Generate a concise, professional 2 to 3 sentence executive summary describ
     const top = anomalies.slice(0, 2).map((a) => a.description.replace(/\.$/, ""));
     const more = anomalies.length - top.length;
     return (
-      `Most unusual values in "${datasetName}" (${rowCount.toLocaleString()} rows${scope}): ${top.join("; ")}.` +
+      `Most unusual values in "${datasetName}" (${countOf(rowCount, "row")}${scope}): ${top.join("; ")}.` +
       (more > 0 ? ` ${more} more ${more === 1 ? "value stands" : "values stand"} out.` : "")
     );
   }
