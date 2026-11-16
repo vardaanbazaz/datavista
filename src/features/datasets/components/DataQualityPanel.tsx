@@ -9,8 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/components/ui/popover";
 import type { ColumnFix, ColumnMetadata, Dataset, ValueCount } from "@/shared/types";
 import { useDatasetStore } from "@/store/datasetStore";
-import { labelKey, suggestionKey, variantMergeText } from "@/shared/services/dataQuality";
-import { previewNumberConversion } from "@/shared/services/columnFixes";
+import { failsType, labelKey, suggestionKey, variantMergeText } from "@/shared/services/dataQuality";
+import { misalignedRowsOf, previewNumberConversion } from "@/shared/services/columnFixes";
+import { getEffectiveColumnType } from "@/shared/utils/columnType";
+import { countOf } from "@/shared/utils/plural";
 import { fixLabel, fixShortLabel } from "../lib/fixLabel";
 
 /** Suggestions answered "No" this session (not stored: they come back after a reload). */
@@ -180,8 +182,33 @@ function ConvertDialog({ dataset, column, onClose }: { dataset: Dataset; column:
   );
 }
 
+const MISALIGNED_PREVIEW = 5;
+
+/** The first misaligned rows: row number, first column, and each value that doesn't fit its column. */
+function MisalignedPreview({ dataset, rows }: { dataset: Dataset; rows: number[] }) {
+  const first = dataset.columns[0];
+  return (
+    <ul className="space-y-1 text-xs" data-testid="misaligned-preview">
+      {rows.slice(0, MISALIGNED_PREVIEW).map((i) => {
+        const row = dataset.data[i];
+        const bad = dataset.columns.filter((c) => failsType(getEffectiveColumnType(dataset, c), row[c]));
+        return (
+          <li key={i} className="rounded border border-border px-2 py-1">
+            <span className="font-semibold">Row {(i + 1).toLocaleString()}</span>
+            {first && <> · {first}: {String(row[first] ?? "")}</>}
+            {bad.map((c) => (
+              <span key={c} className="text-tertiary"> · {c}: "{String(row[c])}"</span>
+            ))}
+          </li>
+        );
+      })}
+      {rows.length > MISALIGNED_PREVIEW && <li className="text-muted-foreground">and {countOf(rows.length - MISALIGNED_PREVIEW, "more row")}</li>}
+    </ul>
+  );
+}
+
 /**
- * Data-quality notices for the active dataset (Data view): duplicate rows, -1-style codes,
+ * Data-quality notices for the active dataset (Data view): duplicate rows, misaligned rows, -1-style codes,
  * label variants, "Convert to number…" offers, and columns left as text with a warning.
  * Nothing here changes data until the user clicks.
  */
@@ -189,6 +216,8 @@ export function DataQualityPanel({ dataset }: { dataset: Dataset }) {
   const applyColumnFix = useDatasetStore((s) => s.applyColumnFix);
   const removeDuplicates = useDatasetStore((s) => s.removeDuplicates);
   const restoreDuplicates = useDatasetStore((s) => s.restoreDuplicates);
+  const excludeMisaligned = useDatasetStore((s) => s.excludeMisalignedRows);
+  const restoreMisaligned = useDatasetStore((s) => s.restoreMisalignedRows);
   const dismissSuggestion = useDatasetStore((s) => s.dismissSuggestion);
   const ensureColumnQuality = useDatasetStore((s) => s.ensureColumnQuality);
   const [, rerender] = useState(0);
@@ -228,10 +257,12 @@ export function DataQualityPanel({ dataset }: { dataset: Dataset }) {
 
   const duplicates = meta.quality?.duplicateRowCount ?? 0;
   const removed = meta.removedDuplicateCount ?? 0;
+  const misaligned = misalignedRowsOf(dataset);
+  const misalignedRemoved = meta.removedMisalignedCount ?? 0;
   const currencyWarnings = Object.entries(meta.quality?.currencyWarnings ?? {});
   const groupingWarnings = Object.entries(meta.quality?.groupingWarnings ?? {});
 
-  if (!duplicates && !sentinels.length && !variants.length && !converts.length && !currencyWarnings.length && !groupingWarnings.length) {
+  if (!duplicates && !misaligned.length && !misalignedRemoved && !sentinels.length && !variants.length && !converts.length && !currencyWarnings.length && !groupingWarnings.length) {
     return null;
   }
 
@@ -252,6 +283,26 @@ export function DataQualityPanel({ dataset }: { dataset: Dataset }) {
             <Button size="sm" variant="outline" onClick={removeDuplicates} data-testid="remove-duplicates">Remove duplicates</Button>
           )}
         </div>
+      )}
+
+      {misalignedRemoved > 0 ? (
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center" data-testid="misaligned-notice">
+          <p className="flex-1">{countOf(misalignedRemoved, "misaligned row")} excluded.</p>
+          <Button size="sm" variant="outline" onClick={restoreMisaligned} data-testid="restore-misaligned">Undo</Button>
+        </div>
+      ) : (
+        misaligned.length > 0 && (
+          <div className="space-y-2" data-testid="misaligned-notice">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <p className="flex-1">
+                {countOf(misaligned.length, "misaligned row")}: two or more values don't fit their column's type, as if
+                the row were shifted by a column. They are kept and counted unless you exclude them.
+              </p>
+              <Button size="sm" variant="outline" onClick={excludeMisaligned} data-testid="exclude-misaligned">Exclude rows</Button>
+            </div>
+            <MisalignedPreview dataset={dataset} rows={misaligned} />
+          </div>
+        )
       )}
 
       {sentinels.map((s) => (

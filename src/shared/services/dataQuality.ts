@@ -5,6 +5,7 @@
  */
 import type { ColumnQuality, ValueCount, DataRow } from "@/shared/types";
 import { parseStrictNumber, toNumberOrNull } from "@/shared/utils/numeric";
+import { parseStoredDate } from "@/shared/utils/dates";
 import { isCommaDecimal, parseCurrency, parseGroupedNumber, parseSuffixNumber } from "@/shared/utils/numberFormats";
 import { countOf, plural } from "@/shared/utils/plural";
 
@@ -273,6 +274,41 @@ export function findDuplicateRows(rows: readonly Record<string, unknown>[], keys
     const candidates = typeof prev === "number" ? [prev] : prev;
     if (candidates.some((j) => same(i, j))) { out.push(i); continue; }
     seen.set(h, [...candidates, i]);
+  }
+  return out;
+}
+
+/** A row with at least this many cells that don't fit their column's type is a misaligned row. */
+export const MISALIGNED_MIN_FAILURES = 2;
+
+/** A cell that doesn't fit its column's type, with the same rule as the metadata pass (blanks never fail). */
+export function failsType(type: string | undefined, cell: unknown): boolean {
+  if (cell === null || cell === undefined) return false;
+  if (typeof cell === "string" && cell.trim() === "") return false;
+  if (type === "numeric") return toNumberOrNull(cell) === null;
+  if (type === "date") return parseStoredDate(cell) === null;
+  return false;
+}
+
+/**
+ * Rows that look shifted by a column (a missing or extra field in the source line): at least
+ * MISALIGNED_MIN_FAILURES non-blank cells that fail their column's type (number rule for
+ * numeric columns, stored-date rule for date columns). Text columns never fail. `types` is
+ * the effective type of each column to check. Returns row indices in order.
+ */
+export function findMisalignedRows(rows: readonly Record<string, unknown>[], types: Readonly<Record<string, string>>): number[] {
+  const checked = Object.keys(types).filter((c) => types[c] === "numeric" || types[c] === "date");
+  if (checked.length < MISALIGNED_MIN_FAILURES) return [];
+  const out: number[] = [];
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    let failures = 0;
+    for (const c of checked) {
+      if (failsType(types[c], row[c]) && ++failures >= MISALIGNED_MIN_FAILURES) {
+        out.push(i);
+        break;
+      }
+    }
   }
   return out;
 }

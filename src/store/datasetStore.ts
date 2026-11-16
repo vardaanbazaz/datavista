@@ -9,7 +9,7 @@ import { formulaEngine } from "@/shared/services/formulaEngine";
 import { windowEngine } from "@/shared/services/window";
 import { queryCache } from "@/shared/services/optimizer";
 import { reparseDateColumn } from "@/shared/services/parsingService";
-import { addColumnFix, mergeColumnMeta, removeColumnFix, removeDuplicateRows, restoreDuplicateRows, sourceColumns } from "@/shared/services/columnFixes";
+import { addColumnFix, excludeMisalignedRows, mergeColumnMeta, removeColumnFix, removeDuplicateRows, restoreDuplicateRows, restoreRemovedRows, sourceColumns } from "@/shared/services/columnFixes";
 import { computeColumnMetadata } from "@/shared/services/columnMeta/client";
 import { perfMark, perfMeasure } from "@/shared/lib/perfMarks";
 import { loadPendingRows } from "@/shared/services/datasetRows";
@@ -65,6 +65,10 @@ interface DatasetState {
   removeDuplicates: () => void;
   /** Puts the removed duplicate rows back where they were. */
   restoreDuplicates: () => void;
+  /** Takes out rows with 2+ cells that don't fit their column's type (columnFixes.misalignedRowsOf). */
+  excludeMisalignedRows: () => void;
+  /** Puts the excluded misaligned rows back where they were. */
+  restoreMisalignedRows: () => void;
   /** "Don't ask again" for one data-quality suggestion (metadata only). */
   dismissSuggestion: (datasetId: string, key: string) => void;
   /**
@@ -532,6 +536,20 @@ export const useDatasetStore = create<DatasetState>((set, get) => {
     perfMark("duplicates");
     const updated = applyActiveDatasetUpdate((dataset) => restoreDuplicateRows(dataset, { deferMeta: true }));
     perfMeasure("duplicates", "duplicates");
+    if (updated) recountColumns(updated.id, sourceColumns(updated));
+  },
+
+  excludeMisalignedRows: () => {
+    perfMark("misaligned");
+    const updated = applyActiveDatasetUpdate((dataset) => excludeMisalignedRows(dataset, { deferMeta: true }));
+    perfMeasure("misaligned", "misaligned");
+    if (updated) recountColumns(updated.id, sourceColumns(updated));
+  },
+
+  restoreMisalignedRows: () => {
+    perfMark("misaligned");
+    const updated = applyActiveDatasetUpdate((dataset) => restoreRemovedRows(dataset, "misaligned", { deferMeta: true }));
+    perfMeasure("misaligned", "misaligned");
     if (updated) recountColumns(updated.id, sourceColumns(updated));
   },
 

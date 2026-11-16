@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { nameWords, columnAggregationFlag, aggregationNote, defaultMeasureColumn, aggregationsForColumn, defaultAggregationForColumn } from "../columnRoles";
+import { nameWords, columnAggregationFlag, aggregationNote, defaultMeasureColumn, aggregationsForColumn, defaultAggregationForColumn, isPerItemName } from "../columnRoles";
 import type { ColumnMetadata, Dataset } from "@/shared/types";
 
 function col(name: string, over: Partial<ColumnMetadata> = {}): ColumnMetadata {
@@ -117,5 +117,41 @@ describe("KPI measure defaults", () => {
     expect(ops).toEqual(["count", "count_rows", "count_distinct"]);
     expect(defaultAggregationForColumn(retail, "Invoice")).toBe("count");
     expect(aggregationsForColumn(retail, "Quantity")).toEqual(expect.arrayContaining(["sum", "avg", "median"]));
+  });
+});
+
+describe("per-item names default to Average", () => {
+  it("matches whole words, case-insensitive, plurals and %", () => {
+    for (const name of [
+      "Rating", "rating", "Ratings", "user_score", "CreditScore", "interest rate", "DailyRate", "MonthlyRate",
+      "PercentSalaryHike", "pct_change", "Win %", "growth%", "Price", "Unit Price", "unit_prices", "Age", "AgeYears",
+      "avg_temp", "Average Order", "mean value", "Debt Ratio",
+    ]) {
+      expect(isPerItemName(name), name).toBe(true);
+    }
+  });
+  it("does not match the words inside other words", () => {
+    for (const name of [
+      "Stage", "Usage", "Corporate", "Generated", "Total Spent", "Reviews", "Quantity", "Revenue", "Accurate",
+      "Priceless", "Percentile", "Meaning", "Rated",
+    ]) {
+      expect(isPerItemName(name), name).toBe(false);
+    }
+  });
+  it("Average for a per-item measure, Sum for other measures, Count for ID / year / constant", () => {
+    const ds = dataset([
+      col("Rating", { allIntegerValues: false, minimumValue: 1, maximumValue: 5 }),
+      col("Reviews", { minimumValue: 0, maximumValue: 9000 }),
+      col("Price", { allIntegerValues: false, minimumValue: 0, maximumValue: 400 }),
+      col("price_code"),
+      col("rate_year", { minimumValue: 2001, maximumValue: 2020 }),
+      col("Score", { minimumValue: 3, maximumValue: 3 }),
+    ]);
+    expect(defaultAggregationForColumn(ds, "Rating")).toBe("avg");
+    expect(defaultAggregationForColumn(ds, "Price")).toBe("avg");
+    expect(defaultAggregationForColumn(ds, "Reviews")).toBe("sum");
+    expect(defaultAggregationForColumn(ds, "price_code")).toBe("count");
+    expect(defaultAggregationForColumn(ds, "rate_year")).toBe("count");
+    expect(defaultAggregationForColumn(ds, "Score")).toBe("count");
   });
 });

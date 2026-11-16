@@ -126,9 +126,28 @@ export function aggregationsForColumn(dataset: Dataset | null | undefined, colum
   return ["count", "count_rows", "count_distinct"];
 }
 
-/** Default aggregation for a column: Sum for a plain measure, Count for IDs, years, constants and non-numbers. */
+const PER_ITEM_WORDS = new Set([
+  "rating", "score", "rate", "percent", "percentage", "pct", "price", "age", "avg", "average", "mean", "ratio",
+]);
+
+/**
+ * The name says each value is a per-item level (a rating, a price, a rate, a percentage), so
+ * adding the values up means nothing ("Sum of Rating" = 39.3K) and Average is the useful
+ * default. Whole words of nameWords (plain plural "s" too), case-insensitive, so "Usage",
+ * "Stage", "Corporate" and "Generated" don't match; a "%" anywhere in the name matches.
+ */
+export function isPerItemName(name: string): boolean {
+  if (name.includes("%")) return true;
+  return nameWords(name).some((w) => PER_ITEM_WORDS.has(w) || (w.endsWith("s") && PER_ITEM_WORDS.has(w.slice(0, -1))));
+}
+
+/**
+ * Default aggregation for a column: Count for IDs, years, constants and non-numbers; Average
+ * for a per-item value (isPerItemName); Sum for any other measure.
+ */
 export function defaultAggregationForColumn(dataset: Dataset | null | undefined, column: string): AggregationOperator {
   if (!dataset || !column) return "count";
   if (getEffectiveColumnType(dataset, column) !== "numeric") return "count";
-  return aggregationFlag(dataset, column) || isConstantNumericColumn(dataset, column) ? "count" : "sum";
+  if (aggregationFlag(dataset, column) || isConstantNumericColumn(dataset, column)) return "count";
+  return isPerItemName(column) ? "avg" : "sum";
 }

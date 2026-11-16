@@ -1,4 +1,4 @@
-import { db, fromStoredDataset, toStoredDataset, type DatasetRowChunk, type RemovedRowsRecord, type StoredDataset } from "@/shared/lib/db";
+import { db, fromStoredDataset, removedRowCount, toStoredDataset, type DatasetRowChunk, type RemovedRowsRecord, type StoredDataset } from "@/shared/lib/db";
 import { Dataset } from "@/shared/types";
 import { formulaEngine } from "@/shared/services/formulaEngine";
 import { windowEngine } from "@/shared/services/window";
@@ -18,7 +18,7 @@ export async function readDatasetRows(
   stored: StoredDataset,
   onProgress?: (loadedRows: number, totalRows: number) => void
 ): Promise<Dataset | null> {
-  const wantRemoved = (stored.metadata?.removedDuplicateCount ?? 0) > 0;
+  const wantRemoved = removedRowCount(stored.metadata) > 0;
   let removed: RemovedRowsRecord | undefined;
   const chunks = await db.transaction("r", db.datasetRows, db.removedRows, async () => {
     if (wantRemoved) removed = await db.removedRows.get(stored.id);

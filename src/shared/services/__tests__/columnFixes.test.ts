@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { processRawData } from "../parsingService";
-import { addColumnFix, previewNumberConversion, removeColumnFix, removeDuplicateRows, restoreDuplicateRows } from "../columnFixes";
+import { addColumnFix, excludeMisalignedRows, misalignedRowsOf, previewNumberConversion, removeColumnFix, removeDuplicateRows, restoreDuplicateRows, restoreRemovedRows, toOriginalIndices } from "../columnFixes";
 import { columnNumbers, mean } from "@/shared/utils/numeric";
 
 const load = (rows: Record<string, string>[]) => processRawData(rows, "t.csv", { dayFirstDefault: true });
@@ -102,5 +102,50 @@ describe("column fixes", () => {
     expect(back.dateSourceValues).toEqual(ds.dateSourceValues);
     expect(back.fixSourceValues).toEqual(ds.fixSourceValues);
     expect(back.metadata!.columns).toEqual(ds.metadata!.columns);
+  });
+
+  it("misaligned rows: exclude and undo, in either order with duplicate removal, round-trip exactly", () => {
+    const rows = [
+      { a: "x", n: "1", p: "$1", d: "2024-01-05" },
+      { a: "x", n: "1", p: "$1", d: "2024-01-05" }, // duplicate of 0
+      { a: "s", n: "oops", p: "Everyone", d: "1.0.19" }, // misaligned
+      { a: "y", n: "2", p: "$2", d: "2024-02-05" },
+      { a: "x", n: "1", p: "$1", d: "2024-01-05" }, // duplicate of 0
+      { a: "t", n: "bad", p: "$3", d: "Free" }, // misaligned
+      { a: "z", n: "3", p: "$4", d: "2024-03-05" },
+      // Enough clean rows for n, p, d to be typed number / number / date.
+      ...Array.from({ length: 12 }, (_, i) => ({ a: `c${i}`, n: String(i + 10), p: `$${i + 5}`, d: `2024-04-${String(i + 10)}` })),
+    ];
+    const ds = load(rows);
+    const tail = ds.data.slice(7).map((r) => r.a);
+    expect(misalignedRowsOf(ds)).toEqual([2, 5]);
+
+    // Duplicates first, then misaligned; undo misaligned first, then duplicates.
+    const noDupes = removeDuplicateRows(ds);
+    expect(misalignedRowsOf(noDupes)).toEqual([1, 3]);
+    expect(toOriginalIndices(noDupes, [1, 3])).toEqual([2, 5]);
+    const both = excludeMisalignedRows(noDupes);
+    expect(both.data.map((r) => r.a)).toEqual(["x", "y", "z", ...tail]);
+    expect(both.removedDuplicates!.map((r) => [r.index, r.reason])).toEqual([[1, undefined], [2, "misaligned"], [4, undefined], [5, "misaligned"]]);
+    expect([both.metadata!.removedDuplicateCount, both.metadata!.removedMisalignedCount, both.metadata!.rowCount]).toEqual([2, 2, 15]);
+    expect(misalignedRowsOf(both)).toEqual([]);
+    const misBack = restoreRemovedRows(both, "misaligned");
+    expect(misBack.data).toEqual(noDupes.data);
+    expect(misBack.metadata!.removedMisalignedCount).toBeUndefined();
+    expect(restoreDuplicateRows(misBack).data).toEqual(ds.data);
+
+    // Misaligned first, then duplicates; undo duplicates first, then misaligned.
+    const noMis = excludeMisalignedRows(ds);
+    expect(noMis.data.map((r) => r.a)).toEqual(["x", "x", "y", "x", "z", ...tail]);
+    const both2 = removeDuplicateRows(noMis);
+    expect(both2.data).toEqual(both.data);
+    const dupBack = restoreDuplicateRows(both2);
+    expect(dupBack.data).toEqual(noMis.data);
+    expect(dupBack.removedDuplicates!.map((r) => r.index)).toEqual([2, 5]);
+    const all = restoreRemovedRows(dupBack, "misaligned");
+    expect(all.data).toEqual(ds.data);
+    expect(all.fixSourceValues).toEqual(ds.fixSourceValues);
+    expect(all.removedDuplicates).toBeUndefined();
+    expect(all.metadata!.columns).toEqual(ds.metadata!.columns);
   });
 });

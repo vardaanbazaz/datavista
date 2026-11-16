@@ -10,6 +10,8 @@ import type { ColumnFix, ColumnMetadata, DataRow, Dataset, RemovedRow } from "@/
 import { generateDatasetMetadata } from "./parsingService";
 import { CONVERTING_FIXES, transformColumn } from "./columnFixTransforms";
 import { parseSuffixNumber } from "@/shared/utils/numberFormats";
+import { getEffectiveColumnType } from "@/shared/utils/columnType";
+import { findMisalignedRows } from "./dataQuality";
 
 type Cell = DataRow[string];
 type ColumnType = Dataset["columnTypes"][string];
@@ -161,24 +163,74 @@ export function sourceColumns(dataset: Dataset): string[] {
   return (dataset.metadata?.columns ?? []).filter((c) => c.role !== "calculated" && c.role !== "window").map((c) => c.name);
 }
 
+export type RemovedReason = "duplicate" | "misaligned";
+
+const reasonOf = (r: RemovedRow): RemovedReason => r.reason ?? "duplicate";
+
+/** Metadata counts of the removed rows, by reason (a zero count is left out). */
+function withRemovedCounts(meta: NonNullable<Dataset["metadata"]>, removed: readonly RemovedRow[]): NonNullable<Dataset["metadata"]> {
+  const { removedDuplicateCount: _d, removedMisalignedCount: _m, ...rest } = meta;
+  const dup = removed.filter((r) => reasonOf(r) === "duplicate").length;
+  const mis = removed.length - dup;
+  return { ...rest, ...(dup > 0 ? { removedDuplicateCount: dup } : {}), ...(mis > 0 ? { removedMisalignedCount: mis } : {}) };
+}
+
+/** True when rows with this reason are currently removed. */
+export function hasRemovedRows(dataset: Dataset, reason: RemovedReason): boolean {
+  return (dataset.removedDuplicates ?? []).some((r) => reasonOf(r) === reason);
+}
+
 /**
- * Removes the exact duplicate rows found at import (metadata.quality.duplicateIndices), keeping
- * each first occurrence. The removed rows (and their per-row source text) go to
- * metadata.removedDuplicates so restoreDuplicateRows can put them back where they were.
+ * Positions in the full data (before any removal) of rows at `current` positions of
+ * dataset.data. `current` must be ascending.
  */
-export function removeDuplicateRows(dataset: Dataset, options: FixOptions = {}): Dataset {
+export function toOriginalIndices(dataset: Dataset, current: readonly number[]): number[] {
+  const removed = (dataset.removedDuplicates ?? []).map((r) => r.index).sort((a, b) => a - b);
+  const out: number[] = [];
+  let j = 0;
+  let shift = 0;
+  for (const c of current) {
+    // Original index o = c + (removed indices below o): advance while the next removed one is at or below.
+    while (j < removed.length && removed[j] <= c + shift) {
+      shift++;
+      j++;
+    }
+    out.push(c + shift);
+  }
+  return out;
+}
+
+/**
+ * Takes the rows at `originalIndices` (positions in the full data, before any removal) out of
+ * the dataset. The rows and their per-row source cells are added to Dataset.removedDuplicates
+ * tagged with `reason`, so restoreRemovedRows can put them back where they were. Indices
+ * already removed (for either reason) are skipped.
+ */
+export function removeRows(dataset: Dataset, originalIndices: readonly number[], reason: RemovedReason, options: FixOptions = {}): Dataset {
   const meta = dataset.metadata;
-  const indices = meta?.quality?.duplicateIndices ?? [];
-  if (!meta || indices.length === 0 || dataset.removedDuplicates) return dataset;
-  const drop = new Set(indices);
-  const removed: RemovedRow[] = indices.map((index) => {
-    const entry: RemovedRow = { index, row: dataset.data[index] };
-    if (dataset.dateSourceValues) entry.dateSource = Object.fromEntries(Object.entries(dataset.dateSourceValues).map(([c, v]) => [c, v[index]]));
-    if (dataset.fixSourceValues) entry.fixSource = Object.fromEntries(Object.entries(dataset.fixSourceValues).map(([c, v]) => [c, v[index]]));
+  const existing = dataset.removedDuplicates ?? [];
+  const already = new Set(existing.map((r) => r.index));
+  const targets = [...new Set(originalIndices)].filter((i) => !already.has(i)).sort((a, b) => a - b);
+  if (!meta || targets.length === 0) return dataset;
+  const sortedExisting = existing.map((r) => r.index).sort((a, b) => a - b);
+  // Current position of an original index = original − removed rows before it.
+  let j = 0;
+  const current = targets.map((o) => {
+    while (j < sortedExisting.length && sortedExisting[j] < o) j++;
+    return o - j;
+  });
+  const added: RemovedRow[] = targets.map((index, k) => {
+    const at = current[k];
+    const entry: RemovedRow = { index, row: dataset.data[at] };
+    if (reason !== "duplicate") entry.reason = reason;
+    if (dataset.dateSourceValues) entry.dateSource = Object.fromEntries(Object.entries(dataset.dateSourceValues).map(([c, v]) => [c, v[at]]));
+    if (dataset.fixSourceValues) entry.fixSource = Object.fromEntries(Object.entries(dataset.fixSourceValues).map(([c, v]) => [c, v[at]]));
     return entry;
   });
+  const drop = new Set(current);
   const keep = <T,>(arr: T[]) => arr.filter((_, i) => !drop.has(i));
   const data = keep(dataset.data);
+  const removed = [...existing, ...added].sort((a, b) => a.index - b.index);
   const next: Dataset = {
     ...dataset,
     data,
@@ -186,29 +238,41 @@ export function removeDuplicateRows(dataset: Dataset, options: FixOptions = {}):
     ...(dataset.fixSourceValues ? { fixSourceValues: mapValues(dataset.fixSourceValues, keep) } : {}),
   };
   next.removedDuplicates = removed;
-  next.metadata = { ...withRefreshedRows(next, data, options)!, removedDuplicateCount: removed.length };
+  next.metadata = withRemovedCounts(withRefreshedRows(next, data, options)!, removed);
   return next;
 }
 
-/** Puts back the rows removeDuplicateRows took out, at their original positions, and re-applies column fixes to them. */
-export function restoreDuplicateRows(dataset: Dataset, options: FixOptions = {}): Dataset {
+/**
+ * Puts back the rows removed for `reason`, at their original positions among the rows still
+ * there (rows removed for the other reason stay out), and re-applies column fixes to them.
+ */
+export function restoreRemovedRows(dataset: Dataset, reason: RemovedReason, options: FixOptions = {}): Dataset {
   const meta = dataset.metadata;
-  const removed = dataset.removedDuplicates;
-  if (!meta || !removed) return dataset;
-  const total = dataset.data.length + removed.length;
-  const insertAt = new Map(removed.map((r) => [r.index, r]));
+  const all = dataset.removedDuplicates ?? [];
+  const back = all.filter((r) => reasonOf(r) === reason);
+  if (!meta || back.length === 0) return dataset;
+  const stay = all.filter((r) => reasonOf(r) !== reason);
+  const stayIdx = stay.map((r) => r.index).sort((a, b) => a - b);
+  const total = dataset.data.length + back.length;
+  // Position of a restored row = its original index − rows still removed before it.
+  const insertAt = new Map<number, RemovedRow>();
+  let j = 0;
+  for (const r of [...back].sort((a, b) => a.index - b.index)) {
+    while (j < stayIdx.length && stayIdx[j] < r.index) j++;
+    insertAt.set(r.index - j, r);
+  }
   const merge = <T,>(arr: T[], pick: (r: RemovedRow) => T): T[] => {
     const out = new Array<T>(total);
-    let j = 0;
+    let k = 0;
     for (let i = 0; i < total; i++) {
       const r = insertAt.get(i);
-      out[i] = r ? pick(r) : arr[j++];
+      out[i] = r ? pick(r) : arr[k++];
     }
     return out;
   };
   const data = merge(dataset.data, (r) => r.row as DataRow);
   const { removedDuplicates: _rows, ...withoutRemoved } = dataset;
-  let next: Dataset = { ...withoutRemoved, data };
+  let next: Dataset = { ...withoutRemoved, data, ...(stay.length > 0 ? { removedDuplicates: stay } : {}) };
   if (dataset.dateSourceValues) {
     next.dateSourceValues = Object.fromEntries(Object.entries(dataset.dateSourceValues).map(([c, v]) => [c, merge(v, (r) => r.dateSource?.[c] ?? null)]));
   }
@@ -219,8 +283,7 @@ export function restoreDuplicateRows(dataset: Dataset, options: FixOptions = {})
       Object.entries(dataset.fixSourceValues).map(([c, v]) => [c, merge(v, (r) => (r.fixSource && c in r.fixSource ? r.fixSource[c] : (r.row[c] ?? null)))])
     );
   }
-  const { removedDuplicateCount: _count, ...rest } = meta;
-  next.metadata = { ...rest, rowCount: total };
+  next.metadata = { ...withRemovedCounts(meta, stay), rowCount: total };
   // Re-apply each fixed column so the restored rows carry the fixes made since.
   for (const column of Object.keys(next.fixSourceValues ?? {})) {
     const fixes = fixesOf(next, column);
@@ -228,6 +291,55 @@ export function restoreDuplicateRows(dataset: Dataset, options: FixOptions = {})
   }
   next.metadata = withRefreshedRows(next, next.data, options);
   return next;
+}
+
+const misalignedCache = new WeakMap<object, WeakMap<object, number[]>>();
+
+/**
+ * Positions in dataset.data of misaligned rows (dataQuality.findMisalignedRows), over the
+ * numeric and date columns from the file. A column whose metadata counts no invalid cell for
+ * the same type can't fail, so it is skipped; with fewer than two columns left nothing is
+ * scanned (most datasets, including the 1M-row retail file). Cached per rows array and metadata.
+ */
+export function misalignedRowsOf(dataset: Dataset | null | undefined): number[] {
+  if (!dataset?.metadata || dataset.rowsPending) return [];
+  const byMeta = misalignedCache.get(dataset.data) ?? new WeakMap<object, number[]>();
+  misalignedCache.set(dataset.data, byMeta);
+  const cached = byMeta.get(dataset.metadata);
+  if (cached) return cached;
+  const types: Record<string, string> = {};
+  for (const col of dataset.metadata.columns) {
+    if (col.role === "calculated" || col.role === "window") continue;
+    const type = getEffectiveColumnType(dataset, col.name);
+    if (type !== "numeric" && type !== "date") continue;
+    const counted = col.quality && (dataset.columnTypes?.[col.name] ?? col.inferredDataType) === type;
+    if (counted && col.quality!.invalidCount === 0) continue;
+    types[col.name] = type;
+  }
+  const found = findMisalignedRows(dataset.data, types);
+  byMeta.set(dataset.metadata, found);
+  return found;
+}
+
+/** Takes the misaligned rows (misalignedRowsOf) out of the dataset; undo with restoreRemovedRows(…, "misaligned"). */
+export function excludeMisalignedRows(dataset: Dataset, options: FixOptions = {}): Dataset {
+  const current = misalignedRowsOf(dataset);
+  if (current.length === 0) return dataset;
+  return removeRows(dataset, toOriginalIndices(dataset, current), "misaligned", options);
+}
+
+/**
+ * Removes the exact duplicate rows found at import (metadata.quality.duplicateIndices, positions
+ * in the full data), keeping each first occurrence. Undo with restoreDuplicateRows.
+ */
+export function removeDuplicateRows(dataset: Dataset, options: FixOptions = {}): Dataset {
+  if (hasRemovedRows(dataset, "duplicate")) return dataset;
+  return removeRows(dataset, dataset.metadata?.quality?.duplicateIndices ?? [], "duplicate", options);
+}
+
+/** Puts back the rows removeDuplicateRows took out, at their original positions, and re-applies column fixes to them. */
+export function restoreDuplicateRows(dataset: Dataset, options: FixOptions = {}): Dataset {
+  return restoreRemovedRows(dataset, "duplicate", options);
 }
 
 function mapValues<T>(obj: Record<string, T[]>, fn: (arr: T[]) => T[]): Record<string, T[]> {

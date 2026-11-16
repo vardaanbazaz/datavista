@@ -209,7 +209,7 @@ export function KPICard({ config, onRemove, onEdit, isMobile = false }: KPICardP
       >
         <div className="flex flex-col justify-center min-w-0 pr-4">
           <span
-            className="font-mono text-kpi text-foreground truncate leading-none mb-2"
+            className="font-sans tabular-nums text-kpi text-foreground truncate leading-none mb-2"
             style={formatStyle?.textColor ? { color: formatStyle.textColor } : undefined}
           >
             {formattedValue}

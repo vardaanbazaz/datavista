@@ -33,9 +33,11 @@ export interface Dataset {
    */
   fixSourceValues?: Record<string, DataRow[string][]>;
   /**
-   * Rows taken out by "Remove duplicates", with their per-row source cells, for undo. Stored
+   * Rows taken out by "Remove duplicates" and by "Exclude rows" for misaligned rows (RemovedRow.reason),
+   * with their per-row source cells, for undo; indices are positions in the full data. Stored
    * in the `removedRows` table and written only when this array changes (remove / undo), so
-   * metadata saves (rename, overrides) never carry rows. Count in metadata.removedDuplicateCount.
+   * metadata saves (rename, overrides) never carry rows. Counts in metadata.removedDuplicateCount
+   * and metadata.removedMisalignedCount (db.ts:removedRowCount).
    */
   removedDuplicates?: RemovedRow[];
   /** Position in the sidebar (upload order, oldest first). Set on upload; backfilled by the Dexie v3 upgrade. */

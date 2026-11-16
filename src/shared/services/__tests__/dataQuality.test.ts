@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { detectImportConversion, detectSentinel, findDuplicateRows, columnQuality, labelKey } from "../dataQuality";
+import { detectImportConversion, detectSentinel, findDuplicateRows, findMisalignedRows, columnQuality, labelKey } from "../dataQuality";
+import { readFileSync } from "fs";
+import { resolve } from "path";
+import { parseCsvText } from "../csvParse";
+import { misalignedRowsOf } from "../columnFixes";
 import { processRawData } from "../parsingService";
 
 const counts = (entries: [number, number][]) => new Map(entries);
@@ -159,5 +163,34 @@ describe("ID columns with letter codes", () => {
     // Junk that isn't a code (no digit, or punctuation) doesn't count.
     expect(processRawData(rows("Invoice", [...nums, "ERROR", "N/A", "12-34"]), "t.csv").columnTypes.Invoice).toBe("numeric");
     expect(processRawData(rows("Amount", [...nums, "C489449"]), "t.csv").columnTypes.Amount).toBe("numeric");
+  });
+});
+
+describe("findMisalignedRows", () => {
+  const types = { n: "numeric", m: "numeric", d: "date", t: "categorical" };
+
+  it("flags a row with 2+ non-blank cells that fail their column's type", () => {
+    const rows = [
+      { n: 1, m: 2, d: "2024-01-02", t: "a" },
+      { n: "x", m: "y", d: "2024-01-02", t: "a" }, // two numbers fail
+      { n: "x", m: 2, d: "1.0.19", t: "a" }, // number + date fail
+      { n: "x", m: 2, d: "2024-01-02", t: "1.9" }, // one failure only; text never fails
+      { n: null, m: "", d: "  ", t: "a" }, // blanks never fail
+      { n: "x", m: null, d: null, t: "b" },
+    ];
+    expect(findMisalignedRows(rows, types)).toEqual([1, 2]);
+  });
+
+  it("needs at least two checkable columns", () => {
+    expect(findMisalignedRows([{ n: "x", t: "y" }], { n: "numeric", t: "categorical" })).toEqual([]);
+  });
+
+  it("finds the shifted Play Store row in the messy fixture", () => {
+    const dir = resolve(__dirname, "../../../../tests/fixtures/messy");
+    const ds = processRawData(parseCsvText(readFileSync(resolve(dir, "playstore.csv"), "utf8")).rows, "playstore.csv");
+    const found = misalignedRowsOf(ds);
+    expect(found.length).toBe(1);
+    expect(ds.data[found[0]].App).toBe("Life Made WI-Fi Touchscreen Photo Frame");
+    expect(ds.data[found[0]].Rating).toBe(19);
   });
 });

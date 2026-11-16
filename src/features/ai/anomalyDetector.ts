@@ -44,14 +44,26 @@ export function anomalyChipText(a: LabelParts & Pick<DetectedAnomaly, "value">):
   return `${anomalyLabel(a)}: ${a.value.toLocaleString()}`;
 }
 
+// toLocaleString with options builds a new Intl.NumberFormat on every call (~0.3 ms each);
+// a dataset can have tens of thousands of outliers, so the formatters are made once.
+const formatters = new Map<number, Intl.NumberFormat>();
+function formatDigits(n: number, maximumFractionDigits: number): string {
+  let f = formatters.get(maximumFractionDigits);
+  if (!f) {
+    f = new Intl.NumberFormat(undefined, { maximumFractionDigits });
+    formatters.set(maximumFractionDigits, f);
+  }
+  return f.format(n);
+}
+
 /** Up to 2 decimals for small numbers, none from 100 up: "4.69", "53,594". */
 function formatAmount(n: number): string {
-  return Math.abs(n).toLocaleString(undefined, { maximumFractionDigits: Math.abs(n) >= 100 ? 0 : 2 });
+  return formatDigits(Math.abs(n), Math.abs(n) >= 100 ? 0 : 2);
 }
 
 /** "×175", "×2.4": one decimal under 10, none from 10 up. */
 function formatRatio(r: number): string {
-  return `×${r.toLocaleString(undefined, { maximumFractionDigits: r < 10 ? 1 : 0 })}`;
+  return `×${formatDigits(r, r < 10 ? 1 : 0)}`;
 }
 
 /**
@@ -113,7 +125,7 @@ export function isNearUniqueColumn(dataset: Dataset | null | undefined, column: 
  * with 78,158,306 and 78,128,208 reviews) would otherwise repeat the same app. Keeps the first,
  * so callers sort by importance first.
  */
-export function dedupeAnomalies(list: DetectedAnomaly[]): DetectedAnomaly[] {
+export function dedupeAnomalies<T extends Pick<DetectedAnomaly, "widgetId" | "columnName" | "dimensionColumn" | "dimensionKey">>(list: T[]): T[] {
   const seen = new Set<string>();
   return list.filter((a) => {
     const key = `${a.widgetId ?? ""}\u0000${a.columnName}\u0000${a.dimensionColumn ?? ""}\u0000${a.dimensionKey ?? ""}`;
@@ -227,7 +239,9 @@ export const anomalyDetector = {
 
       // Largest deviation first, so the summary names the most unusual value.
       const ranked = [...res.outliers].sort((a, b) => Math.abs(b.value - mean) - Math.abs(a.value - mean));
-      const found: DetectedAnomaly[] = [];
+      // Descriptions are written for the 3 kept per column only (formatting every outlier of a
+      // 525k-row column blocked the main thread for seconds).
+      const found: (Omit<DetectedAnomaly, "description"> & { mean: number })[] = [];
       ranked.forEach((outlier, idx) => {
         const row = data[outlier.index];
         const hasDim = Boolean(categoryCol && row[categoryCol] !== null && row[categoryCol] !== undefined && row[categoryCol] !== "");
@@ -247,13 +261,18 @@ export const anomalyDetector = {
           score: outlier.score,
           type,
           severity,
-          description: describeAnomaly(
-            { columnName: col, dimensionColumn: hasDim ? categoryCol : undefined, dimensionKey: dimVal, rowLevel: hasDim && rowLevel },
-            outlier.value, mean
-          ),
+          mean,
         });
       });
-      anomalies.push(...dedupeAnomalies(found).slice(0, 3));
+      for (const { mean: m, ...a } of dedupeAnomalies(found).slice(0, 3)) {
+        anomalies.push({
+          ...a,
+          description: describeAnomaly(
+            { columnName: a.columnName, dimensionColumn: a.dimensionColumn, dimensionKey: a.dimensionKey, rowLevel: Boolean(a.rowLevel) },
+            a.value, m
+          ),
+        });
+      }
     }
 
     return anomalies.sort((a, b) => b.score - a.score);

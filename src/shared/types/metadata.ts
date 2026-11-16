@@ -84,6 +84,8 @@ export interface RemovedRow {
   row: Record<string, string | number | boolean | null>;
   dateSource?: Record<string, string | null>;
   fixSource?: Record<string, string | number | boolean | null>;
+  /** Why the row was taken out; absent means "duplicate" (records written before misaligned rows). */
+  reason?: "misaligned";
 }
 
 /** Dataset-wide findings from the import. */
@@ -161,4 +163,6 @@ export interface DatasetMetadata {
    * stored in the `removedRows` table, never in this record).
    */
   removedDuplicateCount?: number;
+  /** Rows removed by "Exclude rows" on the misaligned-rows notice (also in Dataset.removedDuplicates, reason "misaligned"). */
+  removedMisalignedCount?: number;
 }

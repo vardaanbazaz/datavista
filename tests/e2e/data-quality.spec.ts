@@ -101,6 +101,51 @@ test("currency: Price converts from $ on import, with a badge and undo; duplicat
   await expect(page.getByText(/Showing \d+ of 80 rows/)).toBeVisible();
 });
 
+test("header badge tooltip is fully visible, not clipped by the table's scroll box", async ({ page }) => {
+  await startFreshSessionWithoutTour(page);
+  await page.goto("/");
+  await importFile(page, "tests/fixtures/messy/playstore.csv", "playstore");
+  await openData(page);
+  await page.getByTestId("fix-badge-Price").hover();
+  // Radix also renders a 1x1 visually hidden role="tooltip" copy; measure the floating box.
+  const tip = page.locator("[data-radix-popper-content-wrapper]").filter({ hasText: "converted from $" });
+  await expect(tip).toBeVisible();
+  await page.waitForTimeout(250); // open animation (zoom-in-95)
+  const box = (await tip.boundingBox())!;
+  const viewport = page.viewportSize()!;
+  expect(box.y).toBeGreaterThanOrEqual(0);
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
+  expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
+  // boundingBox ignores overflow clipping: check what is actually painted at the top and
+  // bottom edges (and the middle) of the tooltip is the tooltip.
+  const hits = await tip.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const x = r.left + r.width / 2;
+    return [r.top + 2, r.top + r.height / 2, r.bottom - 2].map((y) => el.contains(document.elementFromPoint(x, y)));
+  });
+  expect(hits).toEqual([true, true, true]);
+});
+
+test("misaligned rows: the shifted Play Store row is found, previewed, excluded and put back", async ({ page }) => {
+  await startFreshSessionWithoutTour(page);
+  await page.goto("/");
+  await importFile(page, "tests/fixtures/messy/playstore.csv", "playstore");
+  await openData(page);
+  const notice = page.getByTestId("misaligned-notice");
+  await expect(notice).toContainText("1 misaligned row");
+  await expect(page.getByTestId("misaligned-preview")).toContainText("Life Made WI-Fi Touchscreen Photo Frame");
+  await expect(page.getByTestId("misaligned-preview")).toContainText('Price: "Everyone"');
+  await expect(page.getByTestId("column-stats-Rating")).toContainText("Max: 19.00");
+  await page.getByTestId("exclude-misaligned").click();
+  await expect(notice).toContainText("1 misaligned row excluded");
+  await expect(page.getByText(/Showing \d+ of 79 rows/)).toBeVisible();
+  await expect(page.getByTestId("column-stats-Rating")).not.toContainText("Max: 19.00");
+  await page.getByTestId("restore-misaligned").click();
+  await expect(page.getByText(/Showing \d+ of 80 rows/)).toBeVisible();
+  await expect(notice).toContainText("1 misaligned row:");
+});
+
 test("full Play Store file: 483 duplicate rows (local file only)", async ({ page }) => {
   const file = "test-data-local/googleplaystore.csv";
   test.skip(!existsSync(file), "git-ignored local file not present");

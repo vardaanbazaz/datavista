@@ -2,6 +2,48 @@
 
 Newest first. Entries marked `Source: inferred` were reconstructed from existing code; their "Why" is a guess and should be corrected by the author.
 
+### 2026-11-16 — Big-file check (run 3): retail sheet on the production build
+- **Decision:** New local bench `scripts/bench/startup/bigfile-retail.spec.ts` (prod build via `vite preview`, fresh browser profile, 1 worker). Measured, after the fix below. XLSX `online_retail_II.xlsx`, sheet "Year 2009-2010", 525,461 rows: sheet picker 13.1 s after the file is chosen; import 36.2 s from the sheet pick (49.4 s from the file); peak main-thread JS heap 218 MB (the import worker's heap is not included), peak browser RSS 1,744 MB; longest main-thread block during import 0.96 s; Data Explorer first render 0.24 s; table scroll top to bottom (30 steps) 0.51 s, no long task; Filters 0.39 s; Pivot 0.28 s (longest block 0.15 s); KPI builder 0.06 s, save to card 0.93 s; reload (rows from IndexedDB) 3.1 s to the KPI card, longest block 1.19 s. The same rows as CSV (first 525,461 data rows of `online_retail_II.csv`): import 11.3 s, RSS 1,248 MB, longest block 0.94 s, the views within ±30 ms of the XLSX run, reload 3.2 s (block 1.24 s).
+- **Why:** User request: measure first, fix only regressions or freezes over 2 s. Earlier numbers come from different setups and are compared like for like where possible: Node `bookSheets` + preview 11.6 s vs the picker at 12.1-13.1 s in the browser; Node one-sheet read 33.3 s and browser whole-workbook 45-47 s vs 36.2-45.3 s here; transfer block 1.1-2.9 s on the XLSX (dev, headless) vs 0.96 s; 1M generated rows reload 2.4-2.5 s, block 0.9-1.0 s (different data) vs 3.1 s, 1.19 s.
+- **Alternatives considered:** Running the 1,067,371-row CSV (both years) — not run: the 525k XLSX already peaked at 1.74 GB browser RSS, and twice the rows would pass the ~2.9 GB budget of this machine (`~/.claude/global.md`).
+- **Tradeoff accepted:** Headless timings on one laptop; the full 1M CSV was not measured in this run.
+- **Source:** made-now
+
+### 2026-11-16 — Executive summary describes only the anomalies it keeps (5 s freeze on 525k rows)
+- **Decision:** `anomalyDetector.ts:detectDatasetAnomalies` builds findings without text, dedupes, keeps the top 3 per column, and only then calls `describeAnomaly`. `formatAmount` / `formatRatio` use cached `Intl.NumberFormat`s (`formatDigits`) instead of `toLocaleString(undefined, options)`. `dedupeAnomalies` is generic over the fields it reads. Output text is unchanged.
+- **Why:** Regression from "Insight wording: multiples…" (same day): describing every outlier with a new formatter per call blocked the main thread for 5.0 s after importing the retail sheet and 4.8 s after a reload (CPU profile: `formatRatio` + `describeAnomaly` ≈ 85% of the block; retail Quantity/Price have tens of thousands of IQR outliers). After: 0.96 s and 1.19 s longest blocks, reload 6.9 s → 3.1 s to the KPI card.
+- **Alternatives considered:** Moving anomaly detection to a worker (rejected for this run: larger change; the remaining ~1 s blocks are the row transfer and first stats pass, documented earlier).
+- **Tradeoff accepted:** `detectChartAnomalies` still describes every outlier it returns (chart rows are grouped, so few; not measured slow).
+- **Source:** made-now
+
+### 2026-11-16 — KPI value in Inter with tabular figures
+- **Decision:** The KPI card's big number (`KPICard.tsx`) was `font-mono` (JetBrains Mono); it is now `font-sans tabular-nums`, like the Overview row count and table numbers.
+- **Why:** User check: JetBrains Mono is reserved for formulas, code and shortcuts (`tailwind.config.ts`).
+- **Alternatives considered:** None.
+- **Tradeoff accepted:** Digits are narrower, so long values truncate later.
+- **Source:** made-now
+
+### 2026-11-16 — Misaligned rows: detect 2+ type failures, exclude through the removed-rows path
+- **Decision:** `dataQuality.ts:findMisalignedRows`: a row whose non-blank cells fail their column's type in at least 2 numeric/date columns (`toNumberOrNull` / `parseStoredDate`, same rule as the metadata pass; blanks and text columns never fail). `columnFixes.ts:misalignedRowsOf` runs it on the current rows with effective types, skipping columns whose metadata counts no invalid cell (so most datasets, including the retail sheet, scan nothing), cached per rows array + metadata. Data view shows "N misaligned rows" with a preview of 5 (first column + the failing cells) and "Exclude rows"; nothing changes until clicked. Removal model: one array, `Dataset.removedDuplicates`, holds rows removed for either reason (`RemovedRow.reason: "misaligned"`, absent = duplicate), indices are positions in the full data; `removeRows` / `restoreRemovedRows(reason)` map between full and current positions, so either action can come first and each undo puts back only its own rows. Counts: `removedDuplicateCount` + new `removedMisalignedCount`; `db.ts:removedRowCount` (their sum) gates the `removedRows` read and its length check on load. No schema change.
+- **Why:** User request: the shifted Play Store row (Rating 19, Price "Everyone") skewed Rating. Counts: messy fixtures playstore 1 (that row), cafe 2, glassdoor 0, netflix 0; hr-attrition 0. Cafe's 2 are rows with two "ERROR"/"UNKNOWN" tokens, not shifted rows: the rule flags them too. Local full files (not tuned, reported): googleplaystore 1, dirty_cafe_sales 55 (same ERROR/UNKNOWN pattern), messy_cancer_lab 8 (invalid dates "2023/13/01" / "invalid" in both date columns), Uncleaned_DS_jobs 0, netflix_titles 0.
+- **Alternatives considered:** Storing the finding in import metadata (rejected: changes the import output the golden tests compare, and datasets already saved would need a backfill); blocking the second removal until the first is undone (rejected: awkward on the full Play Store file, which has both); a separate removed-rows field (rejected: needs its own persistence trigger and load check).
+- **Tradeoff accepted:** The field keeps its old name `removedDuplicates` though it holds both kinds (no migration). Rows with two junk tokens are labelled "misaligned". Detection skips a column for the moment between a fix and its metadata recount. A duplicate index already removed as misaligned is skipped, so undoing the misaligned rows can bring back a duplicate while duplicates stay removed.
+- **Source:** made-now
+
+### 2026-11-16 — KPI builder: Average for per-item columns, title follows until edited
+- **Decision:** `columnRoles.ts:isPerItemName`: whole words of `nameWords` (case-insensitive) rating, score, rate, percent, percentage, pct, price, age, avg, average, mean, ratio, each also with a plain plural "s"; or "%" anywhere in the name. `defaultAggregationForColumn`: Count for ID/year/constant/non-numeric (unchanged), Average for a per-item name, else Sum. Card title: `kpi/lib/kpiTitle.ts:kpiTitleReducer`; "Total X", "Average X", "Count of X", "Distinct X", "Minimum/Maximum/Median X", "Std. deviation of X", "Row count"; it follows every column/aggregation change until the user types in the field, then never changes. Editing a saved card starts as typed unless its title equals the suggestion for its own settings. Supersedes the "Sum for a plain measure" part of "KPI measure defaults to a real measure".
+- **Why:** User report: "Sum of Rating" = 39.3K on Play Store. Word matching keeps "Usage", "Stage", "Corporate", "Generated", "Accurate", "Rated" out.
+- **Alternatives considered:** Average for every non-integer column (rejected: Price × Quantity totals are real sums); "Sum of X" titles like chart axes (rejected: "Total X" reads better on a card; the user's example "Average Rating" has no "of").
+- **Tradeoff accepted:** "percentage" and plurals were added beyond the listed words. Amount-like names with a listed word ("MonthlyRate" in HR, which is an amount) default to Average. No component test (no React testing library); the title logic is a pure reducer with unit tests.
+- **Source:** made-now
+
+### 2026-11-16 — Tooltips portalled with collision handling
+- **Decision:** `ui/tooltip.tsx:TooltipContent` renders in `TooltipPrimitive.Portal` with `collisionPadding` 8 (Radix flips to the other side when there is no room and shifts to stay in the viewport); `ui/popover.tsx` gets the same padding. Audit: every tooltip goes through that one component (`Hint`, DataTable headers, PivotBuilder, FilterPanel, CalculatedFieldsManager, AI panels), popovers, selects and dropdowns were already portalled, chart hovers are SVG `<title>` (native). e2e: the Price header badge tooltip is inside the viewport and `elementFromPoint` at its top, middle and bottom hits it (fails with the old component).
+- **Why:** User report: Data Explorer header badge tooltips were clipped by the table's scroll box (only the bottom edge showed).
+- **Alternatives considered:** Per-call `side="bottom"` on header badges (rejected: still clipped in other scroll boxes and at other scroll positions).
+- **Tradeoff accepted:** Tooltip DOM lives at the end of `<body>` (inherits only global styles; none relied on local ones).
+- **Source:** made-now
+
 ### 2026-11-16 — Background ribbon animation removed
 - **Decision:** The aurora ribbon is always still. Removed the `aurora-sway` keyframes and the per-strand timing, `AuroraRibbon`'s IntersectionObserver / visibility tracking and `data-paused`, the "Background animation" toggle in Appearance and in first-run setup, `Appearance.backgroundAnimation`, `displayPrefs.ts:animationBlockedReason` and the `data-animation` attribute on `<html>`. UI store persist v3 → v4: `readStoredPrefs` rebuilds `appearance` field by field, so a stored `backgroundAnimation` (v2/v3) is dropped on the next write; the pre-paint script and the store share that function, so they agree. The static ribbon, glass and themes are unchanged. The glass-perf bench now compares glass on/off only.
 - **Why:** User request (cleanup run 2): the animation is not wanted. It was opt-in and its measured cost (GPU 54-70% of a core with glass on, see the superseded entry) was the reason it was off by default.
@@ -17,6 +59,7 @@ Newest first. Entries marked `Source: inferred` were reconstructed from existing
 - **Source:** made-now
 
 ### 2026-11-16 — KPI measure defaults to a real measure; counts only for categorical columns
+- **Status:** Superseded in part (default aggregation) by "KPI builder: Average for per-item columns, title follows until edited".
 - **Decision:** `columnRoles.ts:defaultMeasureColumn` picks the first numeric column that is not ID-like, not year-like and not constant (import metadata min = max), else the first numeric column, else the first column. `aggregationsForColumn` offers Sum/Average/Min/Max/Median/Std. dev only for numeric columns; other columns get Count, Count of rows, Distinct count. `defaultAggregationForColumn`: Sum for a plain measure, Count otherwise. Changing the column resets a picked aggregation that no longer fits.
 - **Why:** The builder defaulted to the first column ("Invoice", categorical) with Sum.
 - **Alternatives considered:** Hiding non-numeric columns from Measure (rejected: counting invoices is a valid KPI).

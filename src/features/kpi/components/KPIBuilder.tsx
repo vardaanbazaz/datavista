@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useReducer, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -26,6 +26,7 @@ import { getEffectiveColumnTypes } from "@/shared/utils/columnType";
 import { aggregationFlag, aggregationNote, aggregationsForColumn, defaultAggregationForColumn, defaultMeasureColumn } from "@/shared/utils/columnRoles";
 import { Palette } from "lucide-react";
 import { countOf } from "@/shared/utils/plural";
+import { initialKpiTitle, kpiAutoTitle, kpiTitleReducer } from "../lib/kpiTitle";
 
 const AGGREGATION_LABELS: Partial<Record<AggregationOperator, string>> = {
   sum: "Sum",
@@ -51,7 +52,8 @@ interface KPIBuilderProps {
 export function KPIBuilder({ isOpen, onClose, onSave, editKpi = null, saveNote }: KPIBuilderProps) {
   const dataset = useDatasetStore((state) => state.activeDataset);
 
-  const [title, setTitle] = useState("");
+  // Follows "<aggregation> <column>" until the user types in it (lib/kpiTitle.ts).
+  const [{ title }, dispatchTitle] = useReducer(kpiTitleReducer, initialKpiTitle());
   const [metricCol, setMetricCol] = useState("");
   const [aggregation, setAggregation] = useState<AggregationOperator>("sum");
   // Until the user picks an aggregation, it follows the column: Count for year/ID-like ones.
@@ -79,10 +81,18 @@ export function KPIBuilder({ isOpen, onClose, onSave, editKpi = null, saveNote }
     return dataset.columns.filter((col) => effectiveTypes[col] === "date");
   }, [dataset]);
 
-  // Load configuration if editing
+  // Initialise once per opening (card + dataset): a new dataset object for the same dataset
+  // (e.g. a metadata recount landing) must not reset what the user has picked or typed.
+  const initialisedFor = useRef<string | null>(null);
   useEffect(() => {
+    if (!isOpen) {
+      initialisedFor.current = null;
+      return;
+    }
+    const key = `${editKpi?.id ?? "new"}\u0000${dataset?.id ?? ""}`;
+    if (initialisedFor.current === key) return;
+    initialisedFor.current = key;
     if (editKpi) {
-      setTitle(editKpi.title);
       setMetricCol(editKpi.primaryMetric.column);
       // A card saved before counts-only for categorical columns (e.g. Sum of "Invoice") opens with a valid choice.
       const saved = editKpi.primaryMetric.aggregation;
@@ -91,6 +101,7 @@ export function KPIBuilder({ isOpen, onClose, onSave, editKpi = null, saveNote }
           ? saved
           : defaultAggregationForColumn(dataset, editKpi.primaryMetric.column)
       );
+      dispatchTitle({ type: "reset", state: initialKpiTitle({ title: editKpi.title, aggregation: saved, column: editKpi.primaryMetric.column }) });
       setAggregationTouched(true);
       setPolarity(editKpi.polarity);
       setEnableTrend(!!editKpi.trendConfiguration);
@@ -105,10 +116,11 @@ export function KPIBuilder({ isOpen, onClose, onSave, editKpi = null, saveNote }
       setFormattingRules(editKpi.formattingRules || []);
     } else {
       // Defaults for new KPI card
-      setTitle("");
       const measure = defaultMeasureColumn(dataset) ?? "";
+      const agg = defaultAggregationForColumn(dataset, measure);
       setMetricCol(measure);
-      setAggregation(defaultAggregationForColumn(dataset, measure));
+      setAggregation(agg);
+      dispatchTitle({ type: "reset", state: { title: kpiAutoTitle(agg, measure), edited: false } });
       setAggregationTouched(false);
       setPolarity("positive");
       setEnableTrend(false);
@@ -168,7 +180,7 @@ export function KPIBuilder({ isOpen, onClose, onSave, editKpi = null, saveNote }
                 id="kpi-title"
                 placeholder="e.g. Total Revenue"
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) => dispatchTitle({ type: "edit", title: e.target.value })}
                 required
               />
             </div>
@@ -183,10 +195,13 @@ export function KPIBuilder({ isOpen, onClose, onSave, editKpi = null, saveNote }
                     setMetricCol(col);
                     const allowed = aggregationsForColumn(dataset, col);
                     // Keep a picked aggregation only if it still fits the new column (no Sum of a text column).
+                    let next = aggregation;
                     if (!aggregationTouched || !allowed.includes(aggregation)) {
-                      setAggregation(defaultAggregationForColumn(dataset, col));
+                      next = defaultAggregationForColumn(dataset, col);
+                      setAggregation(next);
                       setAggregationTouched(false);
                     }
+                    dispatchTitle({ type: "auto", aggregation: next, column: col });
                   }}
                 >
                   <SelectTrigger id="metric-col">
@@ -209,6 +224,7 @@ export function KPIBuilder({ isOpen, onClose, onSave, editKpi = null, saveNote }
                   onValueChange={(val: AggregationOperator) => {
                     setAggregation(val);
                     setAggregationTouched(true);
+                    dispatchTitle({ type: "auto", aggregation: val, column: metricCol });
                   }}
                 >
                   <SelectTrigger id="aggregation">

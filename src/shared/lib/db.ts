@@ -11,6 +11,11 @@ export interface UIPreference {
  * (`data`, `dateSourceValues`), which live in `datasetRows`. Renaming, type overrides and
  * dismissing notices rewrite only this small record.
  */
+/** Rows held in the `removedRows` record: removed duplicates plus excluded misaligned rows. */
+export function removedRowCount(meta: Dataset['metadata'] | undefined): number {
+  return (meta?.removedDuplicateCount ?? 0) + (meta?.removedMisalignedCount ?? 0);
+}
+
 export type StoredDataset = Omit<Dataset, 'data' | 'dateSourceValues' | 'fixSourceValues' | 'removedDuplicates'> & {
   /** Rows in the dataset; the chunks in `datasetRows` must add up to this. */
   rowCount: number;
@@ -114,7 +119,7 @@ export function fromStoredDataset(stored: StoredDataset, chunks: (DatasetRowChun
     for (const row of chunk.rows) data.push(row);
   }
   if (data.length !== rowCount) return null;
-  const removedCount = stored.metadata?.removedDuplicateCount ?? 0;
+  const removedCount = removedRowCount(stored.metadata);
   if (removedCount > 0 && removed?.rows.length !== removedCount) return null;
   const dateSourceValues = joinColumns(dateSourceColumns, full, (c) => c.dateSourceValues);
   const fixSourceValues = joinColumns(fixSourceColumns, full, (c) => c.fixSourceValues);

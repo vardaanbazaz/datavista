@@ -347,6 +347,46 @@ describe("column fixes", () => {
     expect((await app.db.datasets.get("ds1"))?.metadata?.removedDuplicateCount).toBeUndefined();
   });
 
+  for (const order of ["duplicates-first", "misaligned-first"] as const) {
+    it(`duplicates and misaligned rows share the removed-rows record across a reload (${order})`, async () => {
+      const ds = makeDataset("ds1", 100);
+      ds.metadata!.quality = { duplicateRowCount: 3, duplicateIndices: [1, 2, 3] };
+      // Rows 10 and 50 shifted: two numeric cells that aren't numbers.
+      for (const i of [10, 50]) ds.data[i] = { id: `row${i}`, Region: "North", Sales: "Everyone" };
+      const original = ds.data.map((r) => ({ ...r }));
+      app = await setup({ datasets: [ds], active: "ds1" });
+      const settle = async () => {
+        await new Promise((r) => setTimeout(r, 0));
+        await app.persistenceService.whenIdle();
+      };
+      const store = () => app.useDatasetStore.getState();
+      if (order === "duplicates-first") store().removeDuplicates();
+      store().excludeMisalignedRows();
+      if (order === "misaligned-first") store().removeDuplicates();
+      await settle();
+      expect(store().datasets[0].data.length).toBe(95);
+      const stored = await app.db.datasets.get("ds1");
+      expect([stored?.metadata?.removedDuplicateCount, stored?.metadata?.removedMisalignedCount]).toEqual([3, 2]);
+      expect((await app.db.removedRows.get("ds1"))?.rows.map((r) => r.index)).toEqual([1, 2, 3, 10, 50]);
+
+      app.db.close();
+      app = await setup({ keepDb: true });
+      expect(store().datasets[0].data.length).toBe(95);
+      expect(store().datasets[0].removedDuplicates?.length).toBe(5);
+
+      if (order === "duplicates-first") store().restoreDuplicates();
+      store().restoreMisalignedRows();
+      if (order === "misaligned-first") store().restoreDuplicates();
+      await settle();
+      expect(store().datasets[0].data).toEqual(original);
+      expect(await app.db.removedRows.get("ds1")).toBeUndefined();
+
+      app.db.close();
+      app = await setup({ keepDb: true });
+      expect(store().datasets[0].data).toEqual(original);
+    });
+  }
+
   it("\"Don't ask again\" writes metadata only", async () => {
     app = await setup({ datasets: [makeDataset("ds1", 100)], active: "ds1" });
     app.useDatasetStore.getState().dismissSuggestion("ds1", "sentinel:Sales:-1");
