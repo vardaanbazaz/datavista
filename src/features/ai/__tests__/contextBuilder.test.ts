@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import type { Dataset, DataRow } from "@/shared/types";
-import { buildAiContext, detectPersonalColumns, renderAiContext, valueForAi, SAMPLE_ROWS_MAX, SAMPLE_ROWS_MIN, type PrivacySettings } from "../privacy/contextBuilder";
+import { buildAiContext, sampleRowIndices, detectPersonalColumns, renderAiContext, valueForAi, SAMPLE_ROWS_MAX, SAMPLE_ROWS_MIN, type PrivacySettings } from "../privacy/contextBuilder";
 import { detectPii, looksLikePhone } from "../privacy/pii";
 import { buildSummaryMessages, buildQueryMessages } from "../aiRequests";
 import { useAiSettingsStore } from "../settings/aiSettingsStore";
@@ -90,15 +90,46 @@ describe("buildAiContext levels", () => {
   it("samples: N rows, masked cells, N clamped to 20-200", () => {
     const ctx = buildAiContext(makeDataset(), settings("samples", { sampleRows: 30 }));
     expect(ctx.sampleRows).toHaveLength(30);
-    expect(ctx.sampleRows![0]).toMatchObject({ Contact: "[masked email]", Who: "[masked name]", Mobile: "[masked phone]", Region: "North", Revenue: 1000000000 });
+    expect(ctx.sampleRows![0]).toMatchObject({ Contact: "[masked email]", Who: "[masked name]", Mobile: "[masked phone]" });
     expect(buildAiContext(makeDataset(), settings("samples", { sampleRows: 5000 })).sampleRows).toHaveLength(SAMPLE_ROWS_MAX);
     expect(buildAiContext(makeDataset(), settings("samples", { sampleRows: 1 })).sampleRows).toHaveLength(SAMPLE_ROWS_MIN);
     expect(buildAiContext(makeDataset(25), settings("samples", { sampleRows: 200 })).sampleRows).toHaveLength(25);
   });
 
+  it("samples: a seeded random sample, the same rows for the same dataset, not the first N", () => {
+    const a = buildAiContext(makeDataset(), settings("samples", { sampleRows: 30 }));
+    const b = buildAiContext(makeDataset(), settings("samples", { sampleRows: 30 }));
+    expect(a.sampleRows).toEqual(b.sampleRows);
+    const revenues = a.sampleRows!.map((r) => r.Revenue as number);
+    // Not simply the first 30 rows, and spread over the dataset, in row order.
+    expect(revenues).not.toEqual(Array.from({ length: 30 }, (_, i) => 1000000000 + i * 7));
+    expect(Math.max(...revenues)).toBeGreaterThan(1000000000 + 150 * 7);
+    expect([...revenues].sort((x, y) => x - y)).toEqual(revenues);
+    // Another dataset id: another sample.
+    const other = buildAiContext({ ...makeDataset(), id: "d2" }, settings("samples", { sampleRows: 30 }));
+    expect(other.sampleRows).not.toEqual(a.sampleRows);
+  });
+
+  it("sampleRowIndices: distinct, in range, deterministic per seed", () => {
+    const idx = sampleRowIndices(1_000_000, 200, "big");
+    expect(new Set(idx).size).toBe(200);
+    expect(idx.every((i) => i >= 0 && i < 1_000_000)).toBe(true);
+    expect(sampleRowIndices(1_000_000, 200, "big")).toEqual(idx);
+    expect(sampleRowIndices(10, 50, "x")).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    expect(sampleRowIndices(0, 20, "x")).toEqual([]);
+  });
+
+  it("queries level: the same context as summaries, no rows", () => {
+    const q = buildAiContext(makeDataset(), settings("queries"));
+    const s = buildAiContext(makeDataset(), settings("summaries"));
+    expect(q.level).toBe("queries");
+    expect({ ...q, level: "x" }).toEqual({ ...s, level: "x" });
+    expect(q.sampleRows).toBeUndefined();
+  });
+
   it("an unmasked column is sent as-is", () => {
     const ctx = buildAiContext(makeDataset(), settings("samples", { sampleRows: 20, unmasked: ["Contact"] }));
-    expect(ctx.sampleRows![0].Contact).toBe("user0@example.com");
+    expect(ctx.sampleRows![0].Contact).toMatch(/^user\d+@example\.com$/);
     expect(ctx.sampleRows![0].Who).toBe("[masked name]");
   });
 

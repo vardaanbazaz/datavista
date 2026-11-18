@@ -72,7 +72,8 @@ export function MainContent({ children, onOpenSearch }: MainContentProps) {
           </Button>
         </Hint>
       </header>
-      <main ref={mainRef} id="main-content" className="flex-1 overflow-auto p-4 sm:p-8">
+      {/* Room at the bottom so the copilot button (bottom-right, with a dataset) never covers the end of a view. */}
+      <main ref={mainRef} id="main-content" className={`flex-1 overflow-auto p-4 sm:p-8 ${activeDataset ? "pb-24 sm:pb-24" : ""}`}>
         {rowsLoading ? (
           <LoadingProgress
             title={`Loading “${rowsLoading.name}”`}

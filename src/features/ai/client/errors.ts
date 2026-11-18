@@ -87,3 +87,16 @@ export function describeAiError(e: unknown, secret?: string): string {
   if (e instanceof Error) return redactSecret(e.message, secret);
   return "Something went wrong with the AI request.";
 }
+
+const TOOLS_UNSUPPORTED =
+  /(does not|doesn't|do not|not) support(?:s|ed)?[^.]{0,40}\b(tools?|tool[ _-]?use|function[ _-]?call(?:ing|s)?)|\b(tools?|tool[ _-]?use|function[ _-]?call(?:ing|s)?)\b[^.]{0,40}\b(not (?:supported|enabled|available)|unsupported)|support tool use/i;
+
+/**
+ * The provider or model refused the request because it carried tools ("does not support
+ * tools", "No endpoints found that support tool use", "Function calling is not enabled").
+ * Checked on 400/404/422 before the error's kind, since "no endpoints found" also reads as
+ * model-not-found.
+ */
+export function isToolsUnsupported(e: unknown): boolean {
+  return e instanceof AiError && e.status !== undefined && [400, 404, 422].includes(e.status) && TOOLS_UNSUPPORTED.test(e.message);
+}

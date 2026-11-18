@@ -10,6 +10,7 @@ import {
   DEFAULT_PRIVACY_LEVEL,
   SAMPLE_ROWS_DEFAULT,
   clampSampleRows,
+  isPrivacyLevel,
   type PrivacyLevel,
   type PrivacySettings,
 } from "../privacy/levels";
@@ -40,8 +41,6 @@ export interface AiSettingsState {
 
 migrateLegacyKey();
 const initialKeys = loadKeys();
-
-const LEVELS: PrivacyLevel[] = ["schema", "summaries", "samples"];
 
 export const useAiSettingsStore = create<AiSettingsState>()(
   persist(
@@ -105,7 +104,7 @@ export const useAiSettingsStore = create<AiSettingsState>()(
           models: typeof saved.models === "object" && saved.models ? saved.models : {},
           baseUrls: typeof saved.baseUrls === "object" && saved.baseUrls ? saved.baseUrls : {},
           privacy: {
-            level: LEVELS.includes(privacy.level as PrivacyLevel) ? (privacy.level as PrivacyLevel) : DEFAULT_PRIVACY_LEVEL,
+            level: isPrivacyLevel(privacy.level) ? privacy.level : DEFAULT_PRIVACY_LEVEL,
             sampleRows: clampSampleRows(privacy.sampleRows ?? SAMPLE_ROWS_DEFAULT),
             unmasked: Array.isArray(privacy.unmasked) ? privacy.unmasked.filter((c): c is string => typeof c === "string") : [],
           },

@@ -16,7 +16,7 @@ const ToastViewport = React.forwardRef<
     className={cn(
       // Bottom on every screen: at the top on phones it covered the sticky header (menu button) for
       // the toast's whole 5 s, and the e2e taps on it waited that long.
-      "fixed bottom-0 right-0 z-[100] flex max-h-screen w-full flex-col p-4 md:max-w-[420px]",
+      "toast-viewport fixed bottom-0 right-0 z-[100] flex max-h-screen w-full flex-col p-4 md:max-w-[420px]",
       className
     )}
     {...props}

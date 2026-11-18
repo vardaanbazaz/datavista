@@ -23,6 +23,88 @@ function splitSystem(messages: ChatMessage[]): { system: string; rest: ChatMessa
   return { system, rest: messages.filter((m) => m.role !== "system") };
 }
 
+/** Tool-call arguments as an object (models sometimes send "" for no arguments). */
+function argsObject(raw: string): Record<string, unknown> {
+  try {
+    const v = JSON.parse(raw || "{}");
+    return v && typeof v === "object" && !Array.isArray(v) ? v : {};
+  } catch {
+    return {};
+  }
+}
+
+/** A tool result as an object (Gemini's functionResponse.response must be one). */
+function resultObject(content: string): Record<string, unknown> {
+  try {
+    const v = JSON.parse(content);
+    return v && typeof v === "object" && !Array.isArray(v) ? v : { result: v };
+  } catch {
+    return { result: content };
+  }
+}
+
+/**
+ * Groups runs of consecutive tool turns: Anthropic and Gemini want all results of one
+ * assistant turn in a single user turn.
+ */
+function groupToolTurns(messages: ChatMessage[]): (ChatMessage | ChatMessage[])[] {
+  const out: (ChatMessage | ChatMessage[])[] = [];
+  for (const m of messages) {
+    const last = out[out.length - 1];
+    if (m.role === "tool" && Array.isArray(last)) last.push(m);
+    else out.push(m.role === "tool" ? [m] : m);
+  }
+  return out;
+}
+
+function anthropicMessages(rest: ChatMessage[]): Record<string, unknown>[] {
+  return groupToolTurns(rest).map((m) => {
+    if (Array.isArray(m)) {
+      return { role: "user", content: m.map((t) => ({ type: "tool_result", tool_use_id: t.toolCallId ?? "", content: t.content })) };
+    }
+    if (m.role === "assistant" && m.toolCalls?.length) {
+      const blocks: Record<string, unknown>[] = [];
+      if (m.content) blocks.push({ type: "text", text: m.content });
+      for (const c of m.toolCalls) blocks.push({ type: "tool_use", id: c.id, name: c.name, input: argsObject(c.arguments) });
+      return { role: "assistant", content: blocks };
+    }
+    return { role: m.role, content: m.content };
+  });
+}
+
+function geminiContents(rest: ChatMessage[]): Record<string, unknown>[] {
+  return groupToolTurns(rest).map((m) => {
+    if (Array.isArray(m)) {
+      return { role: "user", parts: m.map((t) => ({ functionResponse: { name: t.name ?? "", response: resultObject(t.content) } })) };
+    }
+    if (m.role === "assistant" && m.toolCalls?.length) {
+      const parts: Record<string, unknown>[] = [];
+      if (m.content) parts.push({ text: m.content });
+      for (const c of m.toolCalls) {
+        const part: Record<string, unknown> = { functionCall: { name: c.name, args: argsObject(c.arguments) } };
+        if (c.thoughtSignature) part.thoughtSignature = c.thoughtSignature;
+        parts.push(part);
+      }
+      return { role: "model", parts };
+    }
+    return { role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] };
+  });
+}
+
+function openAiMessages(messages: ChatMessage[]): Record<string, unknown>[] {
+  return messages.map((m) => {
+    if (m.role === "tool") return { role: "tool", tool_call_id: m.toolCallId ?? "", content: m.content };
+    if (m.role === "assistant" && m.toolCalls?.length) {
+      return {
+        role: "assistant",
+        content: m.content || null,
+        tool_calls: m.toolCalls.map((c) => ({ id: c.id, type: "function", function: { name: c.name, arguments: c.arguments || "{}" } })),
+      };
+    }
+    return { role: m.role, content: m.content };
+  });
+}
+
 export function buildRequest(conn: ProviderConnection, messages: ChatMessage[], opts: ChatOptions): BuiltRequest {
   const base = trimBase(conn.baseUrl);
   const key = conn.apiKey.trim();
@@ -33,13 +115,14 @@ export function buildRequest(conn: ProviderConnection, messages: ChatMessage[], 
     const body: Record<string, unknown> = {
       model: opts.model,
       max_tokens: opts.maxTokens ?? DEFAULT_MAX_TOKENS,
-      messages: rest.map((m) => ({ role: m.role, content: m.content })),
+      messages: anthropicMessages(rest),
     };
     if (system) body.system = system;
     if (opts.stream) body.stream = true;
     if (opts.temperature !== undefined) body.temperature = opts.temperature;
     if (opts.tools?.length) {
       body.tools = opts.tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.parameters }));
+      if (opts.toolChoice === "none") body.tool_choice = { type: "none" };
     }
     return {
       url: `${base}/messages`,
@@ -61,12 +144,13 @@ export function buildRequest(conn: ProviderConnection, messages: ChatMessage[], 
     if (opts.maxTokens !== undefined) generationConfig.maxOutputTokens = opts.maxTokens;
     if (opts.json) generationConfig.responseMimeType = "application/json";
     const body: Record<string, unknown> = {
-      contents: rest.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] })),
+      contents: geminiContents(rest),
     };
     if (system) body.systemInstruction = { parts: [{ text: system }] };
     if (Object.keys(generationConfig).length) body.generationConfig = generationConfig;
     if (opts.tools?.length) {
       body.tools = [{ functionDeclarations: opts.tools.map((t) => ({ name: t.name, description: t.description, parameters: t.parameters })) }];
+      if (opts.toolChoice === "none") body.toolConfig = { functionCallingConfig: { mode: "NONE" } };
     }
     const path = opts.stream ? `:streamGenerateContent?alt=sse` : `:generateContent`;
     return {
@@ -79,7 +163,7 @@ export function buildRequest(conn: ProviderConnection, messages: ChatMessage[], 
   // openai-compatible
   const body: Record<string, unknown> = {
     model: opts.model,
-    messages: messages.map((m) => ({ role: m.role, content: m.content })),
+    messages: openAiMessages(messages),
   };
   if (opts.stream) body.stream = true;
   if (opts.temperature !== undefined) body.temperature = opts.temperature;
@@ -87,6 +171,7 @@ export function buildRequest(conn: ProviderConnection, messages: ChatMessage[], 
   if (opts.json && conn.provider.jsonMode) body.response_format = { type: "json_object" };
   if (opts.tools?.length) {
     body.tools = opts.tools.map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.parameters } }));
+    if (opts.toolChoice === "none") body.tool_choice = "none";
   }
   const headers: Record<string, string> = { "content-type": "application/json" };
   if (key) headers.authorization = `Bearer ${key}`;
@@ -123,7 +208,11 @@ function geminiParts(parts: Json[]): ChatResult {
   let text = "";
   parts.forEach((p, i) => {
     if (typeof p?.text === "string") text += p.text;
-    if (p?.functionCall) toolCalls.push({ id: String(i), name: String(p.functionCall.name ?? ""), arguments: JSON.stringify(p.functionCall.args ?? {}) });
+    if (p?.functionCall) {
+      const call: ToolCall = { id: String(p.functionCall.id ?? i), name: String(p.functionCall.name ?? ""), arguments: JSON.stringify(p.functionCall.args ?? {}) };
+      if (typeof p.thoughtSignature === "string") call.thoughtSignature = p.thoughtSignature;
+      toolCalls.push(call);
+    }
   });
   return { text, toolCalls };
 }

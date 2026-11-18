@@ -18,7 +18,7 @@ describe('parsingService - leading-zero numeric strings (comprehensive audit #4)
 
     const ds = processRawData(raw, 'test.csv');
 
-    expect(ds.data.map(r => r.zip)).toEqual(['01234', '00501', 90210]);
+    expect(ds.data.map(r => r.zip)).toEqual(['01234', '00501', '90210']);
   });
 
   it('classifies a leading-zero column as categorical, not numeric', () => {
@@ -42,7 +42,7 @@ describe('parsingService - leading-zero numeric strings (comprehensive audit #4)
 
     const ds = processRawData(raw, 'test.csv');
 
-    expect(ds.data.map(r => r.code)).toEqual(['01234', 5000, '007']);
+    expect(ds.data.map(r => r.code)).toEqual(['01234', '5000', '007']);
     expect(ds.columnTypes.code).toBe('categorical');
   });
 

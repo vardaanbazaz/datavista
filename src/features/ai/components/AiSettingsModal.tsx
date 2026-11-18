@@ -384,7 +384,7 @@ export function AiSettingsModal({ isOpen, onClose }: AiSettingsModalProps) {
             )}
             <div className="space-y-1 pt-1">
               <p className="text-xs text-frame-muted">
-                Columns that look like emails, phone numbers or person names are masked in top values and sample rows (their names and types are still sent).
+                Columns that look like emails, phone numbers or person names are masked in top values, query results and sample rows, and the copilot can't group or filter on them (their names and types are still sent).
               </p>
               {activeDataset && personal.length === 0 && <p className="text-xs text-frame-muted">None found in “{activeDataset.name}”.</p>}
               {personal.map(([col, kind]) => {

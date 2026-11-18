@@ -9,12 +9,52 @@ import { applyStreamEvent, buildModelsRequest, buildRequest, parseModels, parseR
 import type { BuiltRequest, ChatMessage, ChatOptions, ChatResult, ProviderConnection, StreamAccumulator } from "./types";
 
 export * from "./types";
-export { AiError, describeAiError, redactSecret } from "./errors";
+export { AiError, describeAiError, isToolsUnsupported, redactSecret } from "./errors";
 export type { AiErrorKind } from "./errors";
 export { buildRequest } from "./styles";
 
 const REQUEST_TIMEOUT_MS = 60_000;
 const STREAM_IDLE_TIMEOUT_MS = 30_000;
+
+/** 503 (overloaded) and 429 (rate limit) are retried this many times before the typed error. */
+export const MAX_RETRIES = 2;
+const RETRY_BASE_MS = 1_000;
+/** A Retry-After longer than this is not waited for: the typed error says when to try again. */
+export const MAX_RETRY_WAIT_MS = 20_000;
+const RETRY_STATUSES = new Set([429, 503]);
+
+/**
+ * How long to wait before retry number `attempt` (0-based): the provider's Retry-After
+ * (seconds or an HTTP date) when it sends one, otherwise 1 s, then 2 s. Null when the wait
+ * would exceed MAX_RETRY_WAIT_MS.
+ */
+export function retryDelayMs(retryAfter: string | null | undefined, attempt: number, now = Date.now()): number | null {
+  let ms = RETRY_BASE_MS * 2 ** attempt;
+  const v = retryAfter?.trim();
+  if (v) {
+    if (/^\d+(\.\d+)?$/.test(v)) ms = Math.ceil(Number(v) * 1000);
+    else {
+      const at = Date.parse(v);
+      if (Number.isFinite(at)) ms = Math.max(0, at - now);
+    }
+  }
+  return ms > MAX_RETRY_WAIT_MS ? null : ms;
+}
+
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(new AiError("other", "The request was cancelled."));
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(new AiError("other", "The request was cancelled."));
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
 
 /**
  * fetch with a timeout that the caller can restart (`touch`) as stream chunks arrive, so a
@@ -79,7 +119,18 @@ export function createChatClient(conn: ProviderConnection) {
       const built = buildRequest(conn, messages, opts);
       const init: RequestInit = { method: "POST", headers: built.headers, body: JSON.stringify(built.body) };
       const timeoutMs = opts.timeoutMs ?? (opts.stream ? STREAM_IDLE_TIMEOUT_MS : REQUEST_TIMEOUT_MS);
-      const { response, t } = await send(conn, { url: built.url, init }, timeoutMs, opts.signal);
+      let { response, t } = await send(conn, { url: built.url, init }, timeoutMs, opts.signal);
+
+      // Busy or rate-limited: retry before any of the answer has been read.
+      for (let attempt = 0; RETRY_STATUSES.has(response.status) && attempt < MAX_RETRIES; attempt++) {
+        const delayMs = retryDelayMs(response.headers.get("retry-after"), attempt);
+        if (delayMs === null) break;
+        t.done();
+        await response.body?.cancel().catch(() => undefined);
+        opts.onRetry?.({ attempt: attempt + 1, delayMs, status: response.status });
+        await sleep(delayMs, opts.signal);
+        ({ response, t } = await send(conn, { url: built.url, init }, timeoutMs, opts.signal));
+      }
 
       try {
         if (!response.ok) await failFrom(response, opts.model);

@@ -11,7 +11,7 @@ import type { ApiStyle } from "./providers/registry";
 import { SYSTEM_PROMPT } from "./llmService";
 import { useAiSettingsStore, resolveConnection, isConnectionReady } from "./settings/aiSettingsStore";
 
-export type AiRequestKind = "query" | "formula" | "summary";
+export type AiRequestKind = "query" | "formula" | "summary" | "chat";
 
 const SUMMARY_SYSTEM_PROMPT =
   "You are a data analyst writing for a busy manager. Write a concise, professional 2 to 3 sentence executive summary " +
@@ -90,6 +90,7 @@ export async function buildSummaryMessages(
  * max_tokens: newer OpenAI (reasoning) models reject both, and other servers have sane defaults.
  */
 export function requestOptions(kind: AiRequestKind, model: string, style: ApiStyle): ChatOptions {
+  if (kind === "chat") return style === "openai-compatible" ? { model } : { model, temperature: 0.2, maxTokens: 1500 };
   const json = kind !== "summary";
   if (style === "openai-compatible") return { model, json };
   return kind === "summary" ? { model, temperature: 0.3, maxTokens: 400 } : { model, json, temperature: 0.1, maxTokens: 1500 };

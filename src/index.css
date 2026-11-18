@@ -392,3 +392,17 @@ html[data-motion="reduce"] *::after {
   transition-duration: 0.01ms !important;
   scroll-behavior: auto !important;
 }
+
+/* The copilot button sits above toasts (z-index over sonner's) but hides while a modal dialog
+   has locked the page (Radix sets data-scroll-locked on body), so it never covers a dialog. */
+body[data-scroll-locked] .copilot-fab {
+  display: none;
+}
+/* While the button shows, toasts stack above it (button 56 px + 24 px from the edge + a gap),
+   so it never covers a toast's action or close button either. */
+html[data-copilot-fab] .toast-viewport {
+  bottom: 5.5rem;
+}
+html[data-copilot-fab] [data-sonner-toaster][data-y-position="bottom"] {
+  bottom: calc(var(--offset-bottom, 32px) + 4.5rem);
+}

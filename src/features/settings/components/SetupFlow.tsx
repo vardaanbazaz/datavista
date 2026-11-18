@@ -238,7 +238,7 @@ export function SetupFlow() {
               <p className="text-frame-muted">
                 <span className="font-medium text-foreground">Your data stays in this browser.</span> Files are read and stored here, not
                 uploaded. The key is kept for this browser session only (choose &quot;Remember on this device&quot; in AI settings to keep it). When you use an AI feature, your question and
-                the dataset&apos;s column names, types, numeric stats and top values (the default privacy level, changeable in AI settings; personal-data columns masked) are sent to {provider.label}.
+                the dataset&apos;s column names, types, numeric stats and top values, plus the results of queries the copilot runs in this browser (never rows; the default privacy level, changeable in AI settings; personal-data columns masked), are sent to {provider.label}.
               </p>
             </div>
           </div>

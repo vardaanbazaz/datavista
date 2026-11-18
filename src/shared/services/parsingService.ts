@@ -83,6 +83,24 @@ export const hasLetterCodes = (column: string, data: DataRow[]): boolean => {
   return false;
 };
 
+/**
+ * An ID column by name whose numeric-looking text isn't the number's own spelling ("1.10",
+ * "1.0", "1e5", "+7"): turning those cells into numbers would change the IDs, so the column is
+ * typed categorical and keeps its text. Plain-integer ID columns (HR EmployeeNumber) stay numeric.
+ */
+export const hasNonCanonicalIdText = (column: string, rawKey: string, rawData: Record<string, unknown>[]): boolean => {
+  if (!isIdName(column)) return false;
+  for (let i = 0; i < rawData.length; i++) {
+    const raw = rawData[i][rawKey];
+    if (typeof raw !== 'string') continue;
+    const text = cleanValue(raw);
+    if (typeof text !== 'string') continue;
+    const n = parseStrictNumber(text);
+    if (n !== null && String(n) !== text) return true;
+  }
+  return false;
+};
+
 export interface ColumnInference {
   type: 'numeric' | 'categorical' | 'date';
   /** Date analysis of the column's values (see utils/dates.ts:analyzeDateColumn). */
@@ -238,9 +256,25 @@ export const processRawData = (
     // A converted column (currency, thousands) is numeric: ≥80% of its cells were numbers
     // written one way, which can sit exactly on the type vote's 80% line.
     columnTypes[col] = fixSourceValues[col] ? 'numeric'
-      : inference.type === 'numeric' && hasLetterCodes(col, data) ? 'categorical'
+      : inference.type === 'numeric' && (hasLetterCodes(col, data) || hasNonCanonicalIdText(col, originalKeys[colIndex], rawData)) ? 'categorical'
       : inference.type;
     dateInfo[col] = inference.dates;
+  });
+
+  // Text columns keep the text as written: cells were turned into numbers above before the
+  // column's type was known, which lost "1.10" (-> 1.1), "1.0" (-> 1) and "1e5" (-> 100000)
+  // in version, code and ID columns. Re-read those cells from the raw rows. XLSX cells that
+  // were already numbers in the workbook stay numbers (their text isn't in the file).
+  columns.forEach((col, colIndex) => {
+    if (columnTypes[col] !== 'categorical' || fixSourceValues[col]) return;
+    const key = originalKeys[colIndex];
+    for (let i = 0; i < data.length; i++) {
+      if (typeof data[i][col] !== 'number') continue;
+      const raw = rawData[i][key];
+      if (typeof raw !== 'string') continue;
+      const text = cleanValue(raw);
+      if (typeof text === 'string') data[i][col] = text;
+    }
   });
 
   // Date columns: store each valid date as a calendar string (utils/dates.ts). Values that

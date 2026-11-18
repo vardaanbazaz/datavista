@@ -38,8 +38,8 @@ async function open(page: Page, theme: string) {
 }
 
 /** Off-palette text on glass: [selector-ish, text, colour]. */
-async function offPaletteText(page: Page) {
-  return page.evaluate(() => {
+async function offPaletteText(page: Page, root = "#main-content") {
+  return page.evaluate((rootSelector) => {
     // One probe per colour, outside any surface (so no remapped tokens).
     const allowed = new Set(
       ["--foreground", "--frame-muted", "--primary-ink", "--destructive", "--success", "--warning", "--tertiary"].map((v) => {
@@ -57,7 +57,7 @@ async function offPaletteText(page: Page) {
       return parts.length === 4 ? Number(parts[3]) : 1;
     };
     const bad: string[] = [];
-    const walker = document.createTreeWalker(document.querySelector("#main-content") ?? document.body, NodeFilter.SHOW_TEXT);
+    const walker = document.createTreeWalker(document.querySelector(rootSelector) ?? document.body, NodeFilter.SHOW_TEXT);
     const seen = new Set<Element>();
     for (let n = walker.nextNode(); n; n = walker.nextNode()) {
       if (!n.textContent?.trim()) continue;
@@ -93,7 +93,7 @@ async function offPaletteText(page: Page) {
       if (!allowed.has(style.color)) bad.push(`${el.tagName.toLowerCase()}.${[...el.classList].slice(0, 4).join(".")} "${n.textContent.trim().slice(0, 40)}" ${style.color}`);
     }
     return [...new Set(bad)];
-  });
+  }, root);
 }
 
 for (const theme of THEMES) {
@@ -123,6 +123,10 @@ for (const theme of THEMES) {
       );
       found.push(...endless.map((e) => `${view}: endless animation at idle: ${e}`));
     }
+    // The copilot panel (outside #main-content): glass frame, chat on a solid surface.
+    await page.getByTestId("copilot-fab").click();
+    await page.getByTestId("copilot-input").waitFor();
+    found.push(...(await offPaletteText(page, "[data-testid='copilot-panel']")).map((b) => `copilot panel: ${b}`));
     expect(found).toEqual([]);
   });
 }

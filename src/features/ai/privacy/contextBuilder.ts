@@ -4,7 +4,10 @@
  * context here, at the user's privacy level:
  *  - schema:    column names and types (+ calculated field formulas)
  *  - summaries: + numeric stats (min, max, mean, missing, distinct) and top values
- *  - samples:   + the first N rows (20-200)
+ *  - queries:   same context as summaries; the copilot may also run local queries
+ *               (copilot/tools.ts) whose aggregate results are sent
+ *  - samples:   + a seeded random sample of N rows (20-200), the same rows each time for a
+ *               dataset (sampleRowIndices)
  * Columns that look like emails, phone numbers or person names are masked in top values
  * and sample rows at every level unless the user unmasked that column.
  */
@@ -99,6 +102,50 @@ function topValues(rows: DataRow[], col: string): { value: string; count: number
     .map(([value, count]) => ({ value: value.length > 80 ? `${value.slice(0, 77)}...` : value, count }));
 }
 
+/** 32-bit FNV-1a hash of a string (the sample seed of a dataset). */
+export function hashSeed(text: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+}
+
+/** mulberry32: a small seeded PRNG returning floats in [0, 1). */
+export function seededRandom(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * `n` row indices out of `total`, picked at random with a seed from `seedKey` (the dataset
+ * id): the same dataset gives the same rows every time, so the preview shows exactly what a
+ * request sends. Partial Fisher-Yates over a sparse swap map (no array of `total` indices);
+ * returned in row order.
+ */
+export function sampleRowIndices(total: number, n: number, seedKey: string): number[] {
+  const k = Math.max(0, Math.min(n, total));
+  if (k === total) return Array.from({ length: total }, (_, i) => i);
+  const rand = seededRandom(hashSeed(seedKey));
+  const swapped = new Map<number, number>();
+  const out: number[] = [];
+  for (let i = 0; i < k; i++) {
+    const j = i + Math.floor(rand() * (total - i));
+    const vi = swapped.get(i) ?? i;
+    const vj = swapped.get(j) ?? j;
+    swapped.set(j, vi);
+    out.push(vj);
+  }
+  return out.sort((a, b) => a - b);
+}
+
 /**
  * Builds the data context for an AI request. `rows` are the rows in view (filtered);
  * defaults to all rows.
@@ -119,6 +166,8 @@ export function buildAiContext(dataset: Dataset, settings: PrivacySettings, opts
     }
     if (level === "schema") return col;
     if (type === "numeric") {
+      // A masked numeric column (a phone column of digits) sends no values: its min/max are one person's number.
+      if (col.masked) return col;
       col.stats = numericStats(dataset, name, rows);
     } else if (type === "date") {
       const meta = dataset.metadata?.columns.find((c) => c.name === name);
@@ -142,7 +191,7 @@ export function buildAiContext(dataset: Dataset, settings: PrivacySettings, opts
   if (level === "samples") {
     const n = clampSampleRows(settings.sampleRows);
     const maskedCols = new Map(columns.filter((c) => c.masked).map((c) => [c.name, c.personalData!]));
-    ctx.sampleRows = rows.slice(0, n).map((r) => {
+    ctx.sampleRows = sampleRowIndices(rows.length, n, dataset.id).map((i) => rows[i]).map((r) => {
       const out: Record<string, string | number | boolean | null> = {};
       for (const name of dataset.columns) {
         const v = r[name] ?? null;

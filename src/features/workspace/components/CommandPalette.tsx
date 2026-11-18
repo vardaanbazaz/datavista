@@ -43,7 +43,7 @@ import { useDashboardStore } from "@/features/dashboards/store/dashboardStore";
 import { aiEngine } from "@/features/ai/aiEngine";
 import { ConnectProviderCard } from "@/features/ai/components/ConnectProviderCard";
 import { useAiConnected, useAiSettingsStore, useProviderLabel } from "@/features/ai/settings/aiSettingsStore";
-import { PRIVACY_LEVELS } from "@/features/ai/privacy/levels";
+import { contextSends, privacyLevelLabel } from "@/features/ai/privacy/levels";
 import { AIResponse } from "@/features/ai/types";
 import { QueryResult } from "@/shared/types";
 import { toast } from "@/shared/hooks/use-toast";
@@ -89,7 +89,7 @@ export function CommandPalette({
   const setActiveView = useUiStore((state) => state.setActiveView);
   const aiConnected = useAiConnected();
   const providerLabel = useProviderLabel();
-  const privacyLabel = useAiSettingsStore((state) => PRIVACY_LEVELS.find((l) => l.id === state.privacy.level)?.label ?? "");
+  const privacyLevel = useAiSettingsStore((state) => state.privacy.level);
   const activeDataset = useDatasetStore((state) => state.activeDataset);
   const datasets = useDatasetStore((state) => state.datasets);
   const selectDataset = useDatasetStore((state) => state.selectDataset);
@@ -464,7 +464,7 @@ export function CommandPalette({
                       </div>
                       {aiConnected && (
                         <p className="px-2 pb-1 text-xs text-muted-foreground">
-                          Sends your question and this dataset&apos;s {privacyLabel.toLowerCase()} (privacy level in AI settings) to {providerLabel}.
+                          Sends your question and this dataset&apos;s {contextSends(privacyLevel)} (privacy level: {privacyLevelLabel(privacyLevel)}, in AI settings) to {providerLabel}.
                         </p>
                       )}
                       {(() => {
