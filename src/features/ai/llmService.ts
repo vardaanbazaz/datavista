@@ -1,4 +1,6 @@
-import { AIPromptContext } from "./types";
+import { AIPromptColumn, AIPromptContext } from "./types";
+import { nameWords } from "@/shared/utils/columnRoles";
+import { OFFLINE_GUESS_LABEL } from "./offlineLabel";
 import { functionsByCategory } from "@/shared/services/formula/library/registry";
 import { FunctionDefinition } from "@/shared/services/formula/library/types";
 
@@ -70,18 +72,75 @@ Strict Constraints:
 3. If the user prompt asks to query, filter, rank, group, or show top items (e.g. "top 5 regions by revenue", "show electronics sales"), set type="query" and populate query configuration.
 `;
 
+/** Group-by columns have at most this many distinct values (more reads as labels or IDs, like App). */
+export const OFFLINE_MAX_GROUPS = 50;
+
+/** Words of a phrase, lower-cased, camelCase and punctuation split ("ContentRating" -> content rating). */
+const words = (text: string) => nameWords(text);
+const singular = (w: string) => (w.endsWith("ies") && w.length > 4 ? `${w.slice(0, -3)}y` : w.endsWith("s") && !w.endsWith("ss") && w.length > 3 ? w.slice(0, -1) : w);
+
 /**
- * Offline heuristic for common analytical phrases, used when no AI provider is connected.
- * Runs locally; nothing is sent anywhere.
+ * Where the question names the column: [start, end) spans of question words where the
+ * column's words appear in order as whole words (plurals allowed: "categories" -> Category),
+ * or the one word that is its name without spaces ("contentrating"). Case- and
+ * space-insensitive; never a raw substring, so "Type" does not match "prototype".
+ */
+function columnSpans(q: string[], column: string): [number, number][] {
+  const col = words(column).map(singular);
+  if (col.length === 0) return [];
+  const spans: [number, number][] = [];
+  for (let i = 0; i + col.length <= q.length; i++) {
+    if (col.every((w, j) => q[i + j] === w)) spans.push([i, i + col.length]);
+  }
+  const joined = col.join("");
+  if (col.length > 1) q.forEach((w, i) => w === joined && spans.push([i, i + 1]));
+  return spans;
+}
+
+/**
+ * The columns the question names, longest name first. A match inside a longer column's match
+ * doesn't count: "content rating" names Content Rating, not Rating too.
+ */
+function namedColumns(question: string, columns: AIPromptColumn[]): AIPromptColumn[] {
+  const q = words(question).map(singular);
+  const found = columns.map((c) => ({ c, spans: columnSpans(q, c.name) })).filter((f) => f.spans.length > 0);
+  const inside = (s: [number, number], t: [number, number]) => t[0] <= s[0] && s[1] <= t[1] && t[1] - t[0] > s[1] - s[0];
+  return found
+    .filter((f) => f.spans.some((s) => !found.some((g) => g !== f && g.spans.some((t) => inside(s, t)))))
+    .sort((a, b) => words(b.c.name).length - words(a.c.name).length)
+    .map((f) => f.c);
+}
+
+const groupable = (c: AIPromptColumn) => c.type === "categorical" && !c.isId && (c.uniqueValueCount === undefined || c.uniqueValueCount <= OFFLINE_MAX_GROUPS);
+
+const OPERATORS: { re: RegExp; op: "avg" | "sum" | "count_rows" | "median" | "max" | "min"; label: string }[] = [
+  { re: /\b(average|avg|mean)\b/, op: "avg", label: "Average" },
+  { re: /\bmedian\b/, op: "median", label: "Median" },
+  { re: /\b(how many|count|number of)\b/, op: "count_rows", label: "Rows" },
+  { re: /\b(total|sum)\b/, op: "sum", label: "Total" },
+  { re: /\b(maximum|max)\b/, op: "max", label: "Max" },
+  { re: /\b(minimum|min)\b/, op: "min", label: "Min" },
+];
+
+/**
+ * Offline heuristic for common analytical phrases, used only when no AI provider is
+ * connected (never in place of a failed provider answer). Runs locally; nothing is sent.
+ * Query: a column the question names is used (a category to group by, a number to
+ * aggregate); otherwise the first categorical column with 2-50 distinct values. Never
+ * groups by a column with more than 50 distinct values or an ID-flagged column. The
+ * operator and sort direction come from words like "average" and "lowest".
  */
 export function generateOfflineFallback(context: AIPromptContext, mode?: 'query' | 'formula'): string {
   const promptLower = context.prompt.toLowerCase();
   const columns = context.columns;
   const colNames = columns.map(c => c.name);
+  const named = namedColumns(context.prompt, columns);
 
-  // Find categorical vs numeric columns
-  const catCol = columns.find(c => c.type === 'categorical')?.name || colNames[0] || 'Category';
-  const numCol = columns.find(c => c.type === 'numeric')?.name || colNames[1] || 'Sales';
+  const measures = columns.filter((c) => c.type === "numeric" && !c.isId);
+  const numCol = named.find((c) => c.type === "numeric" && !c.isId)?.name ?? measures[0]?.name;
+  const groupCol =
+    named.find(groupable)?.name ??
+    columns.find((c) => groupable(c) && (c.uniqueValueCount === undefined || c.uniqueValueCount >= 2))?.name;
 
   if (mode === 'formula' || promptLower.includes('calculate') || promptLower.includes('margin') || promptLower.includes('ratio')) {
     if (promptLower.includes('margin') && colNames.includes('Profit') && colNames.includes('Sales')) {
@@ -90,38 +149,46 @@ export function generateOfflineFallback(context: AIPromptContext, mode?: 'query'
         formula: '([Profit] / [Sales]) * 100',
         fieldName: 'Profit Margin (%)',
         title: 'Profit Margin Calculation',
-        explanation: 'Calculates Profit as a percentage of Sales.'
+        explanation: `${OFFLINE_GUESS_LABEL}: Profit as a percentage of Sales.`
       });
     }
-    if (colNames.length >= 2) {
+    const f = numCol ?? colNames[1] ?? colNames[0];
+    if (colNames.length >= 2 && f) {
       return JSON.stringify({
         type: 'formula',
-        formula: `[${numCol}] * 1.1`,
-        fieldName: `Adjusted ${numCol}`,
-        title: `Adjusted ${numCol} Calculation`,
-        explanation: `Applies a 10% projection to [${numCol}].`
+        formula: `[${f}] * 1.1`,
+        fieldName: `Adjusted ${f}`,
+        title: `Adjusted ${f} Calculation`,
+        explanation: `${OFFLINE_GUESS_LABEL}: a 10% projection of [${f}].`
       });
     }
   }
 
-  // Check for Top N pattern
-  const topMatch = promptLower.match(/top\s+(\d+)/);
-  const pageSize = topMatch ? parseInt(topMatch[1], 10) : 5;
+  // No numeric column to aggregate: count rows.
+  const found = OPERATORS.find((o) => o.re.test(promptLower));
+  const operator = numCol ? found ?? OPERATORS.find((o) => o.op === "sum")! : OPERATORS.find((o) => o.op === "count_rows")!;
+  const measure = operator.op === "count_rows" ? undefined : numCol;
+  const alias = measure ? `${operator.label} ${measure}` : "Rows";
+  const direction = /\b(lowest|least|bottom|smallest|worst|fewest)\b/.test(promptLower) ? "asc" : "desc";
+
+  const topMatch = promptLower.match(/(?:top|bottom)\s+(\d+)/);
+  const what = measure ? `${operator.label.toLowerCase()} ${measure}` : "rows";
+  const title = `${what.charAt(0).toUpperCase()}${what.slice(1)}${groupCol ? ` by ${groupCol}` : ""}`;
 
   return JSON.stringify({
     type: 'query',
     query: {
-      groupBy: { column: catCol },
+      ...(groupCol ? { groupBy: { column: groupCol } } : {}),
       aggregations: [
-        { column: numCol, operator: 'sum', alias: `Total ${numCol}` }
+        measure ? { column: measure, operator: operator.op, alias } : { column: groupCol ?? colNames[0], operator: 'count_rows', alias }
       ],
       sorting: [
-        { column: `Total ${numCol}`, direction: 'desc' }
+        { column: alias, direction }
       ],
-      pagination: { page: 1, pageSize: topMatch ? pageSize : 'all' }
+      pagination: { page: 1, pageSize: topMatch ? parseInt(topMatch[1], 10) : 'all' }
     },
     chartType: 'bar',
-    title: `${catCol} by ${numCol}`,
-    explanation: `Offline AI Heuristic: Aggregated [${numCol}] grouped by [${catCol}].`
+    title,
+    explanation: `${OFFLINE_GUESS_LABEL}: ${what}${groupCol ? ` by ${groupCol}` : ""}.`
   });
 }

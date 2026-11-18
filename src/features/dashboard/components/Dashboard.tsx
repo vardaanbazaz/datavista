@@ -8,6 +8,7 @@ import { ImportDialog } from "@/features/upload/components/ImportDialog";
 import { DataPrivacyDialog } from "@/features/privacy/components/DataPrivacyDialog";
 import { AiSettingsHost } from "@/features/ai/components/AiSettingsHost";
 import { CopilotHost } from "@/features/ai/copilot/CopilotHost";
+import { useCopilotStore } from "@/features/ai/copilot/copilotStore";
 import { AppearancePanel } from "@/features/settings/components/AppearancePanel";
 import { SetupFlow, shouldOfferSetup } from "@/features/settings/components/SetupFlow";
 import { loadSampleDataset } from "@/features/datasets/sampleData";
@@ -146,10 +147,7 @@ export function Dashboard() {
           setSearchInitialQuery(undefined);
           setIsSearchOpen(true);
         }}
-        onOpenAiCoPilot={() => {
-          setSearchInitialQuery("/ai ");
-          setIsSearchOpen(true);
-        }}
+        onOpenAiCoPilot={() => useCopilotStore.getState().setOpen(true)}
       />
       
       <MainContent

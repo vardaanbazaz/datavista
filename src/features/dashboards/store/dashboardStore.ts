@@ -42,8 +42,11 @@ interface DashboardState {
   // Which path produced the current executiveSummary — 'ai' (sent to the configured LLM
   // provider) or 'offline' (local heuristic, no data left the browser). Lets the panel show
   // an "AI Generated" indicator only when data actually left the browser.
-  executiveSummarySource: 'ai' | 'offline' | null;
-  generateExecutiveSummary: () => Promise<void>;
+  executiveSummarySource: 'ai' | 'offline' | 'error' | null;
+  /** The provider's typed error when the AI summary failed (source 'error'); never replaced silently by the offline summary. */
+  executiveSummaryError: string | null;
+  /** `offline`: the local summary even with a provider connected (the "Use offline summary" button). */
+  generateExecutiveSummary: (opts?: { offline?: boolean }) => Promise<void>;
   dismissExecutiveSummary: () => void;
 
   // Undo/Redo History
@@ -229,12 +232,13 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   executiveSummaryDismissed: false,
   detectedAnomalies: [],
   executiveSummarySource: null,
+  executiveSummaryError: null,
   past: [],
   future: [],
 
   dismissExecutiveSummary: () => set({ executiveSummaryDismissed: true }),
 
-  generateExecutiveSummary: async () => {
+  generateExecutiveSummary: async (opts) => {
     const requestDatasetId = useDatasetStore.getState().activeDataset?.id ?? null;
     set({ isGeneratingSummary: true, executiveSummaryDismissed: false });
     const dataset = useDatasetStore.getState().activeDataset;
@@ -245,11 +249,12 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       ? allCharts.filter((c) => c.datasetId === dataset?.id && activeDashboard.chartIds.includes(c.id))
       : allCharts.filter((c) => c.datasetId === dataset?.id);
 
-    const { summary, anomalies, source } = await summaryEngine.generateExecutiveSummary(
+    const { summary, anomalies, source, error } = await summaryEngine.generateExecutiveSummary(
       dataset,
       charts,
       get().activeGlobalFilters,
-      useFilterStore.getState().filteredData
+      useFilterStore.getState().filteredData,
+      { offline: opts?.offline }
     );
 
     // The active dataset may have changed while the request was in flight
@@ -265,6 +270,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       executiveSummary: summary,
       detectedAnomalies: anomalies,
       executiveSummarySource: source,
+      executiveSummaryError: error ?? null,
       isGeneratingSummary: false,
       executiveSummaryDismissed: false,
     });
@@ -671,6 +677,7 @@ useDatasetStore.subscribe((state) => {
       detectedAnomalies: [],
       executiveSummaryDismissed: false,
       executiveSummarySource: null,
+      executiveSummaryError: null,
     });
   }
 });

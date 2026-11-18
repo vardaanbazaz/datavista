@@ -50,6 +50,7 @@ function ExecutiveSummaryPanelInner() {
     isGeneratingSummary,
     executiveSummaryDismissed,
     executiveSummarySource,
+    executiveSummaryError,
     detectedAnomalies,
     generateExecutiveSummary,
     dismissExecutiveSummary,
@@ -59,6 +60,7 @@ function ExecutiveSummaryPanelInner() {
       isGeneratingSummary: state.isGeneratingSummary,
       executiveSummaryDismissed: state.executiveSummaryDismissed,
       executiveSummarySource: state.executiveSummarySource,
+      executiveSummaryError: state.executiveSummaryError,
       detectedAnomalies: state.detectedAnomalies,
       generateExecutiveSummary: state.generateExecutiveSummary,
       dismissExecutiveSummary: state.dismissExecutiveSummary,
@@ -86,6 +88,7 @@ function ExecutiveSummaryPanelInner() {
     if (
       activeDataset &&
       !executiveSummary &&
+      !executiveSummaryError &&
       !isGeneratingSummary &&
       !executiveSummaryDismissed &&
       !needsAiConfirmation
@@ -95,6 +98,7 @@ function ExecutiveSummaryPanelInner() {
   }, [
     activeDataset,
     executiveSummary,
+    executiveSummaryError,
     isGeneratingSummary,
     executiveSummaryDismissed,
     needsAiConfirmation,
@@ -202,6 +206,17 @@ function ExecutiveSummaryPanelInner() {
                     <div className="space-y-2 py-1">
                       <div className="h-3.5 bg-muted rounded-md animate-pulse w-11/12" />
                       <div className="h-3.5 bg-muted rounded-md animate-pulse w-4/5" />
+                    </div>
+                  ) : executiveSummarySource === "error" ? (
+                    // The AI summary failed: the typed error, and the offline summary only on request.
+                    <div className="space-y-2.5" data-testid="summary-error">
+                      <p className="text-body text-destructive leading-relaxed" role="alert">
+                        The AI summary failed: {executiveSummaryError}
+                      </p>
+                      <Button variant="outline" size="sm" onClick={() => generateExecutiveSummary({ offline: true })} className="h-9 px-3 text-sm gap-1.5" data-testid="summary-use-offline">
+                        <Cpu className="h-3.5 w-3.5" aria-hidden />
+                        Use offline summary
+                      </Button>
                     </div>
                   ) : (
                     <p className="text-body text-foreground leading-relaxed">

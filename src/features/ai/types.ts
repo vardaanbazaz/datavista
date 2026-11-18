@@ -9,6 +9,8 @@ export interface AIPromptColumn {
   minimumValue?: number;
   maximumValue?: number;
   uniqueValueCount?: number;
+  /** Holds identifiers (columnRoles.isIdName or the import's identifier role): never grouped or aggregated offline. */
+  isId?: boolean;
 }
 
 export interface AIPromptContext {

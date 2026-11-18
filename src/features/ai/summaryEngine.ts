@@ -13,8 +13,9 @@ export const summaryEngine = {
     dataset: Dataset | null,
     charts: ChartConfig[],
     filters?: FilterState | GlobalFilter[],
-    rows?: DataRow[]
-  ): Promise<{ summary: string; anomalies: DetectedAnomaly[]; source: 'ai' | 'offline' }> {
+    rows?: DataRow[],
+    opts: { offline?: boolean } = {}
+  ): Promise<{ summary: string; anomalies: DetectedAnomaly[]; source: 'ai' | 'offline' | 'error'; error?: string }> {
     if (!dataset) {
       return {
         summary: "No active dataset loaded. Upload or select a dataset to generate automated insights.",
@@ -40,8 +41,9 @@ export const summaryEngine = {
           .map(([k, v]) => `${k}: [${v.join(", ")}]`)
           .join("; ");
 
-    // 3. No provider connected: the offline summary, and no request is made.
-    if (!isAiConnected()) {
+    // 3. No provider connected, or the user asked for the offline summary after an AI error:
+    // the offline summary, and no request is made.
+    if (opts.offline || !isAiConnected()) {
       return {
         summary: this.generateOfflineSummary(datasetName, rowCount, chartCount, anomalies, filterText),
         anomalies,
@@ -78,13 +80,10 @@ export const summaryEngine = {
         source: 'ai'
       };
     } catch (e) {
-      // Only the error kind is logged: provider messages can carry request details.
-      console.warn("AI summary failed, using the offline summary:", e instanceof Error ? e.name : "error", (e as { kind?: string })?.kind ?? "");
-      return {
-        summary: this.generateOfflineSummary(datasetName, rowCount, chartCount, anomalies, filterText),
-        anomalies,
-        source: 'offline'
-      };
+      // Never replaced silently by the offline summary: the panel shows the typed error and
+      // offers the offline summary as an explicit button (opts.offline).
+      const { describeAiError } = await import("./client/errors");
+      return { summary: "", anomalies, source: 'error', error: describeAiError(e) };
     }
   },
 

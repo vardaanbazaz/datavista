@@ -3,7 +3,9 @@
  * Ctrl+J, and the panel shell. Large screens: an aside docked on the right of the workspace
  * row, so the main content shrinks; resizable 320-560 px, width remembered. Smaller screens:
  * a full-screen sheet (Radix dialog: focus trap, Esc). The contents (CopilotPanel and the AI
- * client) load on first open. Hidden when no dataset is loaded.
+ * client) load on first open. Ctrl+J and the sidebar's Co-Pilot button open it with or
+ * without a dataset (without one it shows "Load a dataset to start"); the round button only
+ * shows while a dataset is loaded.
  */
 import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
@@ -91,9 +93,9 @@ export function CopilotHost() {
 
   const close = useCallback(() => setOpen(false), [setOpen]);
 
-  // Ctrl+J (Cmd+J on Mac) opens and closes it, from anywhere, while a dataset is loaded.
+  // Ctrl+J (Cmd+J on Mac) opens and closes it from anywhere in the app, dataset or not; the
+  // browser's own Ctrl+J (downloads, Chrome) never runs while the app has focus.
   useEffect(() => {
-    if (!hasDataset) return;
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "j") {
         e.preventDefault();
@@ -102,7 +104,7 @@ export function CopilotHost() {
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [hasDataset]);
+  }, []);
 
   // Esc closes the docked panel while focus is in it (the phone sheet's dialog handles its own).
   useEffect(() => {
@@ -131,8 +133,6 @@ export function CopilotHost() {
     if (wasOpen.current && !open) requestAnimationFrame(() => fabRef.current?.focus());
     wasOpen.current = open;
   }, [open]);
-
-  if (!hasDataset) return null;
 
   const shortcut = formatShortcut([modKey, "J"]);
   const title = (id: string) => (children: ReactNode) => (desktop ? <h2 id={id}>{children}</h2> : <DialogPrimitive.Title id={id}>{children}</DialogPrimitive.Title>);

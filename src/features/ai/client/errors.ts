@@ -7,12 +7,14 @@ export type AiErrorKind = "blocked" | "bad-key" | "model-not-found" | "rate-limi
 export class AiError extends Error {
   readonly kind: AiErrorKind;
   readonly status?: number;
+  readonly code?: TimeoutCode;
 
-  constructor(kind: AiErrorKind, message: string, status?: number) {
+  constructor(kind: AiErrorKind, message: string, status?: number, code?: TimeoutCode) {
     super(message);
     this.name = "AiError";
     this.kind = kind;
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -77,8 +79,22 @@ export function blockedError(baseUrl: string): AiError {
   );
 }
 
+/** Code on timeout errors (AiError.code): before any output ("first") or a stalled stream ("idle"). */
+export type TimeoutCode = "timeout-first" | "timeout-idle";
+
+/** No output within `seconds` (the first-response timeout). Retryable once (client/index.ts). */
 export function timeoutError(seconds: number): AiError {
-  return new AiError("other", `The provider did not answer within ${seconds} s. It may be slow or unreachable; try again.`);
+  return new AiError("other", `The provider did not answer within ${seconds} s. It may be slow or unreachable; try again.`, undefined, "timeout-first");
+}
+
+/** The stream started, then stopped sending for `seconds`. Not retried: part of the answer was shown. */
+export function idleTimeoutError(seconds: number): AiError {
+  return new AiError("other", `The provider stopped sending the answer for ${seconds} s. Try again.`, undefined, "timeout-idle");
+}
+
+/** A timeout before any output: the request can be sent again without duplicating text. */
+export function isEarlyTimeout(e: unknown): boolean {
+  return e instanceof AiError && e.code === "timeout-first";
 }
 
 /** Plain words for any error from an AI call, safe to show (never includes the key). */

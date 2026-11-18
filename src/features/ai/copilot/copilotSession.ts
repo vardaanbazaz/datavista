@@ -72,7 +72,8 @@ export async function askCopilot(question: string, signal: AbortSignal): Promise
       signal,
       onText: (delta) => update((m) => ({ text: m.text + delta, retrying: false })),
       onStep: (step) => update((m) => ({ steps: [...(m.steps ?? []), step], retrying: false })),
-      onRetry: () => update({ retrying: true }),
+      // status 0: no answer before the first-response timeout (client/index.ts).
+      onRetry: ({ status }) => update({ retrying: true, retryReason: status === 0 ? "timeout" : "busy" }),
     });
     const notes = [result.toolsUnsupported ? NO_TOOLS_NOTE : "", result.capped ? CAPPED_NOTE : ""].filter(Boolean);
     update({ text: result.text, status: "done", retrying: false, note: notes.join(" ") || undefined });

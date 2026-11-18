@@ -3,18 +3,26 @@
  * no vendor SDKs. Loaded with `await import()` by the AI features so none of it is in the
  * startup bundle.
  */
-import { AiError, blockedError, errorFromResponse, timeoutError } from "./errors";
+import { AiError, blockedError, errorFromResponse, idleTimeoutError, isEarlyTimeout, timeoutError } from "./errors";
 import { parseSse } from "./sse";
 import { applyStreamEvent, buildModelsRequest, buildRequest, parseModels, parseResponse } from "./styles";
 import type { BuiltRequest, ChatMessage, ChatOptions, ChatResult, ProviderConnection, StreamAccumulator } from "./types";
 
 export * from "./types";
-export { AiError, describeAiError, isToolsUnsupported, redactSecret } from "./errors";
+export { AiError, describeAiError, isEarlyTimeout, isToolsUnsupported, redactSecret } from "./errors";
 export type { AiErrorKind } from "./errors";
 export { buildRequest } from "./styles";
 
-const REQUEST_TIMEOUT_MS = 60_000;
-const STREAM_IDLE_TIMEOUT_MS = 30_000;
+/**
+ * Wait for the provider's first answer: the whole reply (not streaming), or the first stream
+ * chunk. Slow models with tools (Gemini Flash) can take well over 30 s to start.
+ */
+export const FIRST_RESPONSE_TIMEOUT_MS = 90_000;
+/** Streaming, after the first chunk: the longest gap allowed between chunks. */
+export const STREAM_IDLE_TIMEOUT_MS = 30_000;
+/** A timeout before any output is retried this many times (on top of the 503/429 retries). */
+export const MAX_TIMEOUT_RETRIES = 1;
+const LIST_MODELS_TIMEOUT_MS = 60_000;
 
 /** 503 (overloaded) and 429 (rate limit) are retried this many times before the typed error. */
 export const MAX_RETRIES = 2;
@@ -57,39 +65,51 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
 }
 
 /**
- * fetch with a timeout that the caller can restart (`touch`) as stream chunks arrive, so a
- * long answer that keeps streaming is never cut off but a stalled one is.
+ * fetch with two timeouts: `firstMs` until the first stream chunk (or, not streaming, the
+ * whole reply), then `idleMs` between chunks (`touch`, called per chunk), so a long answer
+ * that keeps streaming is never cut off but a stalled one is. `timedOut()` says which phase
+ * ran out: "first" (no output yet) or "idle".
  */
-function timedFetch(url: string, init: RequestInit, timeoutMs: number, outer?: AbortSignal) {
+function timedFetch(url: string, init: RequestInit, firstMs: number, idleMs: number, outer?: AbortSignal) {
   const controller = new AbortController();
-  let timedOut = false;
+  let phase: "first" | "idle" = "first";
+  let timedOut: "first" | "idle" | null = null;
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const arm = () => {
+  const arm = (ms: number) => {
     clearTimeout(timer);
     timer = setTimeout(() => {
-      timedOut = true;
+      timedOut = phase;
       controller.abort();
-    }, timeoutMs);
+    }, ms);
   };
   const onOuterAbort = () => controller.abort();
   outer?.addEventListener("abort", onOuterAbort);
-  arm();
+  arm(firstMs);
+  const touch = () => {
+    phase = "idle";
+    arm(idleMs);
+  };
   const done = () => {
     clearTimeout(timer);
     outer?.removeEventListener("abort", onOuterAbort);
   };
   const promise = fetch(url, { ...init, signal: controller.signal });
-  return { promise, touch: arm, done, isTimedOut: () => timedOut };
+  return { promise, touch, done, timedOut: () => timedOut };
 }
 
-async function send(conn: ProviderConnection, req: { url: string; init: RequestInit }, timeoutMs: number, signal?: AbortSignal) {
-  const t = timedFetch(req.url, req.init, timeoutMs, signal);
+type Timeouts = { firstMs: number; idleMs: number };
+
+const timeoutFor = (phase: "first" | "idle", t: Timeouts) => (phase === "first" ? timeoutError(Math.round(t.firstMs / 1000)) : idleTimeoutError(Math.round(t.idleMs / 1000)));
+
+async function send(conn: ProviderConnection, req: { url: string; init: RequestInit }, timeouts: Timeouts, signal?: AbortSignal) {
+  const t = timedFetch(req.url, req.init, timeouts.firstMs, timeouts.idleMs, signal);
   let response: Response;
   try {
     response = await t.promise;
   } catch (e) {
     t.done();
-    if (t.isTimedOut()) throw timeoutError(Math.round(timeoutMs / 1000));
+    const phase = t.timedOut();
+    if (phase) throw timeoutFor(phase, timeouts);
     if (signal?.aborted) throw new AiError("other", "The request was cancelled.");
     // fetch() rejects with a TypeError for CORS refusals and network failures alike.
     void e;
@@ -118,46 +138,84 @@ export function createChatClient(conn: ProviderConnection) {
       if (conn.provider.keyRequired && !conn.apiKey.trim()) throw new AiError("bad-key", "No API key is set for this provider.");
       const built = buildRequest(conn, messages, opts);
       const init: RequestInit = { method: "POST", headers: built.headers, body: JSON.stringify(built.body) };
-      const timeoutMs = opts.timeoutMs ?? (opts.stream ? STREAM_IDLE_TIMEOUT_MS : REQUEST_TIMEOUT_MS);
-      let { response, t } = await send(conn, { url: built.url, init }, timeoutMs, opts.signal);
+      const timeouts: Timeouts = opts.stream
+        ? { firstMs: opts.firstResponseTimeoutMs ?? FIRST_RESPONSE_TIMEOUT_MS, idleMs: opts.timeoutMs ?? STREAM_IDLE_TIMEOUT_MS }
+        : { firstMs: opts.timeoutMs ?? FIRST_RESPONSE_TIMEOUT_MS, idleMs: opts.timeoutMs ?? FIRST_RESPONSE_TIMEOUT_MS };
 
-      // Busy or rate-limited: retry before any of the answer has been read.
-      for (let attempt = 0; RETRY_STATUSES.has(response.status) && attempt < MAX_RETRIES; attempt++) {
-        const delayMs = retryDelayMs(response.headers.get("retry-after"), attempt);
-        if (delayMs === null) break;
-        t.done();
-        await response.body?.cancel().catch(() => undefined);
-        opts.onRetry?.({ attempt: attempt + 1, delayMs, status: response.status });
+      // Retries share one backoff (retryDelayMs: 1 s, then 2 s, or Retry-After): up to
+      // MAX_RETRIES for 503/429 before any of the answer is read, and MAX_TIMEOUT_RETRIES
+      // for a timeout before any output (nothing was shown, so nothing is duplicated).
+      let retries = 0;
+      let timeoutRetries = 0;
+      const backoff = async (status: number, retryAfter: string | null): Promise<boolean> => {
+        const delayMs = retryDelayMs(retryAfter, retries);
+        if (delayMs === null) return false;
+        retries++;
+        opts.onRetry?.({ attempt: retries, delayMs, status });
         await sleep(delayMs, opts.signal);
-        ({ response, t } = await send(conn, { url: built.url, init }, timeoutMs, opts.signal));
-      }
+        return true;
+      };
 
-      try {
-        if (!response.ok) await failFrom(response, opts.model);
+      for (;;) {
+        let sent: Awaited<ReturnType<typeof send>>;
+        try {
+          sent = await send(conn, { url: built.url, init }, timeouts, opts.signal);
+        } catch (e) {
+          if (isEarlyTimeout(e) && timeoutRetries < MAX_TIMEOUT_RETRIES && !opts.signal?.aborted) {
+            timeoutRetries++;
+            if (await backoff(0, null)) continue;
+          }
+          throw e;
+        }
+        const { response, t } = sent;
 
-        if (!opts.stream) {
-          const json = await response.json().catch(() => {
-            throw new AiError("other", "The provider's answer was not valid JSON.");
-          });
-          return parseResponse(style, json);
+        // Busy or rate-limited: retry before any of the answer has been read.
+        if (RETRY_STATUSES.has(response.status) && retries - timeoutRetries < MAX_RETRIES) {
+          const retryAfter = response.headers.get("retry-after");
+          if (retryDelayMs(retryAfter, retries) !== null) {
+            t.done();
+            await response.body?.cancel().catch(() => undefined);
+            await backoff(response.status, retryAfter);
+            continue;
+          }
         }
 
-        if (!response.body) throw new AiError("other", "The provider sent no stream.");
-        const acc: StreamAccumulator = { text: "", toolCalls: new Map(), done: false };
-        t.touch();
-        for await (const ev of parseSse(response.body, t.touch)) {
-          const delta = applyStreamEvent(style, ev, acc, secret);
-          if (delta) opts.onText?.(delta);
-          if (acc.done && style === "openai-compatible") break;
+        try {
+          if (!response.ok) await failFrom(response, opts.model);
+
+          if (!opts.stream) {
+            const json = await response.json().catch(() => {
+              throw new AiError("other", "The provider's answer was not valid JSON.");
+            });
+            return parseResponse(style, json);
+          }
+
+          if (!response.body) throw new AiError("other", "The provider sent no stream.");
+          const acc: StreamAccumulator = { text: "", toolCalls: new Map(), done: false };
+          // The first-response timer keeps running until the first body chunk (not the headers).
+          for await (const ev of parseSse(response.body, t.touch)) {
+            const delta = applyStreamEvent(style, ev, acc, secret);
+            if (delta) opts.onText?.(delta);
+            if (acc.done && style === "openai-compatible") break;
+          }
+          return { text: acc.text, toolCalls: [...acc.toolCalls.values()] };
+        } catch (e) {
+          const phase = t.timedOut();
+          if (phase) {
+            await response.body?.cancel().catch(() => undefined);
+            if (phase === "first" && timeoutRetries < MAX_TIMEOUT_RETRIES && !opts.signal?.aborted) {
+              timeoutRetries++;
+              t.done();
+              if (await backoff(0, null)) continue;
+            }
+            throw timeoutFor(phase, timeouts);
+          }
+          if (e instanceof AiError) throw e;
+          if (opts.signal?.aborted) throw new AiError("other", "The request was cancelled.");
+          throw new AiError("other", "The connection dropped while the answer was arriving.");
+        } finally {
+          t.done();
         }
-        return { text: acc.text, toolCalls: [...acc.toolCalls.values()] };
-      } catch (e) {
-        if (t.isTimedOut()) throw timeoutError(Math.round(timeoutMs / 1000));
-        if (e instanceof AiError) throw e;
-        if (opts.signal?.aborted) throw new AiError("other", "The request was cancelled.");
-        throw new AiError("other", "The connection dropped while the answer was arriving.");
-      } finally {
-        t.done();
       }
     },
 
@@ -165,7 +223,7 @@ export function createChatClient(conn: ProviderConnection) {
     async listModels(signal?: AbortSignal): Promise<string[]> {
       const req = buildModelsRequest(conn);
       if (!req) return [];
-      const { response, t } = await send(conn, { url: req.url, init: { method: "GET", headers: req.headers } }, REQUEST_TIMEOUT_MS, signal);
+      const { response, t } = await send(conn, { url: req.url, init: { method: "GET", headers: req.headers } }, { firstMs: LIST_MODELS_TIMEOUT_MS, idleMs: LIST_MODELS_TIMEOUT_MS }, signal);
       try {
         if (!response.ok) {
           const body = await response.text().catch(() => "");

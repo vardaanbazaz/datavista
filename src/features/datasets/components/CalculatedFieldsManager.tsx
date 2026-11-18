@@ -16,6 +16,7 @@ import { aiEngine } from "@/features/ai/aiEngine";
 import { ConnectProviderCard } from "@/features/ai/components/ConnectProviderCard";
 import { useAiConnected, useProviderLabel } from "@/features/ai/settings/aiSettingsStore";
 import { toast } from "@/shared/hooks/use-toast";
+import { OFFLINE_GUESS_LABEL } from "@/features/ai/offlineLabel";
 
 interface CalculatedFieldsManagerProps {
   trigger?: React.ReactNode;
@@ -86,7 +87,8 @@ export function CalculatedFieldsManager({ trigger }: CalculatedFieldsManagerProp
       setFieldName(res.fieldName);
       setExpression(res.formula);
       toast({
-        title: "AI Formula Generated",
+        // Without a provider the formula is the local heuristic's guess, and says so.
+        title: aiConnected ? "AI Formula Generated" : OFFLINE_GUESS_LABEL,
         description: `Generated [${res.fieldName}] = ${res.formula}`,
       });
     } catch (e: unknown) {

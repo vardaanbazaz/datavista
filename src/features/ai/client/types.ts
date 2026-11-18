@@ -48,11 +48,16 @@ export interface ChatOptions {
   /** Streaming only: called with each piece of text as it arrives. */
   onText?: (delta: string) => void;
   signal?: AbortSignal;
-  /** Non-streaming: whole request. Streaming: the wait for the first byte and between chunks. */
-  timeoutMs?: number;
   /**
-   * Called before an automatic retry of a 503 or 429 answer (up to 2 retries, waiting
-   * `delayMs`, from Retry-After when the provider sends one).
+   * Non-streaming: the whole request (default 90 s). Streaming: the longest gap between
+   * chunks after the first one (default 30 s).
+   */
+  timeoutMs?: number;
+  /** Streaming: the wait for the first chunk (default 90 s, client/index.ts:FIRST_RESPONSE_TIMEOUT_MS). */
+  firstResponseTimeoutMs?: number;
+  /**
+   * Called before an automatic retry: a 503 or 429 answer (up to 2 retries), or a timeout
+   * before any output (once, `status` 0). Waits `delayMs` (Retry-After when the provider sends one).
    */
   onRetry?: (info: { attempt: number; delayMs: number; status: number }) => void;
 }

@@ -2,10 +2,12 @@
  * The copilot's contents (lazy chunk): header, chat (streamed Markdown answers with their
  * query steps), starter questions, and the question box. The frame around it (docked aside
  * or phone sheet) is CopilotHost. The chat sits on a solid surface (long text, every theme);
- * the header and footer are on the panel's glass.
+ * the header and footer are on the panel's glass. With no dataset it shows a short empty
+ * state (Upload / Try sample). A question queued by the palette ("/ai ...",
+ * copilotStore.ask) is sent once the panel is ready.
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Check, ChevronRight, Copy, RotateCcw, Send, Settings2, Sparkles, Square, Trash2, X } from "lucide-react";
+import { Check, ChevronRight, Copy, Database, RotateCcw, Send, Settings2, Sparkles, Square, Trash2, Upload, X } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import { useDatasetStore } from "@/store/datasetStore";
 import { useUiStore } from "@/store/uiStore";
@@ -16,6 +18,10 @@ import { starterQuestions, toolsEnabled } from "./context";
 import { askCopilot } from "./copilotSession";
 import { useCopilotStore, type CopilotMessage, type CopilotStepView } from "./copilotStore";
 import { Markdown } from "./Markdown";
+import { loadSampleDataset } from "@/features/datasets/sampleData";
+
+/** No output (text, query step or retry) for this long: "Still waiting for <provider>…". */
+export const STILL_WAITING_MS = 15_000;
 
 const EMPTY: CopilotMessage[] = [];
 
@@ -50,7 +56,19 @@ function IconButton({ label, onClick, children, testId }: { label: string; onCli
   );
 }
 
-function Answer({ m, onRetry }: { m: CopilotMessage; onRetry: () => void }) {
+/** True after STILL_WAITING_MS with no new output while `busy`; any output restarts the wait. */
+function useStillWaiting(busy: boolean, signature: string): boolean {
+  const [waiting, setWaiting] = useState(false);
+  useEffect(() => {
+    setWaiting(false);
+    if (!busy) return;
+    const timer = setTimeout(() => setWaiting(true), STILL_WAITING_MS);
+    return () => clearTimeout(timer);
+  }, [busy, signature]);
+  return waiting;
+}
+
+function Answer({ m, onRetry, onStop, providerLabel }: { m: CopilotMessage; onRetry: () => void; onStop: () => void; providerLabel: string }) {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try {
@@ -62,15 +80,24 @@ function Answer({ m, onRetry }: { m: CopilotMessage; onRetry: () => void }) {
     }
   };
   const busy = m.status === "streaming";
+  const waiting = useStillWaiting(busy, `${m.text.length}|${m.steps?.length ?? 0}|${m.retrying ? 1 : 0}`);
   return (
     <div className="space-y-2" data-testid="copilot-answer" aria-busy={busy}>
       {m.steps?.map((s) => <Step key={s.id} step={s} />)}
       {m.retrying && (
         <p className="text-xs text-muted-foreground" role="status" data-testid="copilot-retrying">
-          Provider busy, retrying…
+          {m.retryReason === "timeout" ? `No answer from ${providerLabel} yet, retrying…` : "Provider busy, retrying…"}
         </p>
       )}
-      {m.text ? <Markdown text={m.text} /> : busy && !m.retrying ? <p className="text-sm text-muted-foreground">Thinking…</p> : null}
+      {m.text ? <Markdown text={m.text} /> : busy && !m.retrying && !waiting ? <p className="text-sm text-muted-foreground">Thinking…</p> : null}
+      {waiting && (
+        <div className="flex items-center gap-2" role="status" data-testid="copilot-still-waiting">
+          <p className="text-sm text-muted-foreground">Still waiting for {providerLabel}…</p>
+          <IconButton label="Stop" onClick={onStop} testId="copilot-waiting-stop">
+            <Square className="h-3.5 w-3.5" aria-hidden />
+          </IconButton>
+        </div>
+      )}
       {m.status === "error" && (
         <p className="text-sm text-destructive" role="alert" data-testid="copilot-error">
           {m.error}
@@ -98,7 +125,56 @@ function Answer({ m, onRetry }: { m: CopilotMessage; onRetry: () => void }) {
   );
 }
 
-export default function CopilotPanel({ onClose, title }: { onClose: () => void; title: (children: ReactNode) => ReactNode }) {
+type PanelProps = { onClose: () => void; title: (children: ReactNode) => ReactNode };
+
+/** No dataset yet (Ctrl+J or the sidebar's Co-Pilot button): what to do first. */
+function NoDataset({ onClose, title }: PanelProps) {
+  const setActiveView = useUiStore((s) => s.setActiveView);
+  const sampleRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => sampleRef.current?.focus(), []);
+  return (
+    <div className="flex h-full min-h-0 flex-col" data-testid="copilot-empty">
+      <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+        <Sparkles className="h-4 w-4 shrink-0 text-primary-ink" aria-hidden />
+        {title(<span className="text-sm font-semibold text-foreground">Copilot</span>)}
+        <Button type="button" variant="ghost" size="icon" className="ml-auto h-8 w-8 text-frame-muted hover:text-foreground" onClick={onClose} aria-label="Close copilot" data-testid="copilot-close">
+          <X className="h-4 w-4" aria-hidden />
+        </Button>
+      </div>
+      <div className="surface-solid m-2 space-y-3 rounded-lg p-4 text-foreground">
+        <p className="text-sm font-semibold">Load a dataset to start</p>
+        <p className="text-sm text-muted-foreground">The copilot answers questions about the dataset you have open.</p>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="gap-1.5"
+            onClick={() => {
+              setActiveView("upload");
+              onClose();
+            }}
+            data-testid="copilot-empty-upload"
+          >
+            <Upload className="h-3.5 w-3.5" aria-hidden />
+            Upload
+          </Button>
+          <Button ref={sampleRef} type="button" size="sm" className="gap-1.5" onClick={() => loadSampleDataset()} data-testid="copilot-empty-sample">
+            <Database className="h-3.5 w-3.5" aria-hidden />
+            Try sample
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function CopilotPanel(props: PanelProps) {
+  const hasDataset = useDatasetStore((s) => s.activeDataset !== null);
+  return hasDataset ? <CopilotChat {...props} /> : <NoDataset {...props} />;
+}
+
+function CopilotChat({ onClose, title }: PanelProps) {
   const dataset = useDatasetStore((s) => s.activeDataset);
   const datasetId = dataset?.id ?? "";
   const messages = useCopilotStore((s) => s.chats[datasetId] ?? EMPTY);
@@ -146,6 +222,16 @@ export default function CopilotPanel({ onClose, title }: { onClose: () => void; 
       setController(null);
     }
   };
+
+  // A question from the palette ("/ai ..."): taken from the store before sending, so it is sent once.
+  const pending = useCopilotStore((s) => s.pendingQuestion);
+  useEffect(() => {
+    if (!pending || busy || !connected || !dataset) return;
+    const q = useCopilotStore.getState().takePendingQuestion();
+    if (q) void send(q);
+    // send is recreated each render; the trigger is a new pending question or the panel becoming free.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pending, busy, connected, dataset]);
 
   const retry = (answer: CopilotMessage) => {
     const i = messages.findIndex((m) => m.id === answer.id);
@@ -219,7 +305,7 @@ export default function CopilotPanel({ onClose, title }: { onClose: () => void; 
                   {m.text}
                 </div>
               ) : (
-                <Answer key={m.id} m={m} onRetry={() => retry(m)} />
+                <Answer key={m.id} m={m} onRetry={() => retry(m)} onStop={() => controller?.abort()} providerLabel={providerLabel} />
               )
             )}
           </div>

@@ -1,6 +1,7 @@
 import { Dataset, QueryResult } from "@/shared/types";
 import { AIPromptContext, AIPromptColumn, AIResponse } from "./types";
-import { generateOfflineFallback } from "./llmService";
+import { generateOfflineFallback, OFFLINE_MAX_GROUPS } from "./llmService";
+import { isIdName } from "@/shared/utils/columnRoles";
 import { buildQueryMessages, runChat } from "./aiRequests";
 import { isAiConnected } from "./settings/aiSettingsStore";
 import { queryEngine } from "@/shared/services/queryEngine";
@@ -8,6 +9,18 @@ import { formulaEngine } from "@/shared/services/formulaEngine";
 import { useFilterStore } from "@/store/filterStore";
 import { useChartStore } from "@/store/chartStore";
 import { getEffectiveColumnType } from "@/shared/utils/columnType";
+
+/** Distinct non-blank values of `column`, counting stops at `cap`. */
+function countDistinct(dataset: Dataset, column: string, cap: number): number {
+  const seen = new Set<unknown>();
+  for (const row of dataset.data) {
+    const v = row[column];
+    if (v === null || v === undefined || v === "") continue;
+    seen.add(v);
+    if (seen.size >= cap) break;
+  }
+  return seen.size;
+}
 
 export class AiEngineError extends Error {
   constructor(message: string) {
@@ -22,7 +35,14 @@ export const aiEngine = {
    * Requests to a provider build their context in privacy/contextBuilder.ts instead.
    */
   offlineContext(dataset: Dataset, prompt: string): AIPromptContext {
-    const columns: AIPromptColumn[] = dataset.columns.map((name) => ({ name, type: getEffectiveColumnType(dataset, name) }));
+    const meta = new Map((dataset.metadata?.columns ?? []).map((c) => [c.name, c]));
+    const columns: AIPromptColumn[] = dataset.columns.map((name) => {
+      const type = getEffectiveColumnType(dataset, name);
+      const m = meta.get(name);
+      // Distinct values decide whether a category can be grouped by; counted (up to 51) when the metadata has none.
+      const uniqueValueCount = m?.uniqueValueCount ?? (type === "categorical" ? countDistinct(dataset, name, OFFLINE_MAX_GROUPS + 1) : undefined);
+      return { name, type, uniqueValueCount, isId: isIdName(name) || m?.role === "identifier" };
+    });
     return { prompt, datasetName: dataset.name, columns };
   },
 

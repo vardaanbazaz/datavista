@@ -44,6 +44,7 @@ test("no key: AI features show Connect a provider, and no request goes to any pr
   // The offline estimate still runs locally.
   await page.keyboard.press("Enter");
   await expect(page.getByRole("button", { name: "Apply" })).toBeVisible();
+  await expect(page.getByTestId("offline-guess-label")).toHaveText("Offline guess (no AI provider connected)");
 
   await page.getByRole("button", { name: "Discard" }).click();
   await page.getByTestId("connect-provider-open").click();

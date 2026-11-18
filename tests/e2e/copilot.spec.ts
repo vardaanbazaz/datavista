@@ -4,9 +4,11 @@ import { startFreshSessionWithoutTour, loadSampleData } from "./helpers";
 
 /**
  * The copilot panel with a mocked provider (OpenAI routes): open/close (button, close, Esc,
- * Ctrl+J), docked panel shrinking the main column, the phone-width sheet, the Connect card
- * without a key, a streamed answer, and a local-query round trip on the Play Store fixture
- * whose numbers come from the app's own query engine (unit-checked in copilotTools.test.ts).
+ * Ctrl+J), Ctrl+J and the sidebar button without a dataset (empty state, browser default
+ * prevented), docked panel shrinking the main column, the phone-width sheet, the Connect card
+ * without a key, a streamed answer, a local-query round trip on the Play Store fixture whose
+ * numbers come from the app's own query engine (unit-checked in copilotTools.test.ts), Ctrl+K
+ * "/ai ..." routed into the panel, and the "Still waiting" note for a slow provider.
  */
 
 const KEY = "sk-e2e-copilot-123456";
@@ -80,15 +82,57 @@ async function mockOpenAi(page: Page, handler: (body: Record<string, unknown>, r
   return bodies;
 }
 
-test("hidden without a dataset; button, close, Esc and Ctrl+J; the docked panel shrinks the main column", async ({ page }) => {
+/** Records, in the bubble phase, whether the last Ctrl/Cmd+J keydown had its default prevented. */
+async function watchCtrlJ(page: Page) {
+  await page.evaluate(() => {
+    const w = window as unknown as { __ctrlJ: boolean[] };
+    w.__ctrlJ = [];
+    window.addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "j") w.__ctrlJ.push(e.defaultPrevented);
+    });
+  });
+  return () => page.evaluate(() => (window as unknown as { __ctrlJ: boolean[] }).__ctrlJ);
+}
+
+test("no dataset: Ctrl+J opens the empty state (browser default prevented); Try sample loads one", async ({ page }) => {
   await startFreshSessionWithoutTour(page);
   await connectOpenAi(page);
   await page.goto("/");
   await page.getByTestId("sidebar").waitFor();
   await expect(page.getByTestId("copilot-fab")).toHaveCount(0);
-  await page.keyboard.press("Control+j");
-  await expect(page.getByTestId("copilot-panel")).toHaveCount(0);
+  const prevented = await watchCtrlJ(page);
 
+  await page.keyboard.press("Control+j");
+  const panel = page.getByTestId("copilot-panel");
+  await expect(panel).toBeVisible();
+  await expect(panel.getByTestId("copilot-empty")).toContainText("Load a dataset to start");
+  await expect(panel.getByTestId("copilot-empty-upload")).toBeVisible();
+  await expect(panel.getByTestId("copilot-empty-sample")).toBeFocused();
+  expect(await prevented()).toEqual([true]);
+  // The round button stays hidden without a dataset.
+  await expect(page.getByTestId("copilot-fab")).toHaveCount(0);
+
+  await page.keyboard.press("Control+j");
+  await expect(panel).toHaveCount(0);
+  expect(await prevented()).toEqual([true, true]);
+
+  // The sidebar's Co-Pilot button does the same; Upload goes to the upload view and closes it.
+  await page.getByTestId("sidebar").getByRole("button", { name: "Co-Pilot" }).click();
+  await expect(panel.getByTestId("copilot-empty")).toBeVisible();
+  await panel.getByTestId("copilot-empty-upload").click();
+  await expect(panel).toHaveCount(0);
+  await expect(page.getByTestId("file-upload-input")).toHaveCount(1);
+
+  // Try sample: the dataset loads and the panel turns into the chat.
+  await page.keyboard.press("Control+j");
+  await panel.getByTestId("copilot-empty-sample").click();
+  await expect(panel.getByTestId("copilot-input")).toBeVisible();
+  await expect(panel.getByTestId("copilot-empty")).toHaveCount(0);
+});
+
+test("button, close, Esc and Ctrl+J; the docked panel shrinks the main column", async ({ page }) => {
+  await startFreshSessionWithoutTour(page);
+  await connectOpenAi(page);
   await importPlaystore(page);
   const fab = page.getByTestId("copilot-fab");
   await expect(fab).toBeVisible();
@@ -325,4 +369,84 @@ test("phone width: a full-screen sheet that Esc closes", async ({ page }) => {
   await page.keyboard.press("Escape");
   await expect(panel).toHaveCount(0);
   await expect(page.getByTestId("copilot-fab")).toBeVisible();
+});
+
+test('Ctrl+K "/ai <question>" with a provider: sent in the copilot panel (one AI path), with the exact steps', async ({ page }) => {
+  const QUESTION = "Which category has the highest average rating?";
+  const args = { groupBy: { column: "Category" }, aggregations: [{ op: "avg", column: "Rating" }], sort: { by: "avg_Rating", direction: "desc" } };
+  const bodies = await mockOpenAi(page, async (body, route) => {
+    const toolMsg = (body.messages as { role: string; content: string }[]).find((m) => m.role === "tool");
+    if (!toolMsg) {
+      return fulfillSse(route, [{ choices: [{ delta: { tool_calls: [{ index: 0, id: "call_1", function: { name: "aggregate", arguments: JSON.stringify(args) } }] } }] }]);
+    }
+    const top = JSON.parse(toolMsg.content).rows[0];
+    await fulfillSse(route, textChunks(`**${top.Category}** has the highest average rating: ${top.avg_Rating}.`));
+  });
+  await startFreshSessionWithoutTour(page);
+  await connectOpenAi(page);
+  await importPlaystore(page);
+
+  await page.keyboard.press("Control+k");
+  await page.getByPlaceholder(/search|ask/i).first().fill(`/ai ${QUESTION}`);
+  await expect(page.getByText(`Ask the copilot: "${QUESTION}"`)).toBeVisible();
+  await page.keyboard.press("Enter");
+
+  // The palette closes; no offline guess anywhere; the panel shows the question and the answer.
+  const panel = page.getByTestId("copilot-panel");
+  await expect(panel.getByTestId("copilot-question")).toHaveText(QUESTION);
+  await expect(page.getByTestId("offline-guess-label")).toHaveCount(0);
+  await expect(page.getByText(/Offline AI Heuristic|Offline guess/)).toHaveCount(0);
+  const step = panel.getByTestId("copilot-step");
+  await expect(step).toHaveCount(1);
+  await expect(step.locator("summary")).toHaveText("Ran: average Rating by Category · 8 rows");
+  const answer = panel.getByTestId("copilot-answer").last();
+  await expect(answer).toContainText("COMICS has the highest average rating: 4.6.");
+  await expect(answer.locator("strong")).toHaveText("COMICS");
+
+  // Sent: the question with the tools; then the tool result (an aggregate, not rows).
+  expect(bodies).toHaveLength(2);
+  const first = bodies[0].messages as { role: string; content: string }[];
+  expect(first[first.length - 1]).toEqual({ role: "user", content: QUESTION });
+  expect(bodies[0].stream).toBe(true);
+  const second = bodies[1].messages as { role: string; content: string; tool_call_id?: string; tool_calls?: { id: string; function: { name: string; arguments: string } }[] }[];
+  const call = second.find((m) => m.role === "assistant" && m.tool_calls)!.tool_calls![0];
+  expect(call.id).toBe("call_1");
+  expect(call.function.name).toBe("aggregate");
+  expect(JSON.parse(call.function.arguments)).toEqual(args);
+  const result = JSON.parse(second.find((m) => m.role === "tool")!.content);
+  expect(result).toMatchObject({ matchedRows: 309, groups: 8 });
+  expect(result.rows[0]).toEqual({ Category: "COMICS", avg_Rating: 4.6 });
+  // Sorted highest first.
+  const avgs = (result.rows as { avg_Rating: number }[]).map((r) => r.avg_Rating);
+  expect(avgs).toEqual([...avgs].sort((a, b) => b - a));
+});
+
+test("slow provider: after 15 s with no output, \"Still waiting for OpenAI…\" with Stop", async ({ page }) => {
+  test.setTimeout(90_000);
+  let release: () => void = () => undefined;
+  const held = new Promise<void>((r) => (release = r));
+  await mockOpenAi(page, async (_b, route) => {
+    await held;
+    await fulfillSse(route, textChunks("Finally."));
+  });
+  await startFreshSessionWithoutTour(page);
+  await connectOpenAi(page);
+  await importPlaystore(page);
+  await page.getByTestId("copilot-fab").click();
+  await page.getByTestId("copilot-input").fill("hello");
+  await page.keyboard.press("Enter");
+
+  const waiting = page.getByTestId("copilot-still-waiting");
+  await expect(page.getByText("Thinking…")).toBeVisible();
+  await page.waitForTimeout(10_000);
+  await expect(waiting).toHaveCount(0);
+  await expect(waiting).toContainText("Still waiting for OpenAI…", { timeout: 10_000 });
+  await expect(waiting.getByTestId("copilot-waiting-stop")).toBeVisible();
+  await expect(page.getByTestId("copilot-stop")).toBeVisible();
+
+  // Stop ends it; nothing more is waited for.
+  await waiting.getByTestId("copilot-waiting-stop").click();
+  await expect(page.getByTestId("copilot-answer").last()).toContainText("Stopped.");
+  await expect(waiting).toHaveCount(0);
+  release();
 });

@@ -18,6 +18,7 @@ import {
   Bookmark,
   Terminal,
   Sparkles,
+  Cpu,
   Sun,
   RotateCcw,
   RotateCw,
@@ -45,6 +46,8 @@ import { ConnectProviderCard } from "@/features/ai/components/ConnectProviderCar
 import { useAiConnected, useAiSettingsStore, useProviderLabel } from "@/features/ai/settings/aiSettingsStore";
 import { contextSends, privacyLevelLabel } from "@/features/ai/privacy/levels";
 import { AIResponse } from "@/features/ai/types";
+import { useCopilotStore } from "@/features/ai/copilot/copilotStore";
+import { OFFLINE_GUESS_LABEL } from "@/features/ai/offlineLabel";
 import { QueryResult } from "@/shared/types";
 import { toast } from "@/shared/hooks/use-toast";
 import { Hint } from "@/shared/components/Hint";
@@ -177,6 +180,14 @@ export function CommandPalette({
 
     if (!activeDataset) {
       setAiError("Please select or upload a dataset first.");
+      return;
+    }
+
+    // One AI path: with a provider connected the question goes to the copilot panel (streamed
+    // answer, local query steps, typed errors). The offline guess below runs only without one.
+    if (aiConnected) {
+      useCopilotStore.getState().ask(promptText);
+      onClose();
       return;
     }
 
@@ -403,6 +414,9 @@ export function CommandPalette({
           {!isAiExecuting && aiPreview && (
             <div className="p-4 space-y-3">
               <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-2">
+                <Badge variant="outline" className="text-xs gap-1" data-testid="offline-guess-label">
+                  <Cpu className="h-3 w-3" aria-hidden /> {OFFLINE_GUESS_LABEL}
+                </Badge>
                 <div className="flex items-center gap-2">
                   <Sparkles className="h-4 w-4 text-primary-ink shrink-0" />
                   <p className="text-sm font-semibold text-foreground truncate">
@@ -491,10 +505,10 @@ export function CommandPalette({
                               </div>
                               <div className="min-w-0">
                                 <p className="truncate font-semibold text-foreground">
-                                  Ask AI: "{aiPromptText || "Show me top 5 regions by revenue"}"
+                                  {aiConnected ? "Ask the copilot" : "Offline guess"}: "{aiPromptText || "Show me top 5 regions by revenue"}"
                                 </p>
                                 <p className="text-xs text-muted-foreground truncate">
-                                  Translates prompt into strict QueryConfig / formula for dataset
+                                  {aiConnected ? `Opens the copilot panel and sends the question to ${providerLabel}` : `${OFFLINE_GUESS_LABEL}: a local query built from the column names`}
                                 </p>
                               </div>
                             </div>

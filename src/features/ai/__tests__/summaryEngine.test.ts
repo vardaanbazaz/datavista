@@ -43,13 +43,26 @@ describe("summaryEngine.generateExecutiveSummary - result source tagging (item 5
     expect(callLLM).toHaveBeenCalledTimes(1);
   });
 
-  it("falls back to 'offline' when a key is configured but the LLM call fails", async () => {
+  it("a failed LLM call is never replaced silently by the offline summary: 'error' with the typed message", async () => {
     useAiSettingsStore.setState({ providerId: "gemini", keys: { gemini: "test-key" } });
-    vi.mocked(callLLM).mockRejectedValue(new Error("network error"));
+    vi.mocked(callLLM).mockRejectedValue(new Error("The provider did not answer within 90 s. It may be slow or unreachable; try again."));
 
     const result = await summaryEngine.generateExecutiveSummary(makeDataset(), [], []);
 
+    expect(result.source).toBe("error");
+    expect(result.summary).toBe("");
+    expect(result.error).toMatch(/did not answer within 90 s/);
+  });
+
+  it("the offline summary on request (the 'Use offline summary' button) makes no call", async () => {
+    useAiSettingsStore.setState({ providerId: "gemini", keys: { gemini: "test-key" } });
+    vi.mocked(callLLM).mockClear();
+
+    const result = await summaryEngine.generateExecutiveSummary(makeDataset(), [], [], undefined, { offline: true });
+
     expect(result.source).toBe("offline");
+    expect(result.summary).not.toBe("");
+    expect(callLLM).not.toHaveBeenCalled();
   });
 
   it("tags 'offline' when there is no active dataset (no call attempted)", async () => {
