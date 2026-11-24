@@ -4,23 +4,24 @@
 Accepted
 
 ## Context
-Frequent UI state changes (such as pagination, sorting, active view switching, and chart resizing) trigger repetitive dataset query executions. Re-filtering and re-calculating aggregated fields on large datasets during minor UI interactions caused frame drops and high CPU utilization.
+Repeated dataset queries re-filter and re-process the same rows.
+
+Why: not recorded. (The earlier claim of frame drops and high CPU has no support in the code or git history.)
 
 ## Decision
 We implemented a **Deterministic Query Hashing and Dual LRU Cache System** (`queryEngine`):
-1. **Deterministic Hashing**: Formatted query payloads (Filters, Search terms, Conditions, Sort rules, Window queries) into a canonical JSON structure and computed a fast 32-bit FNV-1a hash.
+1. **Deterministic Hashing**: Query parts are serialized with sorted keys (`stableStringify`) and hashed with 32-bit FNV-1a (`optimizer/hash.ts`). The filter key hashes `filters` (search is inside it). The process key hashes `filters`, `sorting`, `groupBy`, `aggregations`, and `windowQueries`. Pagination is not hashed.
 2. **Dual LRU Cache**: Maintained two Least Recently Used (LRU) cache layers:
    - Intermediate Filter Cache (stores filtered row arrays).
-   - Window & Aggregation Cache (stores window function results and grouping rollups).
-3. **Automatic Invalidation**: Invalidates cache entries when underlying datasets are modified, updated, or deleted.
-4. **Memory Guardrails**: Applied a strict limit of 100,000 rows per cache entry and max cache depth to safeguard browser memory.
+   - Process Cache (stores the full result of the sort, group, aggregate, and window step).
+3. **Automatic Invalidation**: Entries for a dataset are invalidated when its rows or columns are updated (`datasetStore`, two call sites). Deleting a dataset does not invalidate; its entries age out by LRU.
+4. **Memory Guardrails**: Each cache holds at most 5 entries and skips results over 100,000 rows (`optimizer/cache.ts`).
 
 ## Consequences
 
 ### Positive
-- **Near-Instant UI Feedback**: Repeated queries hit the LRU cache with sub-millisecond return times, eliminating frame drops.
-- **Reduced Memory & CPU Overhead**: Avoids redundant dataset iterations during view toggling and component re-renders.
-- **Measurable Impact**: Displays execution time savings to users via `QueryPerformanceBadge`.
+- **Skipped work on repeat**: a repeated query reuses the cached process result, or the cached filter result and re-runs only the process step. No timing is recorded for this.
+- **Visible**: `QueryPerformanceBadge` (in `DataTable`) shows "Cache Hit" with the time saved.
 
 ### Negative
 - **Memory Overhead**: Caching intermediate datasets consumes additional browser heap memory (mitigated by LRU eviction policy and strict row caps).
