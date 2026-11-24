@@ -33,6 +33,7 @@ import {
   Loader2,
   AlertTriangle,
   Settings,
+  Lightbulb,
 } from "lucide-react";
 
 import { searchEngine, SearchResultItem } from "@/shared/services/searchEngine";
@@ -41,7 +42,7 @@ import { CommandDefinition } from "@/shared/types/commands";
 import { useUiStore } from "@/store/uiStore";
 import { useDatasetStore } from "@/store/datasetStore";
 import { useDashboardStore } from "@/features/dashboards/store/dashboardStore";
-import { aiEngine } from "@/features/ai/aiEngine";
+import { aiEngine, OfflineHintError } from "@/features/ai/aiEngine";
 import { ConnectProviderCard } from "@/features/ai/components/ConnectProviderCard";
 import { useAiConnected, useAiSettingsStore, useProviderLabel } from "@/features/ai/settings/aiSettingsStore";
 import { contextSends, privacyLevelLabel } from "@/features/ai/privacy/levels";
@@ -76,6 +77,8 @@ export function CommandPalette({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isAiExecuting, setIsAiExecuting] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  /** The offline heuristic had nothing to go on: a suggested question, shown as a hint (not an error). */
+  const [aiHint, setAiHint] = useState<string | null>(null);
   const setIsSettingsOpen = useUiStore((state) => state.setIsAiSettingsOpen);
   // Generated-but-unreviewed AI query result, awaiting an explicit Apply/Discard before
   // it's allowed to touch filterStore/chartStore.
@@ -104,6 +107,7 @@ export function CommandPalette({
       setQuery(startQuery);
       setSelectedIndex(0);
       setAiError(null);
+      setAiHint(null);
       setIsAiExecuting(false);
       setAiPreview(null);
       setTimeout(() => {
@@ -193,6 +197,7 @@ export function CommandPalette({
 
     setIsAiExecuting(true);
     setAiError(null);
+    setAiHint(null);
 
     try {
       const { response, queryResult } = await aiEngine.generateAIQueryPreview(promptText, activeDataset);
@@ -202,6 +207,10 @@ export function CommandPalette({
       setAiPreview({ prompt: promptText, response, queryResult });
     } catch (e: unknown) {
       setIsAiExecuting(false);
+      if (e instanceof OfflineHintError) {
+        setAiHint(e.message);
+        return;
+      }
       const errMsg = e instanceof Error ? e.message : "AI generated an invalid query. Please rephrase.";
       setAiError(errMsg);
       toast({
@@ -393,6 +402,13 @@ export function CommandPalette({
               </div>
             </div>
           </DialogHeader>
+
+          {aiHint && !aiError && (
+            <div className="flex items-center gap-2 border-b border-border p-3 text-xs text-muted-foreground" role="status" data-testid="ai-offline-hint">
+              <Lightbulb className="h-4 w-4 shrink-0" aria-hidden />
+              <span className="flex-1">{aiHint}</span>
+            </div>
+          )}
 
           {aiError && (
             <div className="p-3 bg-destructive/10 border-b border-destructive/20 text-destructive flex items-center gap-2 text-xs">

@@ -1,7 +1,7 @@
 import { Dataset, QueryResult } from "@/shared/types";
 import { AIPromptContext, AIPromptColumn, AIResponse } from "./types";
 import { generateOfflineFallback, OFFLINE_MAX_GROUPS } from "./llmService";
-import { isIdName } from "@/shared/utils/columnRoles";
+import { defaultAggregationForColumn, isIdName } from "@/shared/utils/columnRoles";
 import { buildQueryMessages, runChat } from "./aiRequests";
 import { isAiConnected } from "./settings/aiSettingsStore";
 import { queryEngine } from "@/shared/services/queryEngine";
@@ -29,6 +29,14 @@ export class AiEngineError extends Error {
   }
 }
 
+/** The offline heuristic found nothing to go on: `message` suggests a question (shown as a hint, not an error). */
+export class OfflineHintError extends AiEngineError {
+  constructor(message: string) {
+    super(message);
+    this.name = "OfflineHintError";
+  }
+}
+
 export const aiEngine = {
   /**
    * Column names and types for the offline heuristic (runs locally; nothing is sent).
@@ -41,7 +49,8 @@ export const aiEngine = {
       const m = meta.get(name);
       // Distinct values decide whether a category can be grouped by; counted (up to 51) when the metadata has none.
       const uniqueValueCount = m?.uniqueValueCount ?? (type === "categorical" ? countDistinct(dataset, name, OFFLINE_MAX_GROUPS + 1) : undefined);
-      return { name, type, uniqueValueCount, isId: isIdName(name) || m?.role === "identifier" };
+      const isId = isIdName(name) || m?.role === "identifier";
+      return { name, type, uniqueValueCount, isId, defaultAggregation: type === "numeric" ? defaultAggregationForColumn(dataset, name) : undefined };
     });
     return { prompt, datasetName: dataset.name, columns };
   },
@@ -90,6 +99,8 @@ export const aiEngine = {
       console.error("AI JSON Parse Error:", e, rawResponse);
       throw new AiEngineError("AI generated an invalid query. Please rephrase.");
     }
+
+    if (parsed.type === "hint") throw new OfflineHintError(parsed.explanation || "Name a column in the question.");
 
     // Validate columns if type is query
     if (parsed.type === "query" && parsed.query) {

@@ -122,13 +122,35 @@ const OPERATORS: { re: RegExp; op: "avg" | "sum" | "count_rows" | "median" | "ma
   { re: /\b(minimum|min)\b/, op: "min", label: "Min" },
 ];
 
+/** Words that say what to compute even without a column name ("top 5 by ...", "lowest", "per"). */
+const INTENT = /\b(top|bottom|highest|lowest|most|least|best|worst|largest|smallest|biggest|by|per|each|trend|over time|compare|distribution|breakdown|group|rank)\b/;
+
+/** The operator a measure gets when the question names none: its default (Average for Rating), Sum otherwise. */
+function defaultOperator(c: AIPromptColumn | undefined) {
+  const op = c?.defaultAggregation;
+  const mapped = op === "avg" || op === "median" || op === "max" || op === "min" || op === "sum" ? op : op === "count" || op === "count_rows" ? "count_rows" : "sum";
+  return OPERATORS.find((o) => o.op === mapped)!;
+}
+
+/** "Try something like 'average Rating by Category'", from the dataset's own columns. */
+export function offlineHint(columns: AIPromptColumn[]): string {
+  const measure = columns.find((c) => c.type === "numeric" && !c.isId);
+  const group = columns.find((c) => groupable(c) && (c.uniqueValueCount === undefined || c.uniqueValueCount >= 2));
+  const op = defaultOperator(measure);
+  const what = measure && op.op !== "count_rows" ? `${op.label.toLowerCase()} ${measure.name}` : "number of rows";
+  return `Try something like '${what}${group ? ` by ${group.name}` : ""}'.`;
+}
+
 /**
  * Offline heuristic for common analytical phrases, used only when no AI provider is
  * connected (never in place of a failed provider answer). Runs locally; nothing is sent.
  * Query: a column the question names is used (a category to group by, a number to
  * aggregate); otherwise the first categorical column with 2-50 distinct values. Never
  * groups by a column with more than 50 distinct values or an ID-flagged column. The
- * operator and sort direction come from words like "average" and "lowest".
+ * operator and sort direction come from words like "average" and "lowest"; with no operator
+ * word, the measure's default (defaultAggregationForColumn: Average for Rating, not Sum).
+ * A question that names no column and has no recognisable intent ("j") gets a hint
+ * ({type: "hint"}) instead of a guess.
  */
 export function generateOfflineFallback(context: AIPromptContext, mode?: 'query' | 'formula'): string {
   const promptLower = context.prompt.toLowerCase();
@@ -164,9 +186,14 @@ export function generateOfflineFallback(context: AIPromptContext, mode?: 'query'
     }
   }
 
-  // No numeric column to aggregate: count rows.
   const found = OPERATORS.find((o) => o.re.test(promptLower));
-  const operator = numCol ? found ?? OPERATORS.find((o) => o.op === "sum")! : OPERATORS.find((o) => o.op === "count_rows")!;
+  // Nothing to go on ("/ai j"): no column named and no recognisable intent. A hint, not a guess.
+  if (named.length === 0 && !found && !INTENT.test(promptLower)) {
+    return JSON.stringify({ type: "hint", explanation: offlineHint(columns) });
+  }
+
+  // No operator word: the measure's default (Average for a per-item value like Rating). No numeric column: count rows.
+  const operator = numCol ? found ?? defaultOperator(columns.find((c) => c.name === numCol)) : OPERATORS.find((o) => o.op === "count_rows")!;
   const measure = operator.op === "count_rows" ? undefined : numCol;
   const alias = measure ? `${operator.label} ${measure}` : "Rows";
   const direction = /\b(lowest|least|bottom|smallest|worst|fewest)\b/.test(promptLower) ? "asc" : "desc";

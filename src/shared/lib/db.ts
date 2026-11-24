@@ -186,6 +186,18 @@ export async function upgradeToV4(tx: Transaction): Promise<void> {
   }
 }
 
+/**
+ * One dataset's copilot chat (copilot/chatHistory.ts): the last CHAT_MAX_MESSAGES messages
+ * with their query steps (results cut to a short preview) and action proposals. Never part of
+ * an export or PDF. `messages` is CopilotMessage[], typed loosely here so the database module
+ * doesn't import the copilot.
+ */
+export interface CopilotChatRecord {
+  datasetId: string;
+  messages: unknown[];
+  updatedAt: number;
+}
+
 /** Sidebar order: `order`, then import time, then id (stable across reloads). */
 export function compareDatasetOrder(a: Pick<Dataset, 'id' | 'order' | 'metadata' | 'lastUpdated'>, b: Pick<Dataset, 'id' | 'order' | 'metadata' | 'lastUpdated'>): number {
   const oa = a.order ?? Number.MAX_SAFE_INTEGER;
@@ -205,6 +217,7 @@ export class DataVistaDatabase extends Dexie {
   filters!: Table<{ datasetId: string; state: FilterState }, string>;
   uiState!: Table<UIPreference, string>;
   dashboards!: Table<Dashboard, string>;
+  copilotChats!: Table<CopilotChatRecord, string>;
 
   constructor(name = 'DataVistaDatabase') {
     super(name);
@@ -227,6 +240,9 @@ export class DataVistaDatabase extends Dexie {
 
     // Version 4: removed duplicate rows in their own table, keyed by dataset.
     this.version(4).stores({ removedRows: 'datasetId' }).upgrade(upgradeToV4);
+
+    // Version 5: saved copilot chats, one record per dataset. A new table only: no data moves.
+    this.version(5).stores({ copilotChats: 'datasetId' });
   }
 }
 

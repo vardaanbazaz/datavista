@@ -7,7 +7,7 @@
  * copilotStore.ask) is sent once the panel is ready.
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Check, ChevronRight, Copy, Database, RotateCcw, Send, Settings2, Sparkles, Square, Trash2, Upload, X } from "lucide-react";
+import { ArrowRight, Check, ChevronRight, Copy, Database, RotateCcw, Send, Settings2, Sparkles, Square, Trash2, Undo2, Upload, X } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import { useDatasetStore } from "@/store/datasetStore";
 import { useUiStore } from "@/store/uiStore";
@@ -18,6 +18,10 @@ import { starterQuestions, toolsEnabled } from "./context";
 import { askCopilot } from "./copilotSession";
 import { useCopilotStore, type CopilotMessage, type CopilotStepView } from "./copilotStore";
 import { Markdown } from "./Markdown";
+import { aiTimeout } from "../timeouts";
+import type { Proposal } from "./actions";
+import { applyProposal, PROPOSAL_VIEW, undoProposal } from "./applyActions";
+import { loadChat } from "./chatHistory";
 import { loadSampleDataset } from "@/features/datasets/sampleData";
 
 /** No output (text, query step or retry) for this long: "Still waiting for <provider>…". */
@@ -47,6 +51,67 @@ function Step({ step }: { step: CopilotStepView }) {
   );
 }
 
+const KIND_LABEL: Record<Proposal["kind"], string> = { chart: "Chart", kpi: "KPI card", filter: "Filter" };
+
+/** A proposed action: what it will do, the columns it uses, Apply / Dismiss; after Apply, Undo and a link to the view. */
+function ProposalCard({ proposal: p, datasetId, messageId }: { proposal: Proposal; datasetId: string; messageId: string }) {
+  const updateProposal = useCopilotStore((s) => s.updateProposal);
+  const setActiveView = useUiStore((s) => s.setActiveView);
+  const go = PROPOSAL_VIEW[p.kind];
+  const apply = () => {
+    const r = applyProposal(p, datasetId);
+    updateProposal(datasetId, messageId, p.id, "applied" in r ? { status: "applied", applied: r.applied, error: undefined } : { error: r.error });
+  };
+  const undo = () => {
+    const r = undoProposal(p, datasetId);
+    updateProposal(datasetId, messageId, p.id, "error" in r ? { error: r.error } : { status: "undone", applied: undefined, error: undefined });
+  };
+  return (
+    <div className="space-y-1.5 rounded-md border border-border bg-background p-2.5 text-sm" data-testid="copilot-proposal" data-kind={p.kind} data-status={p.status}>
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Suggested {KIND_LABEL[p.kind]}</p>
+      <p className="text-foreground" data-testid="copilot-proposal-description">{p.description}</p>
+      <p className="text-xs text-muted-foreground">Columns: {p.columns.join(", ")}</p>
+      {p.error && (
+        <p className="text-xs text-destructive" role="alert">
+          {p.error}
+        </p>
+      )}
+      <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+        {(p.status === "pending" || p.status === "undone") && (
+          <>
+            <Button type="button" size="sm" className="h-7 px-2.5 text-xs" onClick={apply} data-testid="copilot-proposal-apply">
+              {p.status === "undone" ? "Apply again" : "Apply"}
+            </Button>
+            {p.status === "pending" && (
+              <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => updateProposal(datasetId, messageId, p.id, { status: "dismissed" })} data-testid="copilot-proposal-dismiss">
+                Dismiss
+              </Button>
+            )}
+          </>
+        )}
+        {p.status === "applied" && (
+          <>
+            <span className="flex items-center gap-1 text-xs text-muted-foreground" role="status">
+              <Check className="h-3.5 w-3.5" aria-hidden />
+              Applied
+            </span>
+            <span aria-hidden className="text-xs text-muted-foreground">·</span>
+            <Button type="button" size="sm" variant="ghost" className="h-7 gap-1 px-2 text-xs" onClick={undo} data-testid="copilot-proposal-undo">
+              <Undo2 className="h-3.5 w-3.5" aria-hidden />
+              Undo
+            </Button>
+            <Button type="button" size="sm" variant="outline" className="h-7 gap-1 px-2 text-xs" onClick={() => setActiveView(go.view)} data-testid="copilot-proposal-go">
+              {go.label}
+              <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+            </Button>
+          </>
+        )}
+        {p.status === "dismissed" && <span className="text-xs text-muted-foreground">Dismissed</span>}
+      </div>
+    </div>
+  );
+}
+
 function IconButton({ label, onClick, children, testId }: { label: string; onClick: () => void; children: ReactNode; testId?: string }) {
   return (
     <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground" onClick={onClick} data-testid={testId}>
@@ -62,13 +127,13 @@ function useStillWaiting(busy: boolean, signature: string): boolean {
   useEffect(() => {
     setWaiting(false);
     if (!busy) return;
-    const timer = setTimeout(() => setWaiting(true), STILL_WAITING_MS);
+    const timer = setTimeout(() => setWaiting(true), aiTimeout("stillWaitingMs", STILL_WAITING_MS));
     return () => clearTimeout(timer);
   }, [busy, signature]);
   return waiting;
 }
 
-function Answer({ m, onRetry, onStop, providerLabel }: { m: CopilotMessage; onRetry: () => void; onStop: () => void; providerLabel: string }) {
+function Answer({ m, onRetry, onStop, providerLabel, datasetId }: { m: CopilotMessage; onRetry: () => void; onStop: () => void; providerLabel: string; datasetId: string }) {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try {
@@ -83,7 +148,7 @@ function Answer({ m, onRetry, onStop, providerLabel }: { m: CopilotMessage; onRe
   const waiting = useStillWaiting(busy, `${m.text.length}|${m.steps?.length ?? 0}|${m.retrying ? 1 : 0}`);
   return (
     <div className="space-y-2" data-testid="copilot-answer" aria-busy={busy}>
-      {m.steps?.map((s) => <Step key={s.id} step={s} />)}
+      {m.steps?.filter((s) => !s.proposal).map((s) => <Step key={s.id} step={s} />)}
       {m.retrying && (
         <p className="text-xs text-muted-foreground" role="status" data-testid="copilot-retrying">
           {m.retryReason === "timeout" ? `No answer from ${providerLabel} yet, retrying…` : "Provider busy, retrying…"}
@@ -98,6 +163,7 @@ function Answer({ m, onRetry, onStop, providerLabel }: { m: CopilotMessage; onRe
           </IconButton>
         </div>
       )}
+      {m.steps?.map((s) => s.proposal && <ProposalCard key={s.id} proposal={s.proposal} datasetId={datasetId} messageId={m.id} />)}
       {m.status === "error" && (
         <p className="text-sm text-destructive" role="alert" data-testid="copilot-error">
           {m.error}
@@ -200,6 +266,11 @@ function CopilotChat({ onClose, title }: PanelProps) {
     // Once, on open.
   }, []);
 
+  // The dataset's saved chat (copilot/chatHistory.ts), once per dataset.
+  useEffect(() => {
+    if (datasetId) void loadChat(datasetId);
+  }, [datasetId]);
+
   // Keep the newest text in view while it streams.
   const last = messages[messages.length - 1];
   useEffect(() => {
@@ -259,7 +330,7 @@ function CopilotChat({ onClose, title }: PanelProps) {
           <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-frame-muted hover:text-foreground" onClick={() => openSettings(true)} aria-label="AI settings">
             <Settings2 className="h-4 w-4" aria-hidden />
           </Button>
-          <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-frame-muted hover:text-foreground" onClick={() => clearChat(datasetId)} aria-label="Clear chat" disabled={busy || messages.length === 0}>
+          <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-frame-muted hover:text-foreground" onClick={() => clearChat(datasetId)} aria-label="Clear chat" data-testid="copilot-clear" disabled={busy || messages.length === 0}>
             <Trash2 className="h-4 w-4" aria-hidden />
           </Button>
           <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-frame-muted hover:text-foreground" onClick={onClose} aria-label="Close copilot" data-testid="copilot-close">
@@ -305,7 +376,7 @@ function CopilotChat({ onClose, title }: PanelProps) {
                   {m.text}
                 </div>
               ) : (
-                <Answer key={m.id} m={m} onRetry={() => retry(m)} onStop={() => controller?.abort()} providerLabel={providerLabel} />
+                <Answer key={m.id} m={m} onRetry={() => retry(m)} onStop={() => controller?.abort()} providerLabel={providerLabel} datasetId={datasetId} />
               )
             )}
           </div>

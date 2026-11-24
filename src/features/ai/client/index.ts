@@ -5,6 +5,7 @@
  */
 import { AiError, blockedError, errorFromResponse, idleTimeoutError, isEarlyTimeout, timeoutError } from "./errors";
 import { parseSse } from "./sse";
+import { aiTimeout } from "../timeouts";
 import { applyStreamEvent, buildModelsRequest, buildRequest, parseModels, parseResponse } from "./styles";
 import type { BuiltRequest, ChatMessage, ChatOptions, ChatResult, ProviderConnection, StreamAccumulator } from "./types";
 
@@ -37,7 +38,7 @@ const RETRY_STATUSES = new Set([429, 503]);
  * would exceed MAX_RETRY_WAIT_MS.
  */
 export function retryDelayMs(retryAfter: string | null | undefined, attempt: number, now = Date.now()): number | null {
-  let ms = RETRY_BASE_MS * 2 ** attempt;
+  let ms = aiTimeout("retryBaseMs", RETRY_BASE_MS) * 2 ** attempt;
   const v = retryAfter?.trim();
   if (v) {
     if (/^\d+(\.\d+)?$/.test(v)) ms = Math.ceil(Number(v) * 1000);
@@ -139,8 +140,8 @@ export function createChatClient(conn: ProviderConnection) {
       const built = buildRequest(conn, messages, opts);
       const init: RequestInit = { method: "POST", headers: built.headers, body: JSON.stringify(built.body) };
       const timeouts: Timeouts = opts.stream
-        ? { firstMs: opts.firstResponseTimeoutMs ?? FIRST_RESPONSE_TIMEOUT_MS, idleMs: opts.timeoutMs ?? STREAM_IDLE_TIMEOUT_MS }
-        : { firstMs: opts.timeoutMs ?? FIRST_RESPONSE_TIMEOUT_MS, idleMs: opts.timeoutMs ?? FIRST_RESPONSE_TIMEOUT_MS };
+        ? { firstMs: opts.firstResponseTimeoutMs ?? aiTimeout("firstResponseMs", FIRST_RESPONSE_TIMEOUT_MS), idleMs: opts.timeoutMs ?? aiTimeout("streamIdleMs", STREAM_IDLE_TIMEOUT_MS) }
+        : { firstMs: opts.timeoutMs ?? aiTimeout("firstResponseMs", FIRST_RESPONSE_TIMEOUT_MS), idleMs: opts.timeoutMs ?? aiTimeout("firstResponseMs", FIRST_RESPONSE_TIMEOUT_MS) };
 
       // Retries share one backoff (retryDelayMs: 1 s, then 2 s, or Retry-After): up to
       // MAX_RETRIES for 503/429 before any of the answer is read, and MAX_TIMEOUT_RETRIES

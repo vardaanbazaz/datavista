@@ -9,8 +9,9 @@
  * bad argument returns an error the model can read and fix. Personal-data columns (pii.ts)
  * are masked in results, can't be grouped or filtered on (a filter value would let the model
  * test whether a person is in the data), and get_rows masks their cells.
- * Gated by privacy level here as well as in the tool list: no tools below "queries", get_rows
- * only at "samples".
+ * Gated by privacy level here as well as in the tool list: no query tools below "queries",
+ * get_rows only at "samples". The action tools (propose_chart / propose_kpi / propose_filter,
+ * copilot/actions.ts) send no data and are offered at every level.
  */
 import type { Dataset, DataRow, FilterCondition, QueryAggregation, QuerySort } from "@/shared/types";
 import { queryEngine, aggregateRows, numericColumnSet } from "@/shared/services/queryEngine";
@@ -21,6 +22,7 @@ import type { ToolDefinition } from "../client/types";
 import { detectPersonalColumns } from "../privacy/contextBuilder";
 import { maskToken, type PiiKind } from "../privacy/pii";
 import { levelAtLeast, privacyLevelLabel, type PrivacySettings } from "../privacy/levels";
+import { actionTools, isActionTool, MAX_PROPOSALS, validateProposal, type Proposal } from "./actions";
 
 export const AGGREGATE_LIMIT_MAX = 50;
 export const VALUE_COUNTS_LIMIT_MAX = 20;
@@ -74,8 +76,13 @@ const filtersSchema = {
 const FULL_DATA_NOTE =
   "Runs in the user's browser on the FULL dataset; the user's active filters are NOT applied unless you pass them as filters.";
 
-/** Tool definitions for a privacy level: none below Queries; get_rows only at Sample rows. */
+/** Tool definitions for a privacy level: the actions always; query tools from Queries; get_rows only at Sample rows. */
 export function copilotTools(privacy: Pick<PrivacySettings, "level">): ToolDefinition[] {
+  return [...queryTools(privacy), ...actionTools()];
+}
+
+/** The local query tools only (none below Queries). */
+export function queryTools(privacy: Pick<PrivacySettings, "level">): ToolDefinition[] {
   if (!levelAtLeast(privacy.level, "queries")) return [];
   const tools: ToolDefinition[] = [
     {
@@ -168,6 +175,8 @@ export interface ToolRunResult {
   args: unknown;
   /** The result object (also in `content`), for the expanded step. */
   result: unknown;
+  /** A valid action proposal: shown as a card with Apply / Dismiss. */
+  proposal?: Proposal;
 }
 
 export interface ToolEnv {
@@ -176,14 +185,21 @@ export interface ToolEnv {
   /** Columns masked as personal data (not unmasked by the user), with their kind. */
   masked: Map<string, PiiKind>;
   columns: Set<string>;
+  /** The user's question for this answer (action checks: a Sum of a per-item column only when asked). */
+  question: string;
+  /** Proposals made so far in this answer (at most MAX_PROPOSALS). */
+  proposals: number;
 }
 
-export function createToolEnv(dataset: Dataset, privacy: PrivacySettings): ToolEnv {
+let proposalSeq = 0;
+const newProposalId = () => `p${Date.now().toString(36)}${(proposalSeq++).toString(36)}`;
+
+export function createToolEnv(dataset: Dataset, privacy: PrivacySettings, question = ""): ToolEnv {
   const unmasked = new Set(privacy.unmasked);
   const masked = new Map<string, PiiKind>();
   for (const [col, kind] of detectPersonalColumns(dataset)) if (!unmasked.has(col)) masked.set(col, kind);
   const columns = new Set([...dataset.columns, ...(dataset.metadata?.columns.map((c) => c.name) ?? [])]);
-  return { dataset, privacy, masked, columns };
+  return { dataset, privacy, masked, columns, question, proposals: 0 };
 }
 
 class ToolArgError extends Error {}
@@ -482,13 +498,26 @@ export function runCopilotTool(env: ToolEnv, name: string, rawArgs: string): Too
   let args: unknown = rawArgs;
   try {
     const level = env.privacy.level;
-    if (!levelAtLeast(level, "queries")) fail(`Local queries are off at the "${privacyLevelLabel(level)}" privacy level.`);
+    // Actions send no data: checked before the query gate, so they work at every level.
+    if (!isActionTool(name) && !levelAtLeast(level, "queries")) fail(`Local queries are off at the "${privacyLevelLabel(level)}" privacy level.`);
     try {
       args = rawArgs.trim() ? JSON.parse(rawArgs) : {};
     } catch {
       fail("The arguments were not valid JSON.");
     }
     if (!isObject(args)) fail("The arguments must be a JSON object.");
+    if (isActionTool(name)) {
+      if (env.proposals >= MAX_PROPOSALS) fail(`At most ${MAX_PROPOSALS} proposals per answer; this one was not shown. Answer now.`);
+      const proposal = validateProposal(
+        { dataset: env.dataset, question: env.question, column: (v, what) => columnArg(env, v, what), filters: (v) => filtersArg(env, v), fail, newId: newProposalId },
+        name,
+        args
+      );
+      env.proposals++;
+      // Only the model's own arguments, described: no counts or values from the data.
+      const result = { proposed: proposal.description, status: "Shown to the user as a card with Apply and Dismiss. Not applied yet: don't say it was created." };
+      return { ok: true, content: JSON.stringify(result), summary: `proposed: ${proposal.description}`, args, result, proposal };
+    }
     let out: { result: unknown; summary: string };
     switch (name) {
       case "describe_column":
@@ -505,7 +534,7 @@ export function runCopilotTool(env: ToolEnv, name: string, rawArgs: string): Too
         out = getRows(env, args);
         break;
       default:
-        fail(`Unknown tool "${name}". Tools: describe_column, aggregate, value_counts${levelAtLeast(level, "samples") ? ", get_rows" : ""}.`);
+        fail(`Unknown tool "${name}". Tools: describe_column, aggregate, value_counts${levelAtLeast(level, "samples") ? ", get_rows" : ""}, propose_chart, propose_kpi, propose_filter.`);
     }
     return { ok: true, content: JSON.stringify(out.result), summary: out.summary, args, result: out.result };
   } catch (e) {

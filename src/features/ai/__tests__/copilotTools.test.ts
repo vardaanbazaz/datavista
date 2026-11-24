@@ -30,12 +30,13 @@ const run = (level: PrivacySettings["level"], name: string, args: unknown, unmas
   runCopilotTool(createToolEnv(makeDataset(), privacy(level, unmasked)), name, typeof args === "string" ? args : JSON.stringify(args));
 
 describe("copilot tools: level gating", () => {
-  it("offers no tools below Queries, three at Queries, get_rows only at Sample rows", () => {
-    expect(copilotTools({ level: "schema" })).toEqual([]);
-    expect(copilotTools({ level: "summaries" })).toEqual([]);
-    expect(copilotTools({ level: "queries" }).map((t) => t.name)).toEqual(["describe_column", "aggregate", "value_counts"]);
-    expect(copilotTools({ level: "samples" }).map((t) => t.name)).toEqual(["describe_column", "aggregate", "value_counts", "get_rows"]);
-    for (const t of copilotTools({ level: "samples" })) expect(t.description).toMatch(/FULL dataset/);
+  it("offers no query tools below Queries, three at Queries, get_rows only at Sample rows; the actions at every level", () => {
+    const actions = ["propose_chart", "propose_kpi", "propose_filter"];
+    expect(copilotTools({ level: "schema" }).map((t) => t.name)).toEqual(actions);
+    expect(copilotTools({ level: "summaries" }).map((t) => t.name)).toEqual(actions);
+    expect(copilotTools({ level: "queries" }).map((t) => t.name)).toEqual(["describe_column", "aggregate", "value_counts", ...actions]);
+    expect(copilotTools({ level: "samples" }).map((t) => t.name)).toEqual(["describe_column", "aggregate", "value_counts", "get_rows", ...actions]);
+    for (const t of copilotTools({ level: "samples" }).filter((t) => !actions.includes(t.name))) expect(t.description).toMatch(/FULL dataset/);
   });
 
   it("refuses to run any tool below Queries, and get_rows below Sample rows (executor check)", () => {

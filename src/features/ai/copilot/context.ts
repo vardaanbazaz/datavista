@@ -67,6 +67,11 @@ function systemPrompt(privacy: PrivacySettings, hasTools: boolean, hasRowsTool: 
   } else {
     lines.push("You cannot run queries; answer from the context only, and say when a question needs data you don't have.");
   }
+  lines.push(
+    "When a chart, KPI card or filter would help, propose it with propose_chart, propose_kpi or propose_filter (at most 3 per answer). " +
+      "Each shows the user a card with Apply; nothing changes until they apply it, so never say you created or applied it. " +
+      "Use exact column names and leave out aggregation unless the user asked for one (the column's default is used: Average for ratings and prices)."
+  );
   return lines.join("\n");
 }
 

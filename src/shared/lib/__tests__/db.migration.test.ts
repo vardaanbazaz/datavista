@@ -83,7 +83,7 @@ describe("Dexie v1 → v3 upgrade", () => {
     vi.unstubAllGlobals();
 
     // On disk: v3, metadata records without rows, chunks, charts without rows.
-    expect(db.verno).toBe(4);
+    expect(db.verno).toBe(5);
     for (const record of await db.datasets.toArray()) expect(record).not.toHaveProperty("data");
     expect(await db.datasetRows.where("datasetId").equals("ds1").count()).toBe(3);
     expect(await db.datasetRows.where("datasetId").equals("ds2").count()).toBe(1);
@@ -141,7 +141,7 @@ describe("Dexie v2 → v3 upgrade", () => {
     await persistenceService.hydrate();
     vi.unstubAllGlobals();
 
-    expect(db.verno).toBe(4);
+    expect(db.verno).toBe(5);
     const orders = Object.fromEntries((await db.datasets.toArray()).map((d) => [d.id, d.order]));
     expect(orders).toEqual({ b: 0, c: 1, a: 2 });
     expect(useDatasetStore.getState().datasets.map((d) => d.id)).toEqual(["b", "c", "a"]);
@@ -171,12 +171,47 @@ describe("Dexie v3 → v4 upgrade", () => {
     await persistenceService.hydrate();
     vi.unstubAllGlobals();
 
-    expect(db.verno).toBe(4);
+    expect(db.verno).toBe(5);
     const record = await db.datasets.get("ds1");
     expect(record?.metadata).not.toHaveProperty("removedDuplicates");
     expect(record?.metadata?.removedDuplicateCount).toBe(2);
     expect((await db.removedRows.get("ds1"))?.rows).toEqual(removed);
     expect(useDatasetStore.getState().datasets[0].removedDuplicates).toEqual(removed);
+    db.close();
+  });
+});
+
+describe("Dexie v4 → v5 upgrade", () => {
+  it("adds the copilotChats table and keeps everything already stored", async () => {
+    await Dexie.delete("DataVistaDatabase");
+    vi.resetModules();
+    const { data, ...rest } = dataset("ds1", 5, false);
+    const old = new Dexie("DataVistaDatabase");
+    old.version(1).stores({ datasets: "id", charts: "id, datasetId", filters: "datasetId", uiState: "key", dashboards: "id" });
+    old.version(2).stores({ datasetRows: "[datasetId+index]" });
+    old.version(3).stores({ datasets: "id" });
+    old.version(4).stores({ removedRows: "datasetId" });
+    await old.table("datasets").add({ ...rest, order: 0, rowCount: data.length, chunkCount: 1 });
+    await old.table("datasetRows").add({ datasetId: "ds1", index: 0, rows: data });
+    await old.table("charts").add({ id: "c1", type: "bar", title: "One", xAxis: "Region", yAxis: "Sales", datasetId: "ds1" });
+    await old.table("uiState").add({ key: "activeDatasetId", value: "ds1" });
+    old.close();
+
+    const { db } = await import("@/shared/lib/db");
+    const { persistenceService } = await import("@/shared/services/persistenceService");
+    const { useDatasetStore } = await import("@/store/datasetStore");
+    vi.stubGlobal("document", { documentElement: { classList: { add: () => {}, remove: () => {} } } });
+    await persistenceService.hydrate();
+    vi.unstubAllGlobals();
+
+    expect(db.verno).toBe(5);
+    expect(db.tables.map((t) => t.name)).toContain("copilotChats");
+    expect(await db.copilotChats.count()).toBe(0);
+    expect(useDatasetStore.getState().datasets[0].data).toEqual(data);
+    expect(await db.charts.get("c1")).toMatchObject({ title: "One" });
+
+    await db.copilotChats.put({ datasetId: "ds1", messages: [{ id: "m1", role: "user", text: "hi" }], updatedAt: 1 });
+    expect((await db.copilotChats.get("ds1"))?.messages).toHaveLength(1);
     db.close();
   });
 });

@@ -13,6 +13,7 @@ import type { ChatClient } from "../client";
 import { isToolsUnsupported } from "../client/errors";
 import type { ChatMessage, ChatOptions, ToolCall, ToolDefinition } from "../client/types";
 import type { ToolRunResult } from "./tools";
+import type { Proposal } from "./actions";
 
 export const MAX_TOOL_STEPS = 6;
 
@@ -23,6 +24,8 @@ export interface CopilotStep {
   summary: string;
   args: unknown;
   result: unknown;
+  /** An action the model proposed (shown as a card). */
+  proposal?: Proposal;
 }
 
 export interface CopilotTurnOptions {
@@ -106,7 +109,7 @@ export async function runCopilotTurn(o: CopilotTurnOptions): Promise<CopilotTurn
         continue;
       }
       const r = o.runTool(call.name, call.arguments);
-      const step: CopilotStep = { id: call.id, name: call.name, ok: r.ok, summary: r.summary, args: r.args, result: r.result };
+      const step: CopilotStep = { id: call.id, name: call.name, ok: r.ok, summary: r.summary, args: r.args, result: r.result, ...(r.proposal ? { proposal: r.proposal } : {}) };
       steps.push(step);
       o.onStep?.(step);
       history.push({ role: "tool", toolCallId: call.id, name: call.name, content: r.content });

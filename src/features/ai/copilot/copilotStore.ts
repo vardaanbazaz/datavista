@@ -1,15 +1,20 @@
 /**
  * Copilot panel state. In the startup bundle (small, no AI code): open/closed, the docked
- * width (remembered in localStorage `datavista-copilot`), the chat per dataset, held in
- * memory only for now (cleared on reload), and a question handed over from elsewhere (the
- * Ctrl+K palette's "/ai ...") for the panel to send.
+ * width (remembered in localStorage `datavista-copilot`), the chat per dataset (saved in
+ * IndexedDB by copilot/chatHistory.ts, at most CHAT_MAX_MESSAGES each), and a question
+ * handed over from elsewhere (the Ctrl+K palette's "/ai ...") for the panel to send.
  */
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import type { Proposal } from "./actions";
 
 export const COPILOT_MIN_WIDTH = 320;
 export const COPILOT_MAX_WIDTH = 560;
 export const COPILOT_DEFAULT_WIDTH = 400;
+/** Messages kept per dataset's chat (in memory and saved); older ones drop off. */
+export const CHAT_MAX_MESSAGES = 50;
+
+const capped = (list: CopilotMessage[]) => (list.length > CHAT_MAX_MESSAGES ? list.slice(-CHAT_MAX_MESSAGES) : list);
 
 export interface CopilotStepView {
   id: string;
@@ -18,6 +23,8 @@ export interface CopilotStepView {
   summary: string;
   args: unknown;
   result: unknown;
+  /** An action the model proposed: rendered as a card with Apply / Dismiss (copilot/actions.ts). */
+  proposal?: Proposal;
 }
 
 export interface CopilotMessage {
@@ -52,6 +59,12 @@ interface CopilotState {
   /** Removes `id` and every message after it (retry). */
   truncateFrom: (datasetId: string, id: string) => void;
   clearChat: (datasetId: string) => void;
+  /** Patches one proposal card (Apply / Dismiss / Undo) inside a message's steps. */
+  updateProposal: (datasetId: string, messageId: string, proposalId: string, patch: Partial<Proposal>) => void;
+  /** Puts a chat loaded from IndexedDB in front of anything sent while it loaded. */
+  restoreChat: (datasetId: string, saved: CopilotMessage[]) => void;
+  /** Forgets a dataset's chat (the dataset was deleted). */
+  removeChat: (datasetId: string) => void;
 }
 
 export function clampCopilotWidth(w: number): number {
@@ -75,7 +88,7 @@ export const useCopilotStore = create<CopilotState>()(
         return q;
       },
       setWidth: (w) => set({ width: clampCopilotWidth(w) }),
-      addMessage: (datasetId, m) => set((s) => ({ chats: { ...s.chats, [datasetId]: [...(s.chats[datasetId] ?? []), m] } })),
+      addMessage: (datasetId, m) => set((s) => ({ chats: { ...s.chats, [datasetId]: capped([...(s.chats[datasetId] ?? []), m]) } })),
       updateMessage: (datasetId, id, patch) =>
         set((s) => ({
           chats: {
@@ -90,6 +103,21 @@ export const useCopilotStore = create<CopilotState>()(
           return i === -1 ? s : { chats: { ...s.chats, [datasetId]: list.slice(0, i) } };
         }),
       clearChat: (datasetId) => set((s) => ({ chats: { ...s.chats, [datasetId]: [] } })),
+      updateProposal: (datasetId, messageId, proposalId, patch) =>
+        get().updateMessage(datasetId, messageId, (m) => ({
+          steps: m.steps?.map((st) => (st.proposal?.id === proposalId ? { ...st, proposal: { ...st.proposal, ...patch } } : st)),
+        })),
+      restoreChat: (datasetId, saved) =>
+        set((s) => {
+          const current = s.chats[datasetId] ?? [];
+          const ids = new Set(current.map((m) => m.id));
+          return { chats: { ...s.chats, [datasetId]: capped([...saved.filter((m) => !ids.has(m.id)), ...current]) } };
+        }),
+      removeChat: (datasetId) =>
+        set((s) => {
+          const { [datasetId]: _gone, ...rest } = s.chats;
+          return { chats: rest };
+        }),
     }),
     {
       name: "datavista-copilot",

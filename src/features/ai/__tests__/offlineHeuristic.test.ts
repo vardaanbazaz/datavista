@@ -72,3 +72,35 @@ describe("offline heuristic: ID columns", () => {
     expect(r.query?.aggregations?.[0]).toMatchObject({ column: "Sales", operator: "sum" });
   });
 });
+
+describe("offline heuristic: no intent gives a hint, a guess uses the column's default aggregation", () => {
+  it('"j" (no column, no intent): a hint naming real columns, no query', () => {
+    const r = guess("j");
+    expect(r.type).toBe("hint");
+    expect(r.query).toBeUndefined();
+    expect(r.explanation).toBe("Try something like 'average Rating by Category'.");
+    expect(guess("show me something").type).toBe("hint");
+  });
+
+  it("the hint reaches the caller as OfflineHintError, not an invalid-query error", async () => {
+    await expect(aiEngine.generateAIQueryPreview("j", ds)).rejects.toMatchObject({ name: "OfflineHintError", message: "Try something like 'average Rating by Category'." });
+  });
+
+  it("a named column without an operator word uses its default: Average for Rating, not Sum", () => {
+    const r = guess("rating by category");
+    expect(r.type).toBe("query");
+    expect(r.query?.aggregations).toEqual([{ column: "Rating", operator: "avg", alias: "Average Rating" }]);
+    expect(r.title).toBe("Average Rating by Category");
+  });
+
+  it("intent words without a column still guess (with the default aggregation)", () => {
+    const r = guess("top 5");
+    expect(r.type).toBe("query");
+    expect(r.query?.aggregations?.[0].operator).not.toBe("sum");
+  });
+
+  it("an explicit word still wins: total reviews is a Sum; Reviews' own default is Sum too", () => {
+    expect(guess("total rating by category").query?.aggregations?.[0]).toMatchObject({ column: "Rating", operator: "sum" });
+    expect(guess("reviews by category").query?.aggregations?.[0]).toMatchObject({ column: "Reviews", operator: "sum" });
+  });
+});

@@ -15,6 +15,7 @@ import { DrillThroughModal } from "@/features/dashboards/components/DrillThrough
 import { motion } from "framer-motion";
 import { KPIBuilder } from "@/features/kpi/components/KPIBuilder";
 import { KPICardConfig } from "@/features/kpi/types";
+import { addKpiToWorkspace } from "@/features/dashboards/services/kpiPlacement";
 import { CreateTemplateModal } from "@/features/dashboards/components/CreateTemplateModal";
 import { SnapshotManager } from "@/features/dashboards/components/SnapshotManager";
 import { useTemplateStore } from "@/features/dashboards/store/templateStore";
@@ -39,8 +40,6 @@ export function DashboardSummary() {
   const activeDashboardId = useDashboardStore((state) => state.activeDashboardId);
   const dashboards = useDashboardStore((state) => state.dashboards);
   const loadDashboard = useDashboardStore((state) => state.loadDashboard);
-  const addKpiCard = useDashboardStore((state) => state.addKpiCard);
-  const createDashboard = useDashboardStore((state) => state.createDashboard);
   const updateKpiCard = useDashboardStore((state) => state.updateKpiCard);
 
   const undo = useDashboardStore((state) => state.undo);
@@ -79,19 +78,11 @@ export function DashboardSummary() {
    * it, so the card shows at once; cancelling the builder creates nothing.
    */
   const saveKpi = (kpi: KPICardConfig) => {
-    if (activeDashboard) {
-      if (editKpi) updateKpiCard(activeDashboard.id, kpi.id, kpi);
-      else addKpiCard(activeDashboard.id, kpi);
+    if (activeDashboard && editKpi) {
+      updateKpiCard(activeDashboard.id, kpi.id, kpi);
       return;
     }
-    if (!dataset) return;
-    const taken = new Set(dashboards.filter((d) => d.datasetId === dataset.id).map((d) => d.name.toLowerCase()));
-    const base = `${dataset.name} KPIs`;
-    let name = base;
-    for (let i = 2; taken.has(name.toLowerCase()); i++) name = `${base} ${i}`;
-    createDashboard(name, dataset.id);
-    const created = useDashboardStore.getState().activeDashboardId;
-    if (created) addKpiCard(created, kpi);
+    if (dataset) addKpiToWorkspace(dataset, kpi);
   };
 
   const charts = useMemo(() => {

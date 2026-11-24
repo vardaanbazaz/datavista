@@ -55,6 +55,10 @@ test("no key: AI features show Connect a provider, and no request goes to any pr
 });
 
 test("key kept for the session survives a reload but not a new tab; a remembered key survives both", async ({ page, context }) => {
+  // Four full app loads (goto, reload and two new tabs), each a cold dev-server load in CI: 25-27 s there
+  // against the 30 s default (one CI run timed out and passed on retry), 6-7 s locally. Nothing waits on a
+  // provider (no request is made). 60 s gives headroom without hiding a real hang.
+  test.setTimeout(60_000);
   await startFreshSessionWithoutTour(page);
   await page.goto("/");
   await openAiSettingsFromPalette(page);

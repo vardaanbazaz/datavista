@@ -14,6 +14,7 @@ import { computeColumnMetadata } from "@/shared/services/columnMeta/client";
 import { perfMark, perfMeasure } from "@/shared/lib/perfMarks";
 import { loadPendingRows } from "@/shared/services/datasetRows";
 import { countOf } from "@/shared/utils/plural";
+import { deleteChat } from "@/features/ai/copilot/chatHistory";
 
 /** A dataset whose rows are being read from disk (datasetStore.loadRows). */
 export interface RowsLoading {
@@ -398,6 +399,8 @@ export const useDatasetStore = create<DatasetState>((set, get) => {
     // they accumulate forever and could leak into a reused dataset id.
     db.filters.delete(id).catch((e) => console.error("Failed to delete filters for dataset:", e));
     db.uiState.delete(`pivotConfig::${id}`).catch((e) => console.error("Failed to delete pivot config for dataset:", e));
+    // Its copilot chat too (memory and IndexedDB).
+    void deleteChat(id);
 
     if (activeDataset && activeDataset.id === id) {
       if (updatedDatasets.length > 0) {

@@ -8,7 +8,8 @@ import { startFreshSessionWithoutTour, loadSampleData } from "./helpers";
  * prevented), docked panel shrinking the main column, the phone-width sheet, the Connect card
  * without a key, a streamed answer, a local-query round trip on the Play Store fixture whose
  * numbers come from the app's own query engine (unit-checked in copilotTools.test.ts), Ctrl+K
- * "/ai ..." routed into the panel, and the "Still waiting" note for a slow provider.
+ * "/ai ..." routed into the panel, the "Still waiting" note for a slow provider, a proposed
+ * chart (card, Apply, Undo, also after a reload), and the saved chat (reload, Clear chat).
  */
 
 const KEY = "sk-e2e-copilot-123456";
@@ -256,7 +257,7 @@ test("a streamed answer with Markdown; stop, copy and retry are there", async ({
   expect(system).toContain('privacy level "queries"');
   expect(system).toContain('on the "Overview" view');
   expect(system).toContain("Active filters: none");
-  expect((bodies[0].tools as { function: { name: string } }[]).map((t) => t.function.name)).toEqual(["describe_column", "aggregate", "value_counts"]);
+  expect((bodies[0].tools as { function: { name: string } }[]).map((t) => t.function.name)).toEqual(["describe_column", "aggregate", "value_counts", "propose_chart", "propose_kpi", "propose_filter"]);
   expect(JSON.stringify(bodies[0])).not.toContain(KEY);
 });
 
@@ -421,8 +422,11 @@ test('Ctrl+K "/ai <question>" with a provider: sent in the copilot panel (one AI
   expect(avgs).toEqual([...avgs].sort((a, b) => b - a));
 });
 
-test("slow provider: after 15 s with no output, \"Still waiting for OpenAI…\" with Stop", async ({ page }) => {
-  test.setTimeout(90_000);
+test("slow provider: after the still-waiting delay with no output, \"Still waiting for OpenAI…\" with Stop", async ({ page }) => {
+  // The app waits 15 s (CopilotPanel.tsx:STILL_WAITING_MS); this test injects 2 s (features/ai/timeouts.ts).
+  await page.addInitScript(() => {
+    (window as unknown as { __DATAVISTA_AI_TIMEOUTS__: object }).__DATAVISTA_AI_TIMEOUTS__ = { stillWaitingMs: 2000 };
+  });
   let release: () => void = () => undefined;
   const held = new Promise<void>((r) => (release = r));
   await mockOpenAi(page, async (_b, route) => {
@@ -438,9 +442,12 @@ test("slow provider: after 15 s with no output, \"Still waiting for OpenAI…\" 
 
   const waiting = page.getByTestId("copilot-still-waiting");
   await expect(page.getByText("Thinking…")).toBeVisible();
-  await page.waitForTimeout(10_000);
+  const sent = Date.now();
+  await page.waitForTimeout(1000);
   await expect(waiting).toHaveCount(0);
-  await expect(waiting).toContainText("Still waiting for OpenAI…", { timeout: 10_000 });
+  await expect(waiting).toContainText("Still waiting for OpenAI…", { timeout: 5000 });
+  // Not before the delay.
+  expect(Date.now() - sent).toBeGreaterThanOrEqual(2000);
   await expect(waiting.getByTestId("copilot-waiting-stop")).toBeVisible();
   await expect(page.getByTestId("copilot-stop")).toBeVisible();
 
@@ -449,4 +456,107 @@ test("slow provider: after 15 s with no output, \"Still waiting for OpenAI…\" 
   await expect(page.getByTestId("copilot-answer").last()).toContainText("Stopped.");
   await expect(waiting).toHaveCount(0);
   release();
+});
+
+/** Rows in the copilotChats table (IndexedDB), read in the page. */
+async function savedChats(page: Page): Promise<{ datasetId: string; messages: { text: string }[] }[]> {
+  return page.evaluate(
+    () =>
+      new Promise((resolve, reject) => {
+        const req = indexedDB.open("DataVistaDatabase");
+        req.onerror = () => reject(req.error);
+        req.onsuccess = () => {
+          const idb = req.result;
+          if (!idb.objectStoreNames.contains("copilotChats")) return resolve([]);
+          const all = idb.transaction("copilotChats").objectStore("copilotChats").getAll();
+          all.onsuccess = () => {
+            resolve(all.result);
+            idb.close();
+          };
+          all.onerror = () => reject(all.error);
+        };
+      })
+  );
+}
+
+test("a proposed chart: a card with what it does; Apply adds it to Charts, Undo removes it (also after a reload)", async ({ page }) => {
+  const args = { type: "bar", x: "Category", y: "Rating", title: "Average rating by category" };
+  const bodies = await mockOpenAi(page, async (body, route) => {
+    const msgs = body.messages as { role: string }[];
+    if (!msgs.some((m) => m.role === "tool")) {
+      return fulfillSse(route, [{ choices: [{ delta: { tool_calls: [{ index: 0, id: "call_1", function: { name: "propose_chart", arguments: JSON.stringify(args) } }] } }] }]);
+    }
+    await fulfillSse(route, textChunks("Here is a chart you can add."));
+  });
+  await startFreshSessionWithoutTour(page);
+  await connectOpenAi(page);
+  await importPlaystore(page);
+  await page.getByTestId("copilot-fab").click();
+  await page.getByTestId("copilot-input").fill("Chart the average rating by category");
+  await page.keyboard.press("Enter");
+
+  const card = page.getByTestId("copilot-proposal");
+  await expect(card).toHaveCount(1);
+  await expect(card.getByTestId("copilot-proposal-description")).toHaveText("Bar chart: average Rating by Category");
+  await expect(card).toContainText("Columns: Category, Rating");
+  await expect(page.getByTestId("copilot-answer").last()).toContainText("Here is a chart you can add.");
+  // The model was told it's a pending card, with no data in the result; the tools went in the request.
+  const toolMsg = (bodies[1].messages as { role: string; content: string }[]).find((m) => m.role === "tool")!;
+  expect(JSON.parse(toolMsg.content)).toEqual({ proposed: "Bar chart: average Rating by Category", status: expect.stringContaining("Not applied yet") });
+  expect((bodies[0].tools as { function: { name: string } }[]).map((t) => t.function.name)).toContain("propose_chart");
+
+  // Nothing changes until Apply.
+  await page.getByTestId("sidebar-nav-charts").click();
+  await expect(page.getByTestId("chart-card")).toHaveCount(0);
+  await card.getByTestId("copilot-proposal-apply").click();
+  await expect(card).toHaveAttribute("data-status", "applied");
+  await expect(card).toContainText("Applied");
+  await expect(page.getByTestId("chart-card")).toHaveCount(1);
+  await expect(page.getByTestId("chart-card")).toContainText("Average rating by category");
+
+  // Undo removes it; Apply again puts it back.
+  await card.getByTestId("copilot-proposal-undo").click();
+  await expect(page.getByTestId("chart-card")).toHaveCount(0);
+  await card.getByTestId("copilot-proposal-apply").click();
+  await expect(page.getByTestId("chart-card")).toHaveCount(1);
+
+  // After a reload the card still knows what it applied: Undo works.
+  await expect.poll(async () => JSON.stringify(await savedChats(page))).toContain('"status":"applied"');
+  await page.reload();
+  await page.getByTestId("sidebar-nav-charts").click();
+  await expect(page.getByTestId("chart-card")).toHaveCount(1);
+  await page.getByTestId("copilot-fab").click();
+  await expect(card).toHaveAttribute("data-status", "applied");
+  await card.getByTestId("copilot-proposal-go").click();
+  await card.getByTestId("copilot-proposal-undo").click();
+  await expect(page.getByTestId("chart-card")).toHaveCount(0);
+});
+
+test("the chat is saved: it survives a reload; Clear chat empties it (also after a reload)", async ({ page }) => {
+  await mockOpenAi(page, async (_b, route) => fulfillSse(route, textChunks("Top category: **ART_AND_DESIGN** wins.")));
+  await startFreshSessionWithoutTour(page);
+  await connectOpenAi(page);
+  await importPlaystore(page);
+  await page.getByTestId("copilot-fab").click();
+  await page.getByTestId("copilot-input").fill("Which category is first?");
+  await page.keyboard.press("Enter");
+  const answer = page.getByTestId("copilot-answer").last();
+  // Underscores inside a word stay literal (no italics).
+  await expect(answer).toContainText("Top category: ART_AND_DESIGN wins.");
+  await expect(answer.locator("em")).toHaveCount(0);
+  await expect.poll(async () => (await savedChats(page)).flatMap((c) => c.messages.map((m) => m.text))).toEqual(["Which category is first?", "Top category: **ART_AND_DESIGN** wins."]);
+
+  await page.reload();
+  await page.getByTestId("copilot-fab").click();
+  await expect(page.getByTestId("copilot-question")).toHaveText(["Which category is first?"]);
+  await expect(page.getByTestId("copilot-answer")).toContainText("Top category: ART_AND_DESIGN wins.");
+
+  await page.getByTestId("copilot-clear").click();
+  await expect(page.getByTestId("copilot-question")).toHaveCount(0);
+  await expect(page.getByTestId("copilot-starter").first()).toBeVisible();
+  await expect.poll(() => savedChats(page)).toEqual([]);
+  await page.reload();
+  await page.getByTestId("copilot-fab").click();
+  await expect(page.getByTestId("copilot-starter").first()).toBeVisible();
+  await expect(page.getByTestId("copilot-question")).toHaveCount(0);
 });

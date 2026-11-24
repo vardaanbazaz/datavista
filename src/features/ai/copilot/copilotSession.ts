@@ -12,7 +12,7 @@ import type { ChatMessage } from "../client/types";
 import { requestOptions } from "../aiRequests";
 import { isConnectionReady, resolveConnection, useAiSettingsStore } from "../settings/aiSettingsStore";
 import { buildCopilotMessages } from "./context";
-import { copilotTools, createToolEnv, runCopilotTool } from "./tools";
+import { copilotTools, createToolEnv, queryTools, runCopilotTool } from "./tools";
 import { MAX_TOOL_STEPS, runCopilotTurn } from "./toolLoop";
 import { useCopilotStore, type CopilotMessage } from "./copilotStore";
 
@@ -20,13 +20,26 @@ let seq = 0;
 const newId = () => `m${Date.now().toString(36)}${(seq++).toString(36)}`;
 
 export const NO_TOOLS_NOTE = "This model can't run local queries, so this answer uses the dataset summary only.";
+/** Below Queries the only tools are the actions. */
+export const NO_ACTIONS_NOTE = "This model can't use tools, so it can't propose charts, KPI cards or filters.";
 export const CAPPED_NOTE = `Stopped after ${MAX_TOOL_STEPS} queries; the answer uses the results so far.`;
 
-/** Earlier turns as plain text (the numbers from earlier queries are in the answers). */
-function conversation(list: CopilotMessage[]): ChatMessage[] {
-  return list
-    .filter((m) => m.text.trim() && (m.role === "user" || m.status === "done" || m.status === "stopped"))
-    .map((m) => ({ role: m.role, content: m.text }));
+/** Earlier turns sent with a question: the chat keeps more (CHAT_MAX_MESSAGES), the model gets the last 10. */
+export const CONTEXT_TURNS = 10;
+
+/**
+ * Earlier turns as plain text (the numbers from earlier queries are in the answers): the last
+ * CONTEXT_TURNS questions and their answers, starting on a question.
+ */
+export function conversation(list: CopilotMessage[], turns = CONTEXT_TURNS): ChatMessage[] {
+  const kept = list.filter((m) => m.text.trim() && (m.role === "user" || m.status === "done" || m.status === "stopped"));
+  let start = kept.length;
+  for (let seen = 0; start > 0 && seen < turns; ) {
+    start--;
+    if (kept[start].role === "user") seen++;
+  }
+  while (start < kept.length && kept[start].role !== "user") start++;
+  return kept.slice(start).map((m) => ({ role: m.role, content: m.text }));
 }
 
 /**
@@ -49,7 +62,8 @@ export async function askCopilot(question: string, signal: AbortSignal): Promise
     if (!isConnectionReady(conn)) throw new Error("Connect an AI provider in AI settings first.");
     const privacy = settings.privacy;
     const tools = copilotTools(privacy);
-    const env = createToolEnv(dataset, privacy);
+    const env = createToolEnv(dataset, privacy, question);
+    const queries = queryTools(privacy);
     const filters = useFilterStore.getState();
     const messages = buildCopilotMessages(
       {
@@ -60,7 +74,7 @@ export async function askCopilot(question: string, signal: AbortSignal): Promise
         privacy,
       },
       [...history, { role: "user", content: question }],
-      { tools: tools.length > 0, rowsTool: tools.some((t) => t.name === "get_rows") }
+      { tools: queries.length > 0, rowsTool: queries.some((t) => t.name === "get_rows") }
     );
 
     const result = await runCopilotTurn({
@@ -75,7 +89,7 @@ export async function askCopilot(question: string, signal: AbortSignal): Promise
       // status 0: no answer before the first-response timeout (client/index.ts).
       onRetry: ({ status }) => update({ retrying: true, retryReason: status === 0 ? "timeout" : "busy" }),
     });
-    const notes = [result.toolsUnsupported ? NO_TOOLS_NOTE : "", result.capped ? CAPPED_NOTE : ""].filter(Boolean);
+    const notes = [result.toolsUnsupported ? (queries.length ? NO_TOOLS_NOTE : NO_ACTIONS_NOTE) : "", result.capped ? CAPPED_NOTE : ""].filter(Boolean);
     update({ text: result.text, status: "done", retrying: false, note: notes.join(" ") || undefined });
   } catch (e) {
     if (signal.aborted) update({ status: "stopped", retrying: false });

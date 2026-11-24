@@ -1,4 +1,4 @@
-import { DatasetMetadata, Query, CalculatedField } from "@/shared/types";
+import { DatasetMetadata, Query, CalculatedField, AggregationOperator } from "@/shared/types";
 
 export type QueryConfig = Query;
 
@@ -11,6 +11,8 @@ export interface AIPromptColumn {
   uniqueValueCount?: number;
   /** Holds identifiers (columnRoles.isIdName or the import's identifier role): never grouped or aggregated offline. */
   isId?: boolean;
+  /** columnRoles.defaultAggregationForColumn: the operator used when the question names none (Average for Rating, not Sum). */
+  defaultAggregation?: AggregationOperator;
 }
 
 export interface AIPromptContext {
@@ -22,7 +24,8 @@ export interface AIPromptContext {
 }
 
 export interface AIResponse {
-  type: 'query' | 'formula';
+  /** 'hint' (offline heuristic only): the question named no column and no intent; `explanation` suggests one. */
+  type: 'query' | 'formula' | 'hint';
   query?: QueryConfig;
   formula?: string;
   fieldName?: string;

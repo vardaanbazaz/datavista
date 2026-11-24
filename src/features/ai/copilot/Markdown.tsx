@@ -4,27 +4,19 @@
  * untrusted, so it becomes React elements only (no innerHTML) and links are shown as text.
  */
 import { Fragment, type ReactNode } from "react";
-import { parseMarkdown } from "./markdownParse";
+import { parseInline, parseMarkdown, type Inline } from "./markdownParse";
 
-/** Inline: `code`, **bold**, *italic* / _italic_, [text](url) shown as text. */
-function renderInline(text: string): ReactNode[] {
-  const out: ReactNode[] = [];
-  const re = /(`[^`]+`)|(\*\*[^*]+\*\*|__[^_]+__)|(\*[^*\s][^*]*\*|_[^_\s][^_]*_)|(\[[^\]]+\]\([^)]+\))/g;
-  let last = 0;
-  let m: RegExpExecArray | null;
-  let k = 0;
-  while ((m = re.exec(text))) {
-    if (m.index > last) out.push(text.slice(last, m.index));
-    const t = m[0];
-    if (m[1]) out.push(<code key={k++} className="rounded bg-muted px-1 py-0.5 font-mono text-[0.85em]">{t.slice(1, -1)}</code>);
-    else if (m[2]) out.push(<strong key={k++} className="font-semibold">{renderInline(t.slice(2, -2))}</strong>);
-    else if (m[3]) out.push(<em key={k++}>{renderInline(t.slice(1, -1))}</em>);
-    else out.push(t.slice(1, t.indexOf("]")));
-    last = m.index + t.length;
-  }
-  if (last < text.length) out.push(text.slice(last));
-  return out;
+/** Inline: `code`, **bold**, *italic* / _italic_ (CommonMark intraword rules), [text](url) shown as text. */
+function renderNodes(nodes: Inline[]): ReactNode[] {
+  return nodes.map((n, k) => {
+    if (n.kind === "text") return <Fragment key={k}>{n.text}</Fragment>;
+    if (n.kind === "code") return <code key={k} className="rounded bg-muted px-1 py-0.5 font-mono text-[0.85em]">{n.text}</code>;
+    if (n.kind === "strong") return <strong key={k} className="font-semibold">{renderNodes(n.children)}</strong>;
+    return <em key={k}>{renderNodes(n.children)}</em>;
+  });
 }
+
+const renderInline = (text: string) => renderNodes(parseInline(text));
 
 export function Markdown({ text }: { text: string }) {
   const blocks = parseMarkdown(text);
