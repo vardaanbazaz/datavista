@@ -26,7 +26,9 @@ function themeBootPlugin(): Plugin {
 export default defineConfig(() => ({
   base: process.env.VITE_BASE_PATH ?? "/datavista/",
   server: {
-    host: "::",
+    // Loopback only: the dev server is not reachable from other devices on the network.
+    // `vite --host` still opts in for phone testing.
+    host: "localhost",
     port: 8080,
   },
   plugins: [themeBootPlugin(), react()],

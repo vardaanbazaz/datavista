@@ -2,7 +2,7 @@
  * The DataVista mark, from one geometry: drawn by the React <Logo> (app), `logoSvg` (favicon,
  * og image, design sheets) and exportUtils (PDF, as jsPDF polygons).
  *
- * The final mark (chosen after batch 7 phase B): option 1 of docs/design/batch7-b/logo-options.png,
+ * The final mark (chosen after batch 7 phase B): option 1 of the logo options sheet,
  * a faceted prism with rising bars (logoVariants.ts `facet-bars`). Options 2 and 3 stay in
  * logoVariants.ts only for the options sheet (scripts/brand/logo-options.ts). The mark is flat
  * polygons on a 32x32 grid with a "full" (24px and up) and a "small" (16-23px: prism + 2 wide

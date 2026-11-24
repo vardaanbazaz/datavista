@@ -1,7 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
 
 // Design screenshots (batch 6 redesign review), not a test gate: `npx playwright test
-// --config scripts/design/playwright.design.config.ts`. Writes PNGs to docs/design/<phase>/.
+// --config scripts/design/playwright.design.config.ts`. Writes PNGs to docs/design/<phase>/
+// (git-ignored; earlier review sets are archived outside the repo in datavista-notes/docs/design/).
 export default defineConfig({
   testDir: ".",
   workers: 1,

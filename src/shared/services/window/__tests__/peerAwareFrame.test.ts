@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import { windowEngine } from "../engine";
 import { Dataset, DatasetMetadata, ColumnMetadata, DataRow } from "@/shared/types";
 
-// Regression tests for AUDIT-COMPREHENSIVE-2026-09-14 §item-4: with no explicit frame,
+// Regression tests for the 2026-09-14 comprehensive audit, item 4 (AUDIT-COMPREHENSIVE-2026-09-14.md,
+// archived outside the repo in datavista-notes/docs/): with no explicit frame,
 // SQL's actual default is RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW, which must
 // include every row tied on the ORDER BY column(s) — not just rows up to one arbitrary
 // array position within the tied block.

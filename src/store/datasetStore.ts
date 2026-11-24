@@ -103,7 +103,7 @@ export const useDatasetStore = create<DatasetState>((set, get) => {
    * `updatedDataset` into `datasets[]` instead (a one-word copy-paste mistake, repeated
    * four times). Any code that later re-selects activeDataset from the raw `datasets[]`
    * array (persistenceService.hydrate, dashboardStore.loadDashboard/restoreExternalContext,
-   * snapshotStore — see docs/INVESTIGATION-item3-window-pivot-zeroing-2026-09-14.md and the
+   * snapshotStore — see datavista-notes/docs/INVESTIGATION-item3-window-pivot-zeroing-2026-09-14.md and the
    * 2026-09-14 comprehensive audit) inherited that staleness — window/calculated columns
    * silently zeroed out. Funneling all four through one function means there's only one
    * place left to get this right, instead of four.

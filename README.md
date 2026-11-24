@@ -1,182 +1,61 @@
-# DataVista 📊 
+# DataVista
 
-![Build Status](https://img.shields.io/github/actions/workflow/status/vardaanbazaz/datavista/deploy.yml?branch=main)
-![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white)
-![React](https://img.shields.io/badge/React_18-20232A?style=flat&logo=react&logoColor=61DAFB)
-![License](https://img.shields.io/badge/License-MIT-green.svg)
+Browser-only analytics: import a CSV or Excel file, clean it, explore it, pivot it and chart it, with an optional AI copilot. No backend.
 
-**DataVista** is an offline-first, browser-native Business Intelligence (BI) and analytics platform. 
+**Live demo:** https://vardaanbazaz.github.io/datavista/
 
----
+[![CI](https://github.com/vardaanbazaz/datavista/actions/workflows/deploy.yml/badge.svg?branch=main)](https://github.com/vardaanbazaz/datavista/actions/workflows/deploy.yml)
 
-### 📖 What is DataVista? (The Layman's Explanation)
-Imagine taking the massive analytical power of enterprise tools like **Microsoft Power BI** or **Tableau** and cramming it entirely into your web browser. 
+![Overview of a Play Store dataset: KPI tiles, automated insights and the numeric-columns table, Dark theme](docs/images/overview.webp)
 
-Normally, when you upload a spreadsheet to a data tool, your private data is sent to a remote server to be processed. **DataVista flips this model.** It uses your browser's internal storage and computing power to process, slice, and visualize multi-megabyte datasets locally. Your data never leaves your machine. 
+## Features
 
-Simply drag and drop a CSV or Excel file, and you instantly get access to interactive pivot tables, statistical analysis, complex formula parsing, and an AI Co-Pilot—all running at lightning speed directly on your device.
+- **Import** CSV, TSV and XLSX up to 100 MB, parsed in a Web Worker with Cancel.
+- **Data quality:** duplicates, misaligned rows, missing-value codes and text-to-number fixes with a preview.
+- **Explore** with search, calculated fields, filters, pivot tables, statistics and window functions.
+- **Charts and dashboards:** many chart types, KPI cards, export to CSV, PNG, SVG and PDF.
+- **AI copilot** (optional, your own key) answers questions by running queries in your browser.
+- **Themes and accessibility:** 10 themes, high contrast, command palette, guided tour.
 
-> **Privacy note:** everything above runs fully offline — except the AI
-> Co-Pilot. If you connect an AI provider and use natural-language queries,
-> AI formulas or AI summaries, what your privacy level allows (column names
-> and types; by default also numeric stats and top values; optionally sample
-> rows) is sent to that provider. Columns that look like emails, phone numbers
-> or names are masked by default, and AI settings shows a preview of the exact
-> request. Your key is kept for the session unless you choose to remember it.
-> Skip AI features and nothing ever leaves your device.
+## Highlights
 
----
+- 525,461-row Excel file imports in a Web Worker without freezing the tab.
+- Aggregations checked against pandas on 5 public datasets.
+- Pivot on a 10,841-row file ready in 0.05 s, with row virtualisation.
+- 11 AI providers through one streaming client, no vendor SDKs.
+- 1,020 automated contrast checks, including text on translucent glass.
 
-## 🚀 Core Technical Features
+## Screenshots
 
-* **Offline-First Storage**: Utilizes IndexedDB (via Dexie) to locally store, version, and manage massive datasets without requiring a backend database.
-* **Custom AST Formula Parser**: A recursive-descent parser that evaluates Excel-style calculated fields and window functions on the fly.
-* **Unified Query & Pivot Engine**: A multidimensional framework-agnostic engine allowing users to group data by Rows, Columns, and Values with complex aggregations.
-* **AI Co-Pilot Integration**: Bring your own provider (OpenAI, Anthropic, Gemini, OpenRouter, Groq, Mistral, DeepSeek, Together, a local Ollama or LM Studio, or any OpenAI-compatible server), called directly from the browser, for natural language data querying, formulas and summaries.
-* **Enterprise UX**: Features a robust 14-step guided product tour (`react-joyride`), global command palette (`⌘K`), and strict Tailwind dark-mode constraints.
+|                                                                             |                                                                                 |                                                                                   |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| ![Data Explorer with the data-quality panel](docs/images/data-quality.webp) | ![Pivot table: average rating by category and app type](docs/images/pivot.webp) | ![Three KPI cards with sparklines, Light theme](docs/images/dashboard-light.webp) |
+| *Data-quality panel*                                                      | *Pivot table*                                                                 | *KPI cards*                                                                     |
 
----
+## Run locally
 
-## 💻 Tech Stack
+Requires Node 22.13+.
 
-* **Framework**: React 18, Vite
-* **Language**: Strict TypeScript
-* **State Management**: Zustand (with local storage persistence)
-* **Database / Local Persistence**: IndexedDB (Dexie.js)
-* **Styling & UI**: Tailwind CSS, shadcn/ui, Framer Motion, Lucide Icons
-* **DevOps & Quality**: GitHub Actions (CI/CD), Vitest (Unit Testing), Playwright (E2E), ESLint
-
----
-
-## 🧠 System Architecture
-
-DataVista bypasses traditional backend servers by utilizing a modular, engine-driven architecture completely housed within the client layer. 
-
-```mermaid
-graph TD
-    subgraph UI Layer [React 18 User Interface]
-        A[Dashboard & Charts]
-        B[Command Palette ⌘K]
-        C[Joyride Onboarding]
-    end
-
-    subgraph State Management [Zustand + Persist]
-        D[UI & Theme Store]
-        E[Workspace & History Store]
-    end
-
-    subgraph Analytical Engines [Core Processing]
-        F[AST Formula Parser]
-        G[Pivot Aggregation Engine]
-        H[Statistical Math Engine]
-    end
-
-    subgraph Data Persistence [Browser Storage]
-        I[(IndexedDB / Dexie.js)]
-        J[Local Storage]
-    end
-
-    subgraph External AI APIs
-        K[Hosted LLM APIs: OpenAI / Anthropic / Gemini / OpenRouter / ...]
-        L[Local LLM: Ollama / LM Studio]
-    end
-
-    %% Flow connections
-    A & B & C <--> D & E
-    E <--> F & G & H
-    F & G & H <--> I
-    D <--> J
-    E <--> K & L
+```sh
+git clone https://github.com/vardaanbazaz/datavista.git && cd datavista
+npm ci
+npm run dev        # http://localhost:8080
 ```
 
----
+**Tests:** `npm test` runs 1,746 unit tests (76 files); `npm run test:e2e` runs 80 e2e tests.
 
-## 📸 Platform Gallery
+## Tech stack
 
+React 18, TypeScript, Vite · Zustand · Dexie (IndexedDB) · D3 · Radix UI, Tailwind CSS · Vitest, Playwright · GitHub Actions and Pages.
 
-Screenshots follow your GitHub theme (Light or Dark); both are in [`docs/screenshots/`](docs/screenshots/).
+## Privacy
 
-| Overview Dashboard | Pivot Explorer |
-| :---: | :---: |
-| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dashboard-dark.png"><img alt="Overview dashboard" src="docs/screenshots/dashboard-light.png"></picture> <br> *Real-time metrics and executive summaries* | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/pivot-dark.png"><img alt="Pivot explorer" src="docs/screenshots/pivot-light.png"></picture> <br> *Multidimensional data aggregation* |
+Your files and every row stay in the browser (IndexedDB); without an AI provider nothing is sent anywhere.
+With the copilot, the default "Queries" level sends column names, summary stats and query results, never rows; personal-data columns are masked.
 
-| AI Co-Pilot | Advanced Charting |
-| :---: | :---: |
-| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/ai-dark.png"><img alt="AI Co-Pilot settings" src="docs/screenshots/ai-light.png"></picture> <br> *Natural language queries via Gemini/GPT-4o* | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/charts-dark.png"><img alt="Grouped bar chart" src="docs/screenshots/charts-light.png"></picture> <br> *Over 8 interactive visualization types* |
+## Links
 
----
-
-## 📖 How to Use DataVista
-
-Follow these simple steps to explore and analyze your datasets with DataVista:
-
-1. **Importing Datasets**: 
-   - Click on **Upload Data** in the left sidebar or drag & drop CSV, TSV, or XLSX files (up to 100MB).
-   - Alternatively, click **Try with Sample Data ✨** on the Overview Dashboard for an instant demo.
-2. **Filtering & Narrowing Data**:
-   - Go to **Filters** to construct multi-layered conditions (equals, contains, numeric range) and watch dataset counts update dynamically.
-3. **Exploring Raw Data & Calculated Columns**:
-   - Open **Data Explorer** to inspect records, apply conditional formatting, and write AST formula expressions.
-   - Columns DataVista isn't confident about get a **Might be categorical** prompt — override the inferred type (numeric/categorical) with one click, or clear the override to revert to auto-detection.
-4. **Building Visualizations & Charts**:
-   - Navigate to **Charts** to create over 8 interactive visualization types (Bar, Line, Scatter, Pie, Heatmap, Area, Histogram, Bubble) with conditional formatting rules.
-5. **Building Custom Dashboards**:
-   - Open **Dashboards** to arrange multiple charts into a custom grid layout, save it as a reusable template, capture point-in-time snapshots, and drill through data points across the whole dashboard with a shared filter bar.
-6. **Multidimensional Pivot Analysis**:
-   - Select **Pivot Table** to aggregate fields across Rows, Columns, and Values with automated totals.
-7. **Statistical Summaries & Outliers**:
-   - Open **Statistics** to calculate mean, median, variance, standard deviation, correlation matrices, and IQR/Z-score outlier detection.
-8. **Window Functions & Rankings**:
-   - Use **Window Functions** to run rolling calculations, moving averages, cumulative sums, and row rankings (`ROW_NUMBER`, `RANK`, `DENSE_RANK`).
-9. **AI Co-Pilot Assistance**:
-   - Open **AI settings** (the gear in the command palette, or any "Connect a provider" card) to pick a provider, paste a key, choose a model ("Load models"), and "Test connection". Choose what requests may include (Schema, Summaries or Sample rows) and preview the exact request. A status banner shows whether AI is connected or running offline.
-   - Natural-language queries are staged as a **preview** first; review the proposed filter/result before applying it or discarding it.
-10. **Exporting Data & Reports**:
-    - Visit **Export** to download processed datasets as CSVs, export individual charts as PNG or SVG images, or generate a full PDF report.
-11. **Command Palette & Guided Tour**:
-    - Press `Cmd+K` (or `Ctrl+K`) anytime to open the Global Search / Command Palette.
-    - Click the `?` icon in the top header to restart the **14-step interactive guided tutorial**.
-
----
-
-## 🛠️ Local Development
-
-### Prerequisites
-* **Node.js**: 24 LTS (`.nvmrc`, used by CI); 22.13 or later also works
-* **npm**: v9.x or higher
-
-### Steps to Run Locally
-
-```bash
-# Clone the repository
-git clone https://github.com/vardaanbazaz/datavista.git
-
-# Navigate into the directory
-cd datavista
-
-# Install dependencies
-npm install
-
-# Start the Vite development server
-npm run dev
-```
-
-Open `http://localhost:8080` in your browser to start using DataVista locally.
-
-### Other Available Scripts
-```bash
-# Run unit test suite
-npm run test
-
-# Run TypeScript type check
-npm run typecheck
-
-# Build production bundle
-npm run build
-```
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+- [Architecture and design notes](docs/ARCHITECTURE.md)
+- [Design decisions log](decisions.md)
+- [Licence (MIT)](LICENSE)
+- [Dataset credits](docs/ARCHITECTURE.md#dataset-credits)

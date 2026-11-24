@@ -5,3 +5,5 @@ test-results/
 playwright-report/
 test-data-local/
 bench-results/
+# Review screenshots written by scripts/design and scripts/brand/logo-options.ts (archived outside the repo)
+docs/design/
