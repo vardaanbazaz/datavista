@@ -1,5 +1,5 @@
 // Regression coverage for the item-6 fix (comprehensive audit 2026-09-14, confirmed root
-// cause in docs/INVESTIGATION-item3-window-pivot-zeroing-2026-09-14.md): addCalculatedField/
+// cause in datavista-notes/docs/INVESTIGATION-item3-window-pivot-zeroing-2026-09-14.md): addCalculatedField/
 // deleteCalculatedField/addWindowQuery/deleteWindowQuery wrote the raw, unevaluated dataset
 // into datasets[] while only activeDataset got the evaluated copy — a one-word copy-paste
 // bug repeated across all four actions. Anything that later re-selected activeDataset from

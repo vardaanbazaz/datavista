@@ -4,7 +4,8 @@ import { Dataset } from "@/shared/types";
 // A dataset shaped exactly like the pre-item-6-fix persisted case: windowQueries defined,
 // but the data rows never got the materialized "running_total" column (either because it
 // was saved before this fix, or via some other bypass) — the raw shape mechanism A in
-// docs/INVESTIGATION-item3-window-pivot-zeroing-2026-09-14.md describes.
+// datavista-notes/docs/INVESTIGATION-item3-window-pivot-zeroing-2026-09-14.md (archived outside
+// the repo) describes.
 const staleDataset: Dataset = {
   id: "ds1",
   name: "employees",

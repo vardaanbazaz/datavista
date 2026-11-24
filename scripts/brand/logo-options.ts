@@ -3,7 +3,8 @@
  * full colour and single colour, on the Light, Clay and Dark backgrounds. Rendered with
  * Playwright's Chromium at device scale 1 (16 px is drawn at its real pixel size, then the
  * sheet is shown at 1x so small sizes are judged as they really look).
- * Run: `npx vite-node scripts/brand/logo-options.ts` → docs/design/batch7-b/logo-options.png.
+ * Run: `npx vite-node scripts/brand/logo-options.ts` → docs/design/batch7-b/logo-options.png
+ * (git-ignored; the reviewed sheets are archived outside the repo in datavista-notes/docs/design/).
  */
 import { mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";

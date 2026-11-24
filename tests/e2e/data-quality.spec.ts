@@ -78,6 +78,11 @@ test("currency: Price converts from $ on import, with a badge and undo; duplicat
   await expect(numericStat(page, "Price", "Count")).toHaveText("79");
   await expect(numericStat(page, "Price", "Average")).toHaveText("20.9");
   await expect(numericStat(page, "Price", "Max")).toHaveText("400");
+  // Per-item columns (isPerItemName) show no Sum: adding up prices or ratings means nothing.
+  await expect(numericStat(page, "Price", "Sum")).toContainText("—");
+  await expect(numericStat(page, "Price", "Sum")).toContainText("no sum: each value is a per-item level");
+  await expect(numericStat(page, "Rating", "Sum")).toContainText("—");
+  await expect(numericStat(page, "Reviews", "Sum")).not.toContainText("—");
   const badge = page.getByTestId("fix-badge-Price");
   await expect(badge).toHaveText("$ · undo");
   await expect(badge).toHaveAttribute("aria-label", /converted from \$/);

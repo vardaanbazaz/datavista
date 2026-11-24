@@ -29,8 +29,8 @@ Small subsets of public messy datasets, used by
 plus the listed data rows, copied byte-for-byte (original quoting, embedded newlines and
 line endings kept; `.gitattributes` marks them `-text` so Git never rewrites CRLF). Row
 numbers are **1-based data rows** (header excluded). The row lists come from the
-2026-10-28 messy-data audit (`docs/AUDIT-MESSY-DATA-2026-10-28.md`, section C), which says
-what each row covers.
+2026-10-28 messy-data audit (`AUDIT-MESSY-DATA-2026-10-28.md`, section C; kept in the
+maintainer's notes outside this repo), which says what each row covers.
 
 | File | Source | Licence | Rows |
 |---|---|---|---|

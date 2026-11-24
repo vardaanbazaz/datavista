@@ -2,6 +2,12 @@
   "name": "datavista",
   "private": true,
   "version": "1.0.0",
+  "description": "Browser-only analytics app: import CSV/XLSX, clean, explore, pivot and chart your data, with an optional AI copilot whose queries run in the browser.",
+  "homepage": "https://vardaanbazaz.github.io/datavista/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vardaanbazaz/datavista.git"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",

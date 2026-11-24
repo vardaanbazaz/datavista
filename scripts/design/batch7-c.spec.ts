@@ -8,7 +8,7 @@ import { THEME_BY_ID } from "../../src/shared/theme/themes";
  * sheet picker, the Play Store import summary, and Overview with googleplaystore.csv in Light
  * and Dusk. The XLSX and Play Store shots need the local files in test-data-local/ (not in Git;
  * skipped without them). `npx playwright test --config scripts/design/playwright.design.config.ts batch7-c`
- * (dev server on :8080). Writes docs/design/batch7-c/*.png.
+ * (dev server on :8080). Writes docs/design/batch7-c/*.png (git-ignored).
  */
 
 const OUT = process.env.DESIGN_OUT || "docs/design/batch7-c";

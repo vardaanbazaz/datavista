@@ -23,7 +23,7 @@ choice is non-standard that is called out, not hidden):
 * Pearson r: pairwise complete observations, population/sample choice cancels out.
 * Window functions (PARTITION BY Department ORDER BY MonthlyIncome DESC):
   - ROW_NUMBER: ties broken by original CSV row order. The app's sort is stable; that rule
-    is recorded only in docs/INVESTIGATION-item3-window-pivot-zeroing-2026-09-14.md, not in
+    is recorded only in datavista-notes/docs/INVESTIGATION-item3-window-pivot-zeroing-2026-09-14.md, not in
     user-facing docs, so it is pinned here explicitly.
   - RANK: SQL RANK (gaps after ties) == pandas rank(method="min").
   - DENSE_RANK: SQL DENSE_RANK == pandas rank(method="dense").
