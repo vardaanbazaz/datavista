@@ -3,6 +3,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import type { NumericProfile } from "@/shared/services/stats/columnProfile";
 import { constantText, roleLabel } from "@/shared/services/stats/columnProfile";
 import { cn } from "@/shared/lib/utils";
+import { isPerItemName } from "@/shared/utils/columnRoles";
 
 type SortKey = "column" | "count" | "mean" | "min" | "max" | "sum" | "missing" | "invalid";
 
@@ -25,14 +26,16 @@ function sortValue(p: NumericProfile, key: SortKey): number | string {
   if (key === "missing" || key === "invalid" || key === "count") return p[key];
   if (p.role === "constant") return Number.NaN;
   if ((p.role === "id" || p.role === "year") && (key === "mean" || key === "sum")) return Number.NaN;
+  if (key === "sum" && isPerItemName(p.column)) return Number.NaN;
   return p[key];
 }
 
 /**
  * Overview table of numeric columns: one row per column, tabular figures, sortable headers,
  * sticky header inside a bounded scroll area. ID/year columns show count, min and
- * max with "—" for average and sum (with their distinct count next to the name); constant
- * columns collapse to one line. Column names are shown exactly as in the data.
+ * max with "—" for average and sum (with their distinct count next to the name); per-item
+ * columns (isPerItemName: Rating, Price, Age…) show "—" for sum, since adding them up means
+ * nothing; constant columns collapse to one line. Column names are shown exactly as in the data.
  */
 export function NumericSummaryTable({ profiles }: { profiles: NumericProfile[] }) {
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" } | null>(null);
@@ -99,6 +102,7 @@ export function NumericSummaryTable({ profiles }: { profiles: NumericProfile[] }
           {sorted.map((p) => {
             const tag = roleLabel(p.role, p.constantIn);
             const labelsOnly = p.role === "id" || p.role === "year";
+            const perItem = !labelsOnly && isPerItemName(p.column);
             return (
               <tr key={p.column} className="border-b border-border last:border-b-0 hover:bg-accent/50" data-testid={`numeric-row-${p.column}`}>
                 <th scope="row" className="max-w-[16rem] px-3 py-1.5 text-left font-medium">
@@ -123,7 +127,7 @@ export function NumericSummaryTable({ profiles }: { profiles: NumericProfile[] }
                     <td className="px-3 py-1.5 text-right tabular-nums">{labelsOnly ? <Hidden why="average" /> : fmt(p.mean)}</td>
                     <td className="px-3 py-1.5 text-right tabular-nums">{fmt(p.min)}</td>
                     <td className="px-3 py-1.5 text-right tabular-nums">{fmt(p.max)}</td>
-                    <td className="px-3 py-1.5 text-right tabular-nums">{labelsOnly ? <Hidden why="sum" /> : fmt(p.sum)}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums">{labelsOnly ? <Hidden why="sum" /> : perItem ? <Hidden why="sum" reason="each value is a per-item level" /> : fmt(p.sum)}</td>
                   </>
                 )}
                 <td className="px-3 py-1.5 text-right tabular-nums">{p.missing.toLocaleString()}</td>
@@ -137,11 +141,11 @@ export function NumericSummaryTable({ profiles }: { profiles: NumericProfile[] }
   );
 }
 
-function Hidden({ why }: { why: string }) {
+function Hidden({ why, reason = "the values are labels" }: { why: string; reason?: string }) {
   return (
     <span className="text-muted-foreground">
       <span aria-hidden>—</span>
-      <span className="sr-only">no {why}: the values are labels</span>
+      <span className="sr-only">no {why}: {reason}</span>
     </span>
   );
 }

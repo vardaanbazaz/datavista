@@ -1,5 +1,5 @@
 /**
- * Batch 7 phase B logo options (docs/design/batch7-b/logo-options.png). Option 1 (`facet-bars`)
+ * Batch 7 phase B logo options (sheet drawn by scripts/brand/logo-options.ts). Option 1 (`facet-bars`)
  * is the final mark (logoGeometry.ts ACTIVE_LOGO); options 2 and 3 were not chosen and are kept
  * only so the options sheet can be redrawn. Each variant is a list
  * of flat polygons on a 32x32 grid, in two levels of detail: "full" (24px and up) and "small"

@@ -7,7 +7,7 @@ import { THEME_BY_ID } from "../../src/shared/theme/themes";
  * Charts, the Upload view (glass panel) in Light, Clay and Midnight, Data Explorer, Pivot and
  * Statistics in Light and Dark, and Overview at 390px. The logo sheet is
  * scripts/brand/logo-options.ts. `npx playwright test --config scripts/design/playwright.design.config.ts batch7-b`
- * (dev server on :8080). Writes docs/design/batch7-b/*.png.
+ * (dev server on :8080). Writes docs/design/batch7-b/*.png (git-ignored).
  */
 
 const OUT = process.env.DESIGN_OUT || "docs/design/batch7-b";
