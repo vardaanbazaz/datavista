@@ -4,9 +4,7 @@ import { Dataset, ColumnMetadata } from "@/shared/types";
  * Heuristic for "this numeric column looks like it might actually be an ordinal
  * or category code" (Likert scales, boolean 0/1 codes, small fixed-range integer
  * codes) rather than a genuine continuous measure. Deliberately conservative —
- * see the 2026-09-17 numeric/categorical override design spec, Part 1, for the validation
- * table these thresholds were checked against (archived outside the repo in
- * datavista-notes/docs/superpowers/specs/2026-09-17-numeric-categorical-override-design.md).
+ * thresholds were validated against a table in design notes kept outside this repo.
  */
 export function mightBeCategorical(columnMeta: ColumnMetadata): boolean {
   if (columnMeta.inferredDataType !== 'numeric') return false;
