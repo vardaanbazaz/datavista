@@ -4,25 +4,23 @@
 Accepted
 
 ## Context
-DataVista requires the capability to import, filter, aggregate, and visualize high-cardinality datasets (such as CSVs, TSVs, and Excel spreadsheets up to 100MB / tens of thousands of rows) in real-time. Traditional web architectures rely on server-side databases (PostgreSQL, BigQuery, Elasticsearch) to parse and process data. However:
-- Hosting and scaling server-side data processing infrastructure incurs continuous cloud infrastructure costs.
-- Network round-trips for data filtering, sorting, and drill-downs introduce latency and depend on active internet connectivity.
-- Transferring unencrypted user datasets to cloud backends poses data privacy and compliance risks.
+DataVista imports, filters, aggregates, and visualizes CSV, TSV, and Excel files (import cap: 100 MB, `src/features/upload/lib/importLimits.ts`).
+
+Why: not recorded. (The earlier cost, latency, and privacy reasons have no support in the code or git history.)
 
 ## Decision
-We adopted a **Zero-Backend, Offline-First Architecture** executing entirely within the client's web browser environment:
-1. **Client-Side Persistence**: Utilized Dexie.js over IndexedDB for persistent, structured storage of datasets, saved dashboards, custom color palettes, and global configuration.
-2. **In-Memory Query Engine**: Executed all data parsing (Papa Parse, SheetJS), filtering, aggregations, statistical summaries, and window functions locally via TypeScript calculation engines.
-3. **Offline Capability**: Hosted static application assets via GitHub Pages with no active API server requirements.
+We adopted a **Zero-Backend Architecture**: data parsing, storage, and queries run in the client's web browser. (The "offline-first" in the title is not backed by code: there is no service worker or web app manifest.)
+1. **Client-Side Persistence**: Dexie.js over IndexedDB stores datasets, their row chunks, removed rows, charts, filters, dashboards, and UI state (`src/shared/lib/db.ts`). UI preferences (including theme), AI settings, templates, saved views, and snapshots are in localStorage.
+2. **In-Memory Query Engine**: Data parsing (Papa Parse, SheetJS, in a web worker), filtering, aggregations, statistical summaries, and window functions run locally in TypeScript engines.
+3. **Static hosting**: Static assets are deployed to GitHub Pages (`.github/workflows/deploy.yml`); no API server. The optional AI copilot calls a provider the user chooses.
 
 ## Consequences
 
 ### Positive
-- **Zero Operating Costs**: Eliminates cloud server, database, and backend maintenance expenses.
-- **Sub-Millisecond Interactivity**: Local data manipulation eliminates network latency for instantaneous UI feedback during filtering, sorting, and cross-filtering.
-- **Privacy & Security**: User datasets never leave the browser local storage environment.
-- **Full Offline Functionality**: Users can run analytics without an internet connection.
+- **No backend to run**: no server or database to host or maintain.
+- **No network round-trip**: filtering, sorting, and cross-filtering run locally. No timing is measured or recorded for this.
+- **Privacy**: files and rows stay in the browser (IndexedDB). With the optional AI copilot, the default "Queries" level sends column names, summary stats, and query results, never rows (README).
 
 ### Negative
-- **Browser Memory Boundaries**: Maximum dataset size is bound by client device RAM and browser storage quotas (mitigated via virtualized tables and streaming row chunking).
-- **CPU Constraints**: Heavy analytical computations rely on client CPU single-thread capacity.
+- **Browser Memory Boundaries**: Maximum dataset size is bound by client device RAM and browser storage quotas (the table is virtualized and rows are stored in IndexedDB in chunks).
+- **CPU Constraints**: Queries run on the main thread. Only file import and column metadata run in web workers.

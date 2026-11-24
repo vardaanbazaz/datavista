@@ -57,5 +57,5 @@ With the copilot, the default "Queries" level sends column names, summary stats 
 
 - [Architecture and design notes](docs/ARCHITECTURE.md)
 - [Design decisions log](decisions.md)
-- [Licence (MIT)](LICENSE)
+- [Licence](LICENSE): code is MIT. Test fixtures keep their original licences, see [tests/fixtures/README.md](tests/fixtures/README.md).
 - [Dataset credits](docs/ARCHITECTURE.md#dataset-credits)
