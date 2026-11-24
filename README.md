@@ -19,10 +19,10 @@ Browser-only analytics: import a CSV or Excel file, clean it, explore it, pivot 
 
 ## Highlights
 
-- 525,461-row Excel file imports in a Web Worker without freezing the tab.
+- 525,461-row Excel file imports in a Web Worker without freezing the tab (36 s total, longest main-thread block under 1 s; [method](docs/ARCHITECTURE.md)).
 - Aggregations checked against pandas on 5 public datasets.
-- Pivot on a 10,841-row file ready in 0.05 s, with row virtualisation.
-- 11 AI providers through one streaming client, no vendor SDKs.
+- Pivot on a 10,841-row file ready in 0.05 s on my laptop, with row virtualisation.
+- 11 AI providers through one streaming client, no vendor SDKs (tested live with Gemini).
 - 1,020 automated contrast checks, including text on translucent glass.
 
 ## Screenshots
