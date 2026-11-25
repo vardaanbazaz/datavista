@@ -6,7 +6,7 @@ Browser-only analytics: import a CSV or Excel file, clean it, explore it, pivot 
 
 [![CI](https://github.com/vardaanbazaz/datavista/actions/workflows/deploy.yml/badge.svg?branch=main)](https://github.com/vardaanbazaz/datavista/actions/workflows/deploy.yml)
 
-![Overview of a Play Store dataset: KPI tiles, automated insights and the numeric-columns table, Dark theme](docs/images/overview.webp)
+![Overview of a Play Store dataset: KPI tiles, automated insights and the numeric-columns table, Taupe theme](docs/images/overview.webp)
 
 ## Features
 
@@ -29,7 +29,7 @@ Browser-only analytics: import a CSV or Excel file, clean it, explore it, pivot 
 
 |                                                                             |                                                                                 |                                                                                   |
 | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| ![Data Explorer with the data-quality panel](docs/images/data-quality.webp) | ![Pivot table: average rating by category and app type](docs/images/pivot.webp) | ![Three KPI cards with sparklines, Light theme](docs/images/dashboard-light.webp) |
+| ![Data Explorer with the data-quality panel](docs/images/data-quality.webp) | ![Pivot table: average rating by category and app type](docs/images/pivot.webp) | ![Three KPI cards with sparklines, Taupe theme](docs/images/dashboard-light.webp) |
 | *Data-quality panel*                                                      | *Pivot table*                                                                 | *KPI cards*                                                                     |
 
 ## Run locally

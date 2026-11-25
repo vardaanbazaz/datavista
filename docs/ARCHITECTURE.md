@@ -79,7 +79,7 @@ npm run build && npx playwright test --config playwright.prod.config.ts   # prod
 
 The golden files are committed, so Python is only needed to regenerate them (`npm run golden:regen`, see [tests/fixtures/README.md](../tests/fixtures/README.md)).
 
-README screenshots: `npm run build`, then `npx playwright test --config scripts/design/playwright.portfolio.config.ts` and `scripts/design/to-webp.sh` (writes `docs/images/*.webp`).
+README screenshots: `npx vite-node scripts/screenshots/capture.ts` (builds, serves the production build, captures in the Taupe theme with Transparency off and reduced motion, writes `docs/images/*.webp`; `--skip-build` reuses `dist/`).
 
 ## Project structure
 
