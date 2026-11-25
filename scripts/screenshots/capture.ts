@@ -18,7 +18,9 @@
  * - dashboard-light  Overview dashboard widgets, three KPI cards (Play Store fixture), main column
  *                    from the Dashboard Filters bar to below the cards
  *
- * The AI copilot is not captured: it needs a real provider and API key.
+ * The AI copilot is not captured: it needs a real provider and API key. Its floating round
+ * button (CopilotHost.tsx, `data-testid="copilot-fab"`) is hidden by a style injected into the
+ * page before each shot, so it cannot cover content; the app's own CSS is unchanged.
  * The aurora ribbon (AuroraRibbon.tsx) still shows: no Effects setting turns it off.
  */
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
@@ -114,9 +116,13 @@ async function importFile(page: Page, file: string) {
   await page.getByTestId("numeric-summary").waitFor({ timeout: 60_000 });
 }
 
+// Injected into the page before each shot (this script only, not the app): toasts (sonner and
+// Radix) and the floating Co-Pilot button would otherwise cover parts of the views.
+const HIDE_OVERLAYS =
+  '[aria-label^="Notifications"], [data-sonner-toaster], [data-testid="copilot-fab"] { display: none !important; }';
+
 async function settle(page: Page) {
-  // Toasts (sonner and Radix) are hidden so they don't cover the views.
-  await page.addStyleTag({ content: '[aria-label^="Notifications"], [data-sonner-toaster] { display: none !important; }' });
+  await page.addStyleTag({ content: HIDE_OVERLAYS });
   // Pointer to the bottom-right corner: no hover state, and any open tooltip closes.
   await page.mouse.move(VIEWPORT.width - 2, VIEWPORT.height - 2);
   await page.evaluate(() => document.fonts.ready);
@@ -129,6 +135,7 @@ async function settle(page: Page) {
 }
 
 async function shoot(page: Page, name: string, clip?: { x: number; y: number; width: number; height: number }) {
+  if (await page.getByTestId("copilot-fab").isVisible()) throw new Error(`Co-Pilot button still visible before ${name}`);
   const png = join(PNG_DIR, `${name}.png`);
   await page.screenshot({ path: png, type: "png", animations: "disabled", caret: "hide", scale: "device", clip });
   const webp = join(OUT, `${name}.webp`);
@@ -188,8 +195,7 @@ async function dashboardKpis(browser: Browser) {
   await addKpi(page, "Price"); // Average Price
   // Scrolling the heading to the top hits the end of the page, and the categorical table's
   // tail still sits above the Dashboard Filters bar. Clip to the main column from just above
-  // that bar to below the cards, so no cut-off table, half sidebar or floating Co-Pilot button
-  // shows.
+  // that bar to below the cards, so no cut-off table or half sidebar shows.
   await page.getByText(/^Dashboard Widgets/).evaluate((el) => el.scrollIntoView({ block: "start" }));
   await settle(page);
   const filters = await page.getByText(/^Dashboard Filters/).boundingBox();

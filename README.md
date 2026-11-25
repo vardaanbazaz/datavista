@@ -27,10 +27,14 @@ Browser-only analytics: import a CSV or Excel file, clean it, explore it, pivot 
 
 ## Screenshots
 
-|                                                                             |                                                                                 |                                                                                   |
-| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| ![Data Explorer with the data-quality panel](docs/images/data-quality.webp) | ![Pivot table: average rating by category and app type](docs/images/pivot.webp) | ![Three KPI cards with sparklines, Taupe theme](docs/images/dashboard-light.webp) |
-| *Data-quality panel*                                                      | *Pivot table*                                                                 | *KPI cards*                                                                     |
+|                                                                             |                                                                                 |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| ![Data Explorer with the data-quality panel](docs/images/data-quality.webp) | ![Pivot table: average rating by category and app type](docs/images/pivot.webp) |
+| *Data-quality panel*                                                        | *Pivot table*                                                                   |
+
+![Three KPI cards with sparklines, Taupe theme](docs/images/dashboard-light.webp)
+
+*KPI cards*
 
 ## Run locally
 
