@@ -4,8 +4,8 @@
 
 - **Source:** IBM HR Analytics Employee Attrition sample dataset, via
   https://www.kaggle.com/datasets/pavansubhasht/ibm-hr-analytics-attrition-dataset
-- **Licence:** Open Data Commons Database Contents License (DbCL) v1.0,
-  http://opendatacommons.org/licenses/dbcl/1.0/
+- **Licence:** Database: Open Database License (ODbL) 1.0; Contents: Database Contents License (DbCL) 1.0.
+  ODbL: https://opendatacommons.org/licenses/odbl/1-0/ ; DbCL: http://opendatacommons.org/licenses/dbcl/1.0/
 - **Use:** only as a test fixture for the golden numeric tests.
 
 ## hr-attrition.golden.json
