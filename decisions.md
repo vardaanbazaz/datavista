@@ -2,6 +2,13 @@
 
 Newest first. Entries marked `Source: inferred` were reconstructed from existing code; their "Why" is a guess and should be corrected by the author.
 
+### 2026-11-25 — Co-Pilot button hidden in README screenshots; KPI image on its own row
+- **Decision:** `scripts/screenshots/capture.ts` injects `[data-testid="copilot-fab"] { display: none !important; }` (with the toast rule) via `page.addStyleTag` before each shot and fails if the button is still visible; README shows data-quality and pivot as a two-column table and the KPI-cards image full width below it.
+- **Why:** User request: the floating button must not cover content, and three images in one row were too small.
+- **Alternatives considered:** Hiding the button in app CSS or behind a flag (rejected: no app source edits for a screenshot-only concern).
+- **Tradeoff accepted:** The screenshots no longer show the Co-Pilot button at all.
+- **Source:** `made-now`
+
 ### 2026-11-25 — README screenshots retaken in Taupe with Effects off, by a standalone script
 - **Decision:** `scripts/screenshots/capture.ts` (run with `npx vite-node`) builds, serves `dist/` with `vite preview` on :4173, seeds `datavista-ui-storage` v4 before boot (theme `taupe`, Transparency off, Motion "Reduce motion"), and overwrites the four existing `docs/images/*.webp` with the same names (PNG at 1440×900 ×2, then ImageMagick WebP quality 82). Same views and fixtures as `scripts/design/portfolio.spec.ts`: Data Explorer's data-quality shot keeps the messy Play Store fixture; the KPI shot is clipped to the main column from the Dashboard Filters bar to below the three cards (scrolling cannot move the categorical table's tail out of view). No Charts or copilot image: nothing references one.
 - **Why:** User request: screenshots that match the portfolio's wabi-sabi look. File names unchanged so the README needs no edit.
