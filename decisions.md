@@ -1047,7 +1047,7 @@ Newest first. Entries marked `Source: inferred` were reconstructed from existing
 
 ### Vite + React 18 + TypeScript SPA, deployed to GitHub Pages under `/datavista/`
 - **Decision:** Client-only SPA built with Vite (`@vitejs/plugin-react-swc`), `base` from `VITE_BASE_PATH` defaulting to `/datavista/`, deployed by `.github/workflows/deploy.yml`.
-- **Why:** Likely: free static hosting with no backend needed for an offline-first tool.
+- **Why:** Likely: free static hosting with no backend needed for a browser-only tool.
 - **Alternatives considered:** Unknown.
 - **Tradeoff accepted:** No server-side logic; all data processing and API calls happen in the browser.
 - **Source:** `inferred`
@@ -1060,7 +1060,7 @@ Newest first. Entries marked `Source: inferred` were reconstructed from existing
 - **Tradeoff accepted:** User-supplied API key sits in localStorage in plaintext.
 - **Source:** `inferred`
 
-### IndexedDB via Dexie for offline-first persistence
+### IndexedDB via Dexie for local persistence
 - **Decision:** `src/shared/lib/db.ts` defines a Dexie database; `src/shared/services/persistenceService.ts` hydrates stores from it on startup and writes back on store changes.
 - **Why:** Likely: datasets are too large for localStorage, and the app is meant to work offline without a backend.
 - **Alternatives considered:** localStorage only; a remote DB.

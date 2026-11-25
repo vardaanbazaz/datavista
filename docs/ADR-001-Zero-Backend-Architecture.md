@@ -1,4 +1,4 @@
-# ADR-001: Zero-Backend Offline-First Architecture
+# ADR-001: Zero-Backend Architecture
 
 ## Status
 Accepted
@@ -9,7 +9,7 @@ DataVista imports, filters, aggregates, and visualizes CSV, TSV, and Excel files
 Why: not recorded. (The earlier cost, latency, and privacy reasons have no support in the code or git history.)
 
 ## Decision
-We adopted a **Zero-Backend Architecture**: data parsing, storage, and queries run in the client's web browser. (The "offline-first" in the title is not backed by code: there is no service worker or web app manifest.)
+We adopted a **Zero-Backend Architecture**: data parsing, storage, and queries run in the client's web browser. (There is no service worker or web app manifest, so the app is not offline-capable.)
 1. **Client-Side Persistence**: Dexie.js over IndexedDB stores datasets, their row chunks, removed rows, charts, filters, dashboards, and UI state (`src/shared/lib/db.ts`). UI preferences (including theme), AI settings, templates, saved views, and snapshots are in localStorage.
 2. **In-Memory Query Engine**: Data parsing (Papa Parse, SheetJS, in a web worker), filtering, aggregations, statistical summaries, and window functions run locally in TypeScript engines.
 3. **Static hosting**: Static assets are deployed to GitHub Pages (`.github/workflows/deploy.yml`); no API server. The optional AI copilot calls a provider the user chooses.

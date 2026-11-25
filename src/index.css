@@ -2,7 +2,7 @@
 @import "./shared/theme/themes.generated.css";
 
 /*
- * Fonts: bundled woff2 only (offline-first: no CDN). Our own @font-face rules instead of the
+ * Fonts: bundled woff2 only (no CDN). Our own @font-face rules instead of the
  * @fontsource CSS, which also emit .woff files and every subset.
  * - Inter (variable, wght 100-900): all UI and data text. One latin file (~47 KB) covers every
  *   weight we use; tabular figures (`tnum`) line numbers up in tables and KPI tiles.
